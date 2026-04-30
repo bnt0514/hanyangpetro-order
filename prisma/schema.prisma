@@ -1,0 +1,517 @@
+// Hanyang Petrochemical e-Business OS - Database Schema
+// See docs/03-data-model.md for full description.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// Enums
+// ============================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// ============================================================
+// Users (internal employees)
+// ============================================================
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String?  @unique
+  loginId      String?  @unique
+  passwordHash String?
+  phone        String?
+  role         String
+  isActive     Boolean  @default(true)
+  backupUserId String?
+  backupUser   User?    @relation("UserBackup", fields: [backupUserId], references: [id])
+  backedUpBy   User[]   @relation("UserBackup")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // relations
+  customersAsDefaultRep Customer[]           @relation("CustomerDefaultRep")
+  ordersAsRequester     Order[]              @relation("OrderRequestedBy")
+  ordersAsSalesRep      Order[]              @relation("OrderSalesRep")
+  statusChanges         OrderStatusHistory[]
+  holdRemindersTarget   HoldReminder[]       @relation("HoldReminderTarget")
+  holdRemindersCreated  HoldReminder[]       @relation("HoldReminderCreator")
+  approvedBatches       ErpInputBatch[]
+  receiptsConfirmed     DeliveryReceipt[]    @relation("ReceiptConfirmedByEmployee")
+}
+
+// ============================================================
+// Customers & Delivery Addresses
+// ============================================================
+
+model Customer {
+  id                String   @id @default(cuid())
+  customerCode      String   @unique
+  companyName       String
+  businessNumber    String?
+  defaultSalesRepId String?
+  defaultSalesRep   User?    @relation("CustomerDefaultRep", fields: [defaultSalesRepId], references: [id])
+  creditLimit       Float  @default(0)
+  paymentTerms      String?
+  receivableAmount  Float  @default(0)
+  isActive          Boolean  @default(true)
+  memo              String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  addresses         DeliveryAddress[]
+  orderableProducts CustomerProductWhitelist[]
+  customerUsers     CustomerUser[]
+  orders            Order[]
+
+  @@index([companyName])
+}
+
+/// ??Í±∞ÎûòÏ≤òÎäî ?ÔøΩÎü¨ ?ÔøΩÏ∞©ÏßÄÔøΩ?Í∞ÄÔøΩ????ÔøΩÎã§.
+/// ?ÔøΩÏ∞©ÏßÄÔøΩ??ÔøΩÎ†•?ÔøΩÎèÑ Í±∞ÎûòÏ≤òÔøΩ? ??ÔøΩÔøΩ?ÔøΩÌï† ???ÔøΩÎèÑÔøΩ?addressLine1 ?ÔøΩÎç±???ÔøΩÏö©.
+model DeliveryAddress {
+  id           String   @id @default(cuid())
+  customerId   String
+  customer     Customer @relation(fields: [customerId], references: [id])
+  label        String // ?? "Î≥∏ÏÇ¨ Ï∞ΩÍ≥†", "?ÔøΩÌôî 1Í≥µÏû•", "Í≥†Í∞ù ÏßÅÎÇ©"
+  addressLine1 String
+  addressLine2 String?
+  postalCode   String?
+  contactName  String?
+  contactPhone String?
+  isDefault    Boolean  @default(false)
+  isActive     Boolean  @default(true)
+  memo         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  orders Order[]
+
+  @@index([customerId])
+  @@index([addressLine1])
+}
+
+// ============================================================
+// Products & per-customer whitelist
+// ============================================================
+
+model Product {
+  id                String    @id @default(cuid())
+  productCode       String    @unique
+  productName       String
+  manufacturer      String?
+  grade             String?
+  packagingType     String? // ?? 25kg PP bag, 1???ÔøΩÎ∞±, Î≤åÌÅ¨ ??
+  category          String? // EVA / HDPE / LDPE / LLDPE / mLLDPE / Í∏∞ÔøΩ?
+  ecountItemCode    String?
+  click2002ItemCode String?
+  defaultSupplierId String?
+  defaultSupplier   Supplier? @relation(fields: [defaultSupplierId], references: [id])
+  isActive          Boolean   @default(true)
+  memo              String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  customerWhitelists CustomerProductWhitelist[]
+  orderItems         OrderItem[]
+}
+
+/// Í±∞ÎûòÔøΩ??ÔøΩÌÑ∏ Ï£ºÎ¨∏ ???ÔøΩÏ∂ú???ÔøΩÌíà ?ÔøΩÏù¥?ÔøΩÎ¶¨?ÔøΩÌä∏.
+/// Í≥ºÍ±∞ Ï∂úÍ≥† ?ÔøΩÎ†•???ÔøΩÎäî ?ÔøΩÌíàÔøΩ??ÔøΩÎèô ?ÔøΩÎ°ù?ÔøΩÎ©∞, ?ÔøΩÏóÖ???ÔøΩÎèô Ï∂îÔøΩ?/?ÔøΩÍ±∞ Í∞Ä??
+model CustomerProductWhitelist {
+  id                String    @id @default(cuid())
+  customerId        String
+  productId         String
+  customer          Customer  @relation(fields: [customerId], references: [id])
+  product           Product   @relation(fields: [productId], references: [id])
+  firstOrderedAt    DateTime?
+  lastOrderedAt     DateTime?
+  totalOrderCount   Int       @default(0)
+  isVisibleInPortal Boolean   @default(true)
+  memo              String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([customerId, productId])
+  @@index([customerId])
+}
+
+// ============================================================
+// Suppliers
+// ============================================================
+
+model Supplier {
+  id            String       @id @default(cuid())
+  supplierName  String
+  supplierType  String  @default("DOMESTIC_OTHER")
+  contactPerson String?
+  phone         String?
+  email         String?
+  memo          String?
+  isActive      Boolean      @default(true)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  products Product[]
+  orders   Order[]
+}
+
+// ============================================================
+// Customer-side users (B2B portal accounts)
+// ============================================================
+
+model CustomerUser {
+  id           String    @id @default(cuid())
+  customerId   String
+  customer     Customer  @relation(fields: [customerId], references: [id])
+  email        String    @unique
+  passwordHash String
+  name         String
+  phone        String?
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  ordersRequested      Order[]           @relation("OrderCustomerUserRequester")
+  receiptConfirmations DeliveryReceipt[] @relation("ReceiptConfirmedByCustomer")
+
+  @@index([customerId])
+}
+
+// ============================================================
+// Orders
+// ============================================================
+
+model Order {
+  id                        String        @id @default(cuid())
+  orderNo                   String        @unique
+  customerId                String
+  customer                  Customer      @relation(fields: [customerId], references: [id])
+  deliveryAddressId         String
+  deliveryAddress           DeliveryAddress @relation(fields: [deliveryAddressId], references: [id])
+  requestedByUserId         String?
+  requestedByUser           User?         @relation("OrderRequestedBy", fields: [requestedByUserId], references: [id])
+  requestedByCustomerUserId String?
+  requestedByCustomerUser   CustomerUser? @relation("OrderCustomerUserRequester", fields: [requestedByCustomerUserId], references: [id])
+  salesRepId                String?
+  salesRep                  User?         @relation("OrderSalesRep", fields: [salesRepId], references: [id])
+  orderSource               String   @default("SALES_MANUAL")
+  status                    String   @default("REQUESTED")
+  priceStatus               String   @default("UNKNOWN")
+  requestedDeliveryDate     DateTime?
+  confirmedDeliveryDate     DateTime?
+  supplierType              String?
+  supplierId                String?
+  supplier                  Supplier?     @relation(fields: [supplierId], references: [id])
+  /// 0=normal, 1=warning, 2=danger (over credit limit)
+  creditWarningLevel        Int           @default(0)
+  customerNoticeRequired    Boolean       @default(true)
+  /// Raw text of incoming order (for AI parsing in 2nd MVP)
+  rawOrderText              String?
+  memo                      String?
+  createdAt                 DateTime      @default(now())
+  updatedAt                 DateTime      @updatedAt
+
+  items            OrderItem[]
+  statusHistory    OrderStatusHistory[]
+  holdReminders    HoldReminder[]
+  dispatches       Dispatch[]
+  shipments        Shipment[]
+  deliveryReceipts DeliveryReceipt[]
+  erpInputItems    ErpInputItem[]
+  notifications    NotificationLog[]
+
+  @@index([customerId])
+  @@index([status])
+  @@index([salesRepId])
+  @@index([createdAt])
+  @@index([requestedDeliveryDate])
+}
+
+model OrderItem {
+  id                String       @id @default(cuid())
+  orderId           String
+  order             Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId         String
+  product           Product      @relation(fields: [productId], references: [id])
+  requestedQuantity Float
+  approvedQuantity  Float?
+  shippedQuantity   Float?
+  receivedQuantity  Float?
+  unit              String @default("KG")
+  expectedPrice     Float?
+  confirmedPrice    Float?
+  priceStatus       String  @default("UNKNOWN")
+  memo              String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  @@index([orderId])
+}
+
+/// Î™®Îì† Ï£ºÎ¨∏ ?ÔøΩÌÉú Î≥ÄÍ≤ΩÔøΩ? ?ÔøΩÎ†•?ÔøΩÎ°ú ?ÔøΩÍ∏¥??(?ÔøΩÏàò).
+model OrderStatusHistory {
+  id              String       @id @default(cuid())
+  orderId         String
+  order           Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  previousStatus  String?
+  newStatus       String
+  changedByUserId String?
+  changedByUser   User?        @relation(fields: [changedByUserId], references: [id])
+  changeReason    String?
+  internalMemo   String?
+  customerMessage String?
+  createdAt       DateTime     @default(now())
+
+  @@index([orderId])
+  @@index([createdAt])
+}
+
+/// Î≥¥Î•ò ???ÔøΩÏùå ?ÔøΩÏù∏ ?ÔøΩÏ†ï?ÔøΩÏãú(remindAt) ?ÔøΩÏàò.
+model HoldReminder {
+  id                   String    @id @default(cuid())
+  orderId              String
+  order                Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  holdReason           String
+  remindAt             DateTime
+  reminderTargetUserId String?
+  reminderTargetUser   User?     @relation("HoldReminderTarget", fields: [reminderTargetUserId], references: [id])
+  isCompleted          Boolean   @default(false)
+  completedAt          DateTime?
+  createdByUserId      String?
+  createdByUser        User?     @relation("HoldReminderCreator", fields: [createdByUserId], references: [id])
+  memo                 String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@index([orderId])
+  @@index([remindAt])
+  @@index([isCompleted])
+}
+
+// ============================================================
+// Dispatch & Shipment
+// ============================================================
+
+model Dispatch {
+  id                   String         @id @default(cuid())
+  orderId              String
+  order                Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  dispatchStatus       String @default("WAITING")
+  plannedDispatchDate  DateTime?
+  dispatchAttemptCount Int            @default(0)
+  carrierName          String?
+  vehicleNumber        String?
+  driverName           String?
+  driverPhone          String?
+  failureReason        String?
+  nextRetryDate        DateTime?
+  /// Ï∞®Îüâ/Í∏∞ÏÇ¨ ?ÔøΩÎ≥¥ÔøΩ?Í±∞ÎûòÏ≤òÏóêÍ≤åÎèÑ ?ÔøΩÎÇ¥?ÔøΩÔøΩ? ?ÔøΩÔøΩ? (?ÔøΩÏ±Ö??Î≥¥ÌÜµ false)
+  shareWithCustomer    Boolean        @default(false)
+  memo                 String?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  @@index([orderId])
+  @@index([dispatchStatus])
+  @@index([nextRetryDate])
+}
+
+model Shipment {
+  id                       String         @id @default(cuid())
+  orderId                  String
+  order                    Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  shipmentStatus           String @default("NOT_READY")
+  plannedShipDate          DateTime?
+  actualShipDate           DateTime?
+  plannedQuantity          Float?
+  shippedQuantity          Float?
+  unit                     String   @default("KG")
+  hasQuantityDiscrepancy   Boolean        @default(false)
+  quantityDifferenceReason String?
+  shipmentMemo             String?
+  createdAt                DateTime       @default(now())
+  updatedAt                DateTime       @updatedAt
+
+  @@index([orderId])
+  @@index([shipmentStatus])
+  @@index([actualShipDate])
+}
+
+model DeliveryReceipt {
+  id                String        @id @default(cuid())
+  orderId           String
+  order             Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  receiptStatus     String        @default("PENDING")
+  confirmedByUserId String?
+  confirmedByUser   User?         @relation("ReceiptConfirmedByEmployee", fields: [confirmedByUserId], references: [id])
+  customerUserId    String?
+  customerUser      CustomerUser? @relation("ReceiptConfirmedByCustomer", fields: [customerUserId], references: [id])
+  confirmedAt       DateTime?
+  receivedQuantity  Float?
+  discrepancyReason String?
+  memo              String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@index([orderId])
+}
+
+// ============================================================
+// ERP daily-closing batch
+// ============================================================
+
+model ErpInputBatch {
+  id               String         @id @default(cuid())
+  /// ÎßàÍ∞ê ?ÔøΩ???ÔøΩÏóÖ??(?? 2026-04-29)
+  batchDate        DateTime
+  batchStatus      String @default("GENERATED")
+  generatedAt      DateTime       @default(now())
+  approvedByUserId String?
+  approvedByUser   User?          @relation(fields: [approvedByUserId], references: [id])
+  approvedAt       DateTime?
+  ecountResult     String?
+  click2002Result  String?
+  memo             String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  items ErpInputItem[]
+
+  @@index([batchDate])
+  @@index([batchStatus])
+}
+
+model ErpInputItem {
+  id                    String        @id @default(cuid())
+  batchId               String
+  batch                 ErpInputBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  orderId               String
+  order                 Order         @relation(fields: [orderId], references: [id])
+  ecountStatus          String @default("NOT_STARTED")
+  click2002Status       String @default("NOT_STARTED")
+  ecountErrorMessage    String?
+  click2002ErrorMessage String?
+  retryCount            Int           @default(0)
+  isExcluded            Boolean       @default(false)
+  excludeReason         String?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  @@index([batchId])
+  @@index([ecountStatus])
+  @@index([click2002Status])
+}
+
+// ============================================================
+// Notification log (cross-check requirement ¬ß12)
+// ============================================================
+
+model NotificationLog {
+  id               String                 @id @default(cuid())
+  orderId          String?
+  order            Order?                 @relation(fields: [orderId], references: [id])
+  recipientType    String
+  recipientId      String?
+  recipientLabel   String?
+  channel          String
+  /// ?? ORDER_REQUESTED, ORDER_APPROVED, ORDER_REJECTED, ORDER_HOLD,
+  /// HOLD_REMINDER, DISPATCH_FAILED, DISPATCH_COMPLETED, SHIPPED,
+  /// INTERNAL_PENDING_10MIN, INTERNAL_PENDING_30MIN, ...
+  notificationType String
+  title            String
+  message          String
+  sendStatus       String @default("PENDING")
+  sentAt           DateTime?
+  failedReason     String?
+  metadata         String?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  @@index([orderId])
+  @@index([sendStatus])
+  @@index([channel])
+  @@index([createdAt])
+}
+
+
+// =====================================================================
+// «—»≠¿¸ªÍΩ√Ω∫≈€(H-CRM) πË¬˜/√‚∞Ì ¡∂»∏ ƒ≥Ω√
+// =====================================================================
+/// ∆Ø¡§ ¿œ¿⁄ø° ¥Î«ÿ «—»≠ H-CRMø°º≠ ±‹æÓø¬ ∞·∞˙¿« ∏ﬁ≈∏¡§∫∏. «— ≥Ø¬•¥Á 1«‡.
+model HanwhaDispatchSnapshot {
+  id            String                @id @default(cuid())
+  /// ¡∂»∏ ¥ÎªÛ ¿œ¿⁄ (YYYY-MM-DD ¿⁄¡§)
+  dispatchDate  DateTime              @unique
+  /// ∏∂¡ˆ∏∑¿∏∑Œ «—»≠ ªÁ¿Ã∆Æø°º≠ ±‹æÓø¬ Ω√∞¢
+  fetchedAt     DateTime              @default(now())
+  /// ∆Æ∏Æ∞≈«— ¡˜ø¯
+  fetchedByUserId String?
+  /// 'OK' | 'PARTIAL' | 'FAILED'
+  status        String                @default("OK")
+  /// ¿Œµµ√≥ «‡ ∞≥ºˆ
+  rowCount      Int                   @default(0)
+  /// ø¿∑˘ πﬂª˝ Ω√ ∏ﬁΩ√¡ˆ
+  errorMessage  String?
+  rows          HanwhaDispatchRow[]
+
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  @@index([dispatchDate])
+}
+
+/// ¿Œµµ√≥∫∞ Line ªÛºº. «— ¿Œµµ√≥∞° ø©∑Ø ¿⁄¿Á∏¶ πﬁ¿∏∏È ø©∑Ø «‡¿∏∑Œ ¿˙¿Â.
+model HanwhaDispatchRow {
+  id              String                  @id @default(cuid())
+  snapshotId      String
+  snapshot        HanwhaDispatchSnapshot  @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  /// ∞Àªˆ ∞·∞˙ ≈◊¿Ã∫Ìø°º≠¿« ¿Œµµ√≥ º¯π¯ (1∫Œ≈Õ)
+  indoChiIndex    Int
+  /// ¿Œµµ√≥∏Ì (title º”º∫ø°º≠ √ﬂ√‚)
+  indoChiName     String
+  /// Line ¡§∫∏¿« ¿⁄¿Á∏Ì (ø¯∫ª)
+  materialNameRaw String?
+  /// «—æÁ «•±‚∑Œ ∫Ø»Ø«— ¿⁄¿Á∏Ì (øπ: LDPE<953>)
+  materialName    String?
+  /// √‚∞Ì ºˆ∑Æ (kg) ? ø¯∫ª ∞™
+  quantityKg      Float?
+  /// Line «‡¿« ∏µÁ ºø(td)¿ª ±◊¥Î∑Œ ∫∏∞¸. ƒ√∑≥ √ﬂ∞°/º¯º≠ ∫Ø∞Êø°µµ æ» ±˙¡¸.
+  rawCells        String   // JSON-stringified string[]
+  createdAt       DateTime @default(now())
+
+  @@index([snapshotId])
+  @@index([indoChiName])
+  @@index([materialName])
+}
+
+// =====================================================================
+// SystemSetting - generic key/value store (Hanwha credentials, etc.)
+// =====================================================================
+model SystemSetting {
+  key         String   @id
+  value       String
+  description String?
+  updatedById String?
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+}

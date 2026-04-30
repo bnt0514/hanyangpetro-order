@@ -1,0 +1,184 @@
+import { auth, signOut } from '@/lib/auth';
+import { redirect, notFound } from 'next/navigation';
+import Image from 'next/image';
+import Link from 'next/link';
+import { prisma } from '@/lib/db';
+import { statusLabel, statusColor, fmtDate, fmtDateTime, fmtNumber } from '@/lib/orders';
+import { ArrowLeft, MapPin, Calendar, FileText, Clock } from 'lucide-react';
+import CancelButton from './CancelButton';
+
+export const dynamic = 'force-dynamic';
+
+export default async function PortalOrderDetail({
+    params,
+}: {
+    params: Promise<{ id: string }>;
+}) {
+    const { id } = await params;
+    const session = await auth();
+    if (!session?.user) redirect('/login');
+    if (session.user.userKind !== 'customer') redirect('/admin');
+    if (!session.user.customerId) redirect('/login');
+
+    const order = await prisma.order.findUnique({
+        where: { id },
+        include: {
+            customer: true,
+            deliveryAddress: true,
+            items: { include: { product: true } },
+            statusHistory: { orderBy: { createdAt: 'asc' } },
+        },
+    });
+
+    if (!order || order.customerId !== session.user.customerId) notFound();
+
+    return (
+        <div className="min-h-screen">
+            <header className="bg-white border-b border-slate-200">
+                <div className="max-w-3xl mx-auto px-6 h-16 flex items-center justify-between">
+                    <Link href="/portal" className="flex items-center gap-2">
+                        <Image src="/hanyanglogo.png" alt="logo" width={32} height={32} className="h-8 w-auto" />
+                        <span className="font-bold text-slate-800">한양유화 거래처 포털</span>
+                    </Link>
+                    <div className="flex items-center gap-4 text-sm">
+                        <span className="text-slate-600">{session.user.customerName}</span>
+                        <form
+                            action={async () => {
+                                'use server';
+                                await signOut({ redirectTo: '/login' });
+                            }}
+                        >
+                            <button className="text-slate-500 hover:text-red-600 transition">로그아웃</button>
+                        </form>
+                    </div>
+                </div>
+            </header>
+
+            <main className="max-w-3xl mx-auto p-6 space-y-6">
+                <Link
+                    href="/portal"
+                    className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800"
+                >
+                    <ArrowLeft size={14} /> 주문 목록으로
+                </Link>
+
+                {/* 헤더 */}
+                <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                    <div className="flex items-start justify-between gap-4 flex-wrap">
+                        <div>
+                            <p className="text-xs text-slate-400 font-mono">{order.orderNo}</p>
+                            <p className="mt-2 text-sm text-slate-500">
+                                등록 {fmtDateTime(order.createdAt)}
+                            </p>
+                        </div>
+                        <span
+                            className={`inline-flex rounded-full px-3 py-1 text-sm font-medium ${statusColor(order.status)}`}
+                        >
+                            {statusLabel(order.status)}
+                        </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6 text-sm">
+                        <Info icon={<MapPin size={14} />} label="도착지">
+                            <span className="font-medium">{order.deliveryAddress.label}</span>
+                            <span className="block text-xs text-slate-500">
+                                {order.deliveryAddress.addressLine1}
+                            </span>
+                        </Info>
+                        <Info icon={<Calendar size={14} />} label="요청 도착일">
+                            {fmtDate(order.requestedDeliveryDate)}
+                        </Info>
+                        {order.memo && (
+                            <Info icon={<FileText size={14} />} label="메모">
+                                <span className="whitespace-pre-wrap">{order.memo}</span>
+                            </Info>
+                        )}
+                    </div>
+                </section>
+
+                {/* 품목 */}
+                <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div className="px-6 py-4 border-b border-slate-100">
+                        <h2 className="font-semibold text-slate-800">주문 품목</h2>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="bg-slate-50 text-left text-xs font-medium text-slate-500 uppercase">
+                                    <th className="px-6 py-3">제품명</th>
+                                    <th className="px-6 py-3 text-right">요청수량</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {order.items.map((it) => (
+                                    <tr key={it.id}>
+                                        <td className="px-6 py-3 font-medium text-slate-800">
+                                            {it.product.productName}
+                                            <span className="ml-2 text-xs text-slate-400 font-mono">
+                                                {it.product.productCode}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-3 text-right text-slate-700">
+                                            {fmtNumber(it.requestedQuantity)} {it.unit}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                {/* 취소 버튼 (REQUESTED 상태일 때만) */}
+                {order.status === 'REQUESTED' && (
+                    <CancelButton orderId={order.id} />
+                )}
+
+                {/* 진행 이력 */}
+                <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
+                        <Clock size={16} className="text-slate-500" />
+                        <h2 className="font-semibold text-slate-800">진행 이력</h2>
+                    </div>
+                    <ul className="divide-y divide-slate-100">
+                        {order.statusHistory.map((h) => (
+                            <li key={h.id} className="px-6 py-3 flex items-center gap-3 text-sm">
+                                <span className="text-xs text-slate-400 w-32 shrink-0 font-mono">
+                                    {fmtDateTime(h.createdAt)}
+                                </span>
+                                <span
+                                    className={`inline-flex rounded-full px-2 py-0.5 text-xs ${statusColor(h.newStatus)}`}
+                                >
+                                    {statusLabel(h.newStatus)}
+                                </span>
+                                {h.changeReason && (
+                                    <span className="text-xs text-slate-500 ml-2">
+                                        {h.changeReason}
+                                    </span>
+                                )}
+                            </li>
+                        ))}
+                    </ul>
+                </section>
+            </main>
+        </div>
+    );
+}
+
+function Info({
+    icon,
+    label,
+    children,
+}: {
+    icon: React.ReactNode;
+    label: string;
+    children: React.ReactNode;
+}) {
+    return (
+        <div>
+            <p className="flex items-center gap-1.5 text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+                {icon} {label}
+            </p>
+            <div className="text-slate-700">{children}</div>
+        </div>
+    );
+}

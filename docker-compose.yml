@@ -1,0 +1,47 @@
+# Local development stack for 한양유화 주문관제 시스템
+# Run: docker compose up -d postgres
+# In production (office PC), the `app` service is also brought up.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: hanyang_ops_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: hanyang
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-CHANGE_ME_STRONG_PW}
+      POSTGRES_DB: hanyang_ops
+      TZ: Asia/Seoul
+    ports:
+      - "5432:5432"
+    volumes:
+      - hanyang_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U hanyang -d hanyang_ops" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  # Uncomment after Next.js app is scaffolded
+  # app:
+  #   build: .
+  #   container_name: hanyang_ops_app
+  #   restart: unless-stopped
+  #   env_file: .env
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #   ports:
+  #     - "3000:3000"
+
+  # Cloudflare Tunnel (free, no public IP needed)
+  # See docs/09-hosting-and-domain.md for setup.
+  # cloudflared:
+  #   image: cloudflare/cloudflared:latest
+  #   container_name: hanyang_ops_cloudflared
+  #   restart: unless-stopped
+  #   command: tunnel --no-autoupdate run
+  #   environment:
+  #     - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+
+volumes:
+  hanyang_pgdata:

@@ -1,0 +1,42 @@
+# Node
+node_modules/
+.next/
+out/
+build/
+dist/
+*.log
+npm-debug.log*
+
+# Env
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Prisma
+prisma/migrations/dev.db*
+
+# Next
+next-env.d.ts
+.vercel
+
+# Local data / backups
+data/
+backups/
+*.sqlite
+*.db
+
+# Test coverage
+coverage/
+
+# TypeScript
+*.tsbuildinfo
