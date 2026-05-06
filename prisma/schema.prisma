@@ -47,6 +47,7 @@ model User {
   creditTransactions    CreditTransaction[]    @relation("CreditTxCreatedBy")
   overrideRequested     CreditOverrideRequest[] @relation("OverrideRequested")
   overrideReviewed      CreditOverrideRequest[] @relation("OverrideReviewed")
+  priceAdjustments      PriceAdjustment[]       @relation("PriceAdjCreatedBy")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -89,6 +90,7 @@ model Customer {
   @@index([companyName])
 }
 
+
 /// ??거래처는 ?�러 ?�착지�?가�????�다.
 /// ?�착지�??�력?�도 거래처�? ??��?�할 ???�도�?addressLine1 ?�덱???�용.
 model DeliveryAddress {
@@ -123,8 +125,8 @@ model Product {
   productName       String
   manufacturer      String?
   grade             String?
-  packagingType     String? // ?? 25kg PP bag, 1???�백, 벌크 ??
-  category          String? // EVA / HDPE / LDPE / LLDPE / mLLDPE / 기�?
+  packagingType     String?
+  category          String?
   ecountItemCode    String?
   click2002ItemCode String?
   defaultSupplierId String?
@@ -136,6 +138,7 @@ model Product {
 
   customerWhitelists CustomerProductWhitelist[]
   orderItems         OrderItem[]
+  productPrice       ProductPrice?
 }
 
 /// 거래�??�털 주문 ???�출???�품 ?�이?�리?�트.
@@ -232,6 +235,8 @@ model Order {
   /// Raw text of incoming order (for AI parsing in 2nd MVP)
   rawOrderText              String?
   memo                      String?
+  /// 오더 수락 전 여신 시뮬레이션 결과 (단가 × 수량 합계)
+  estimatedAmount           Float?
   createdAt                 DateTime      @default(now())
   updatedAt                 DateTime      @updatedAt
 
@@ -265,6 +270,8 @@ model OrderItem {
   unit              String @default("KG")
   expectedPrice     Float?
   confirmedPrice    Float?
+  /// 여신 시뮬레이션 시 적용된 단가 (원/TON)
+  estimatedUnitPrice Float?
   priceStatus       String  @default("UNKNOWN")
   memo              String?
   createdAt         DateTime     @default(now())
@@ -567,4 +574,38 @@ model CreditOverrideRequest {
 
   @@index([status])
   @@index([createdAt])
+}
+
+// =====================================================================
+// 단가 시스템 (여신 시뮬레이션용)
+// =====================================================================
+
+/// 제품별 기준 단가 (원/TON). 월별 PriceAdjustment와 합산하여 실효 단가 계산.
+model ProductPrice {
+  id          String   @id @default(cuid())
+  productId   String   @unique
+  product     Product  @relation(fields: [productId], references: [id])
+  basePrice   Float    @default(0)
+  memo        String?
+  updatedById String?
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+}
+
+/// 월별 브랜드/제품군별 단가 조정값 (인상:+, 인하:-  원/TON).
+/// 예: 2026-05, 한화, LDPE → +50,000 원/TON
+model PriceAdjustment {
+  id             String   @id @default(cuid())
+  effectiveMonth String   // "2026-05"
+  brand          String   // 한화 | 롯데 | LG | 대한유화 | 기타
+  productGroup   String   // LDPE | LLDPE | EVA | HDPE | mLLDPE | 기타
+  delta          Float    @default(0)
+  memo           String?
+  createdById    String?
+  createdBy      User?    @relation("PriceAdjCreatedBy", fields: [createdById], references: [id])
+  createdAt      DateTime @default(now())
+
+  @@unique([effectiveMonth, brand, productGroup])
+  @@index([effectiveMonth])
+  @@index([brand, productGroup])
 }

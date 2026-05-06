@@ -99,6 +99,20 @@ export default async function AdminHome() {
                                 🔑 한화 비번
                             </Link>
                         )}
+                        {isHanwhaManager && (
+                            <Link
+                                href="/admin/prices"
+                                className="inline-flex items-center gap-2 rounded-xl bg-white border border-slate-300 px-3 py-2.5 text-xs font-semibold text-slate-600 shadow-sm hover:bg-slate-50"
+                            >
+                                📊 단가 관리
+                            </Link>
+                        )}
+                        <Link
+                            href="/admin/credit-overrides"
+                            className="inline-flex items-center gap-2 rounded-xl bg-white border border-red-300 px-3 py-2.5 text-xs font-semibold text-red-600 shadow-sm hover:bg-red-50"
+                        >
+                            🛡 여신 초과 승인
+                        </Link>
                         <Link
                             href="/admin/orders/new"
                             className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"

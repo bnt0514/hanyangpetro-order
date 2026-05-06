@@ -6,6 +6,7 @@ import { prisma } from '@/lib/db';
 import { statusLabel, statusColor, fmtDate, fmtDateTime, fmtNumber } from '@/lib/orders';
 import { ArrowLeft, Building2, MapPin, Calendar, FileText, Clock, User } from 'lucide-react';
 import StatusActions from './StatusActions';
+import CreditSimulationPanel from '@/app/admin/credit/CreditSimulationPanel';
 
 export const dynamic = 'force-dynamic';
 
@@ -165,8 +166,16 @@ export default async function AdminOrderDetail({
                     </div>
                 </section>
 
+                {/* 여신 시뮬레이션 (수락 전 필수 확인) */}
+                {['REQUESTED', 'PENDING_SALES_REVIEW', 'ON_HOLD'].includes(order.status) && (
+                    <CreditSimulationPanel orderId={order.id} />
+                )}
+
                 {/* 액션 */}
-                <StatusActions orderId={order.id} currentStatus={order.status} />
+                <StatusActions
+                    orderId={order.id}
+                    currentStatus={order.status}
+                />
 
                 {/* 이력 */}
                 <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">

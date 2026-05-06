@@ -21,41 +21,41 @@ const DATA_START = 2;
 const results = [];
 
 for (let i = DATA_START; i < rows.length; i++) {
-  const row = rows[i];
-  const code = String(row[0] || '').trim();
-  const name = String(row[1] || '').trim();
-  if (!code || !name) continue;
+    const row = rows[i];
+    const code = String(row[0] || '').trim();
+    const name = String(row[1] || '').trim();
+    if (!code || !name) continue;
 
-  const monthlySales = monthCols.map((m, idx) => ({
-    month: m,
-    amount: Number(row[2 + idx]) || 0,
-  }));
+    const monthlySales = monthCols.map((m, idx) => ({
+        month: m,
+        amount: Number(row[2 + idx]) || 0,
+    }));
 
-  const activeMonths = monthlySales.filter(m => m.amount > 0);
-  const total = monthlySales.reduce((s, m) => s + m.amount, 0);
-  const avgMonthly = activeMonths.length > 0 ? total / activeMonths.length : 0;
-  const proposedLimit = Math.ceil((avgMonthly * 2) / 1000000) * 1000000; // 백만 단위 올림
+    const activeMonths = monthlySales.filter(m => m.amount > 0);
+    const total = monthlySales.reduce((s, m) => s + m.amount, 0);
+    const avgMonthly = activeMonths.length > 0 ? total / activeMonths.length : 0;
+    const proposedLimit = Math.ceil((avgMonthly * 2) / 1000000) * 1000000; // 백만 단위 올림
 
-  const maxMonth = monthlySales.reduce((a, b) => (b.amount > a.amount ? b : a), monthlySales[0]);
-  const minActiveMonth = activeMonths.length > 0
-    ? activeMonths.reduce((a, b) => (b.amount < a.amount ? b : a), activeMonths[0])
-    : null;
+    const maxMonth = monthlySales.reduce((a, b) => (b.amount > a.amount ? b : a), monthlySales[0]);
+    const minActiveMonth = activeMonths.length > 0
+        ? activeMonths.reduce((a, b) => (b.amount < a.amount ? b : a), activeMonths[0])
+        : null;
 
-  results.push({
-    customerCode: code,
-    customerName: name,
-    monthlySales,
-    activeMonthCount: activeMonths.length,
-    totalSales: total,
-    avgMonthlySales: Math.round(avgMonthly),
-    proposedCreditLimit: proposedLimit,
-    maxMonth: maxMonth.month,
-    maxSales: maxMonth.amount,
-    minActiveMonth: minActiveMonth ? minActiveMonth.month : null,
-    minActiveSales: minActiveMonth ? minActiveMonth.amount : null,
-    creditRiskTier: 'STANDARD', // 기본값; 별도로 조정 필요
-    note: '',
-  });
+    results.push({
+        customerCode: code,
+        customerName: name,
+        monthlySales,
+        activeMonthCount: activeMonths.length,
+        totalSales: total,
+        avgMonthlySales: Math.round(avgMonthly),
+        proposedCreditLimit: proposedLimit,
+        maxMonth: maxMonth.month,
+        maxSales: maxMonth.amount,
+        minActiveMonth: minActiveMonth ? minActiveMonth.month : null,
+        minActiveSales: minActiveMonth ? minActiveMonth.amount : null,
+        creditRiskTier: 'STANDARD', // 기본값; 별도로 조정 필요
+        note: '',
+    });
 }
 
 // 정렬: 제안한도 내림차순
@@ -68,24 +68,24 @@ console.log(`✅ ${results.length}개 거래처 분석 완료 → ${outPath}\n`)
 
 // 콘솔 요약 테이블
 console.log(
-  '순위'.padEnd(4),
-  '거래처명'.padEnd(20),
-  '활성월수'.padEnd(6),
-  '월평균매출'.padEnd(14),
-  '제안여신한도'.padEnd(14),
+    '순위'.padEnd(4),
+    '거래처명'.padEnd(20),
+    '활성월수'.padEnd(6),
+    '월평균매출'.padEnd(14),
+    '제안여신한도'.padEnd(14),
 );
 console.log('-'.repeat(70));
 
 results.forEach((r, idx) => {
-  const avg = r.avgMonthlySales.toLocaleString('ko-KR');
-  const limit = r.proposedCreditLimit.toLocaleString('ko-KR');
-  console.log(
-    String(idx + 1).padEnd(4),
-    r.customerName.slice(0, 18).padEnd(20),
-    String(r.activeMonthCount).padEnd(6),
-    avg.padStart(14),
-    limit.padStart(14),
-  );
+    const avg = r.avgMonthlySales.toLocaleString('ko-KR');
+    const limit = r.proposedCreditLimit.toLocaleString('ko-KR');
+    console.log(
+        String(idx + 1).padEnd(4),
+        r.customerName.slice(0, 18).padEnd(20),
+        String(r.activeMonthCount).padEnd(6),
+        avg.padStart(14),
+        limit.padStart(14),
+    );
 });
 
 // 전체 통계
