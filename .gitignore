@@ -30,7 +30,7 @@ next-env.d.ts
 .vercel
 
 # Local data / backups
-data/
+# data/ - 엑셀 업로드 폴더 (raw files 제외, .gitkeep 포함)
 backups/
 *.sqlite
 *.db
@@ -40,3 +40,7 @@ coverage/
 
 # TypeScript
 *.tsbuildinfo
+
+data/*.xlsx
+data/*.xls
+data/*.csv
