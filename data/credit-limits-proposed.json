@@ -1,0 +1,7394 @@
+[
+  {
+    "customerCode": "1428146046",
+    "customerName": "주식회사동방에프엔씨코리아",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 293557000
+      },
+      {
+        "month": "2025.7",
+        "amount": 242285450
+      },
+      {
+        "month": "2025.8",
+        "amount": 258291550
+      },
+      {
+        "month": "2025.9",
+        "amount": 397017500
+      },
+      {
+        "month": "2025.10",
+        "amount": 390537840
+      },
+      {
+        "month": "2025.11",
+        "amount": 419639000
+      },
+      {
+        "month": "2025.12",
+        "amount": 417994225
+      },
+      {
+        "month": "2026.1",
+        "amount": 268890600
+      },
+      {
+        "month": "2026.2",
+        "amount": 330980100
+      },
+      {
+        "month": "2026.3",
+        "amount": 297865700
+      }
+    ],
+    "activeMonthCount": 10,
+    "totalSales": 3317058965,
+    "avgMonthlySales": 331705897,
+    "proposedCreditLimit": 664000000,
+    "maxMonth": "2025.11",
+    "maxSales": 419639000,
+    "minActiveMonth": "2025.7",
+    "minActiveSales": 242285450,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1408170313",
+    "customerName": "보스팩 주식회사",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 137379000
+      },
+      {
+        "month": "2025.8",
+        "amount": 277629000
+      },
+      {
+        "month": "2025.9",
+        "amount": 171259000
+      },
+      {
+        "month": "2025.10",
+        "amount": 288468400
+      },
+      {
+        "month": "2025.11",
+        "amount": 412689475
+      },
+      {
+        "month": "2025.12",
+        "amount": 386573000
+      },
+      {
+        "month": "2026.1",
+        "amount": 220473000
+      },
+      {
+        "month": "2026.2",
+        "amount": 187374000
+      },
+      {
+        "month": "2026.3",
+        "amount": 141350000
+      }
+    ],
+    "activeMonthCount": 9,
+    "totalSales": 2223194875,
+    "avgMonthlySales": 247021653,
+    "proposedCreditLimit": 495000000,
+    "maxMonth": "2025.11",
+    "maxSales": 412689475,
+    "minActiveMonth": "2025.7",
+    "minActiveSales": 137379000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1272276826",
+    "customerName": "신일폴리머",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 123878700
+      },
+      {
+        "month": "2025.7",
+        "amount": 143266200
+      },
+      {
+        "month": "2025.8",
+        "amount": 155749000
+      },
+      {
+        "month": "2025.9",
+        "amount": 75460000
+      },
+      {
+        "month": "2025.10",
+        "amount": 125664000
+      },
+      {
+        "month": "2025.11",
+        "amount": 166441000
+      },
+      {
+        "month": "2025.12",
+        "amount": 183249000
+      },
+      {
+        "month": "2026.1",
+        "amount": 206536000
+      },
+      {
+        "month": "2026.2",
+        "amount": 164956000
+      },
+      {
+        "month": "2026.3",
+        "amount": 85591000
+      }
+    ],
+    "activeMonthCount": 10,
+    "totalSales": 1430790900,
+    "avgMonthlySales": 143079090,
+    "proposedCreditLimit": 287000000,
+    "maxMonth": "2026.1",
+    "maxSales": 206536000,
+    "minActiveMonth": "2025.9",
+    "minActiveSales": 75460000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1238132522",
+    "customerName": "(주)연합",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 105901400
+      },
+      {
+        "month": "2025.7",
+        "amount": 99629200
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 2,
+    "totalSales": 205530600,
+    "avgMonthlySales": 102765300,
+    "proposedCreditLimit": 206000000,
+    "maxMonth": "2025.6",
+    "maxSales": 105901400,
+    "minActiveMonth": "2025.7",
+    "minActiveSales": 99629200,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "3122541402",
+    "customerName": "익성화학",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 89066890
+      },
+      {
+        "month": "2025.7",
+        "amount": 102746490
+      },
+      {
+        "month": "2025.8",
+        "amount": 97206890
+      },
+      {
+        "month": "2025.9",
+        "amount": 92469300
+      },
+      {
+        "month": "2025.10",
+        "amount": 93568970
+      },
+      {
+        "month": "2025.11",
+        "amount": 69111350
+      },
+      {
+        "month": "2025.12",
+        "amount": 74591550
+      },
+      {
+        "month": "2026.1",
+        "amount": 155227050
+      },
+      {
+        "month": "2026.2",
+        "amount": 109307550
+      },
+      {
+        "month": "2026.3",
+        "amount": 64432500
+      }
+    ],
+    "activeMonthCount": 10,
+    "totalSales": 947728540,
+    "avgMonthlySales": 94772854,
+    "proposedCreditLimit": 190000000,
+    "maxMonth": "2026.1",
+    "maxSales": 155227050,
+    "minActiveMonth": "2026.3",
+    "minActiveSales": 64432500,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1248723751",
+    "customerName": "주식회사 인코팩",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 90585000
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 1,
+    "totalSales": 90585000,
+    "avgMonthlySales": 90585000,
+    "proposedCreditLimit": 182000000,
+    "maxMonth": "2025.11",
+    "maxSales": 90585000,
+    "minActiveMonth": "2025.11",
+    "minActiveSales": 90585000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1408155350",
+    "customerName": "주식회사 스타폴리머",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 8085000
+      },
+      {
+        "month": "2025.9",
+        "amount": 80465000
+      },
+      {
+        "month": "2025.10",
+        "amount": 85384750
+      },
+      {
+        "month": "2025.11",
+        "amount": 167519275
+      },
+      {
+        "month": "2025.12",
+        "amount": 76274000
+      },
+      {
+        "month": "2026.1",
+        "amount": 130691000
+      },
+      {
+        "month": "2026.2",
+        "amount": 61523000
+      },
+      {
+        "month": "2026.3",
+        "amount": 29040000
+      }
+    ],
+    "activeMonthCount": 8,
+    "totalSales": 638982025,
+    "avgMonthlySales": 79872753,
+    "proposedCreditLimit": 160000000,
+    "maxMonth": "2025.11",
+    "maxSales": 167519275,
+    "minActiveMonth": "2025.8",
+    "minActiveSales": 8085000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1278801210",
+    "customerName": "주식회사 비와이팩",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 85250000
+      },
+      {
+        "month": "2025.10",
+        "amount": 84700000
+      },
+      {
+        "month": "2025.11",
+        "amount": 67320000
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 3,
+    "totalSales": 237270000,
+    "avgMonthlySales": 79090000,
+    "proposedCreditLimit": 159000000,
+    "maxMonth": "2025.9",
+    "maxSales": 85250000,
+    "minActiveMonth": "2025.11",
+    "minActiveSales": 67320000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "2248801113",
+    "customerName": "주식회사 우진기업",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 52453500
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 102102000
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 2,
+    "totalSales": 154555500,
+    "avgMonthlySales": 77277750,
+    "proposedCreditLimit": 155000000,
+    "maxMonth": "2025.10",
+    "maxSales": 102102000,
+    "minActiveMonth": "2025.6",
+    "minActiveSales": 52453500,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1358101551",
+    "customerName": "부국티엔씨(주)",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 92532000
+      },
+      {
+        "month": "2025.7",
+        "amount": 44704000
+      },
+      {
+        "month": "2025.8",
+        "amount": 58850000
+      },
+      {
+        "month": "2025.9",
+        "amount": 83715500
+      },
+      {
+        "month": "2025.10",
+        "amount": 50677000
+      },
+      {
+        "month": "2025.11",
+        "amount": 44924000
+      },
+      {
+        "month": "2025.12",
+        "amount": 60698000
+      },
+      {
+        "month": "2026.1",
+        "amount": 89577125
+      },
+      {
+        "month": "2026.2",
+        "amount": 92010875
+      },
+      {
+        "month": "2026.3",
+        "amount": 81774000
+      }
+    ],
+    "activeMonthCount": 10,
+    "totalSales": 699462500,
+    "avgMonthlySales": 69946250,
+    "proposedCreditLimit": 140000000,
+    "maxMonth": "2025.6",
+    "maxSales": 92532000,
+    "minActiveMonth": "2025.7",
+    "minActiveSales": 44704000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1258116358",
+    "customerName": "삼흥산업(주)",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 79530000
+      },
+      {
+        "month": "2025.7",
+        "amount": 90684000
+      },
+      {
+        "month": "2025.8",
+        "amount": 82434000
+      },
+      {
+        "month": "2025.9",
+        "amount": 97900000
+      },
+      {
+        "month": "2025.10",
+        "amount": 83556000
+      },
+      {
+        "month": "2025.11",
+        "amount": 64790000
+      },
+      {
+        "month": "2025.12",
+        "amount": 26884000
+      },
+      {
+        "month": "2026.1",
+        "amount": 24816000
+      },
+      {
+        "month": "2026.2",
+        "amount": 28952000
+      },
+      {
+        "month": "2026.3",
+        "amount": 108449000
+      }
+    ],
+    "activeMonthCount": 10,
+    "totalSales": 687995000,
+    "avgMonthlySales": 68799500,
+    "proposedCreditLimit": 138000000,
+    "maxMonth": "2026.3",
+    "maxSales": 108449000,
+    "minActiveMonth": "2026.1",
+    "minActiveSales": 24816000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1058642366",
+    "customerName": "월드켐코퍼레이션주식회사",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 66132000
+      },
+      {
+        "month": "2025.7",
+        "amount": 66132000
+      },
+      {
+        "month": "2025.8",
+        "amount": 65340000
+      },
+      {
+        "month": "2025.9",
+        "amount": 65340000
+      },
+      {
+        "month": "2025.10",
+        "amount": 64548000
+      },
+      {
+        "month": "2025.11",
+        "amount": 63756000
+      },
+      {
+        "month": "2025.12",
+        "amount": 63756000
+      },
+      {
+        "month": "2026.1",
+        "amount": 63756000
+      },
+      {
+        "month": "2026.2",
+        "amount": 63756000
+      },
+      {
+        "month": "2026.3",
+        "amount": 71676000
+      }
+    ],
+    "activeMonthCount": 10,
+    "totalSales": 654192000,
+    "avgMonthlySales": 65419200,
+    "proposedCreditLimit": 131000000,
+    "maxMonth": "2026.3",
+    "maxSales": 71676000,
+    "minActiveMonth": "2025.11",
+    "minActiveSales": 63756000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "3958102792",
+    "customerName": "주식회사 삼영인더스트리",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 76914475
+      },
+      {
+        "month": "2025.7",
+        "amount": 75468800
+      },
+      {
+        "month": "2025.8",
+        "amount": 82139750
+      },
+      {
+        "month": "2025.9",
+        "amount": 64825200
+      },
+      {
+        "month": "2025.10",
+        "amount": 72534000
+      },
+      {
+        "month": "2025.11",
+        "amount": 49097400
+      },
+      {
+        "month": "2025.12",
+        "amount": 78899975
+      },
+      {
+        "month": "2026.1",
+        "amount": 25349500
+      },
+      {
+        "month": "2026.2",
+        "amount": 62962350
+      },
+      {
+        "month": "2026.3",
+        "amount": 38535750
+      }
+    ],
+    "activeMonthCount": 10,
+    "totalSales": 626727200,
+    "avgMonthlySales": 62672720,
+    "proposedCreditLimit": 126000000,
+    "maxMonth": "2025.8",
+    "maxSales": 82139750,
+    "minActiveMonth": "2026.1",
+    "minActiveSales": 25349500,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1378642193",
+    "customerName": "주식회사 다인산업",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 89397000
+      },
+      {
+        "month": "2025.7",
+        "amount": 51975000
+      },
+      {
+        "month": "2025.8",
+        "amount": 77962500
+      },
+      {
+        "month": "2025.9",
+        "amount": 52734000
+      },
+      {
+        "month": "2025.10",
+        "amount": 52734000
+      },
+      {
+        "month": "2025.11",
+        "amount": 52453500
+      },
+      {
+        "month": "2025.12",
+        "amount": 51892500
+      },
+      {
+        "month": "2026.1",
+        "amount": 76312500
+      },
+      {
+        "month": "2026.2",
+        "amount": 51892500
+      },
+      {
+        "month": "2026.3",
+        "amount": 57502500
+      }
+    ],
+    "activeMonthCount": 10,
+    "totalSales": 614856000,
+    "avgMonthlySales": 61485600,
+    "proposedCreditLimit": 123000000,
+    "maxMonth": "2025.6",
+    "maxSales": 89397000,
+    "minActiveMonth": "2025.12",
+    "minActiveSales": 51892500,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1428149529",
+    "customerName": "주식회사 엠앤씨",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 71973000
+      },
+      {
+        "month": "2025.7",
+        "amount": 54780000
+      },
+      {
+        "month": "2025.8",
+        "amount": 51359000
+      },
+      {
+        "month": "2025.9",
+        "amount": 64438000
+      },
+      {
+        "month": "2025.10",
+        "amount": 66660000
+      },
+      {
+        "month": "2025.11",
+        "amount": 60126000
+      },
+      {
+        "month": "2025.12",
+        "amount": 55462000
+      },
+      {
+        "month": "2026.1",
+        "amount": 57772000
+      },
+      {
+        "month": "2026.2",
+        "amount": 53328000
+      },
+      {
+        "month": "2026.3",
+        "amount": 69883000
+      }
+    ],
+    "activeMonthCount": 10,
+    "totalSales": 605781000,
+    "avgMonthlySales": 60578100,
+    "proposedCreditLimit": 122000000,
+    "maxMonth": "2025.6",
+    "maxSales": 71973000,
+    "minActiveMonth": "2025.8",
+    "minActiveSales": 51359000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1077461745",
+    "customerName": "성도화학",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 48532000
+      },
+      {
+        "month": "2025.7",
+        "amount": 96668000
+      },
+      {
+        "month": "2025.8",
+        "amount": 49038000
+      },
+      {
+        "month": "2025.9",
+        "amount": 46376000
+      },
+      {
+        "month": "2025.10",
+        "amount": 47784000
+      },
+      {
+        "month": "2025.11",
+        "amount": 47135000
+      },
+      {
+        "month": "2025.12",
+        "amount": 46750000
+      },
+      {
+        "month": "2026.1",
+        "amount": 46479400
+      },
+      {
+        "month": "2026.2",
+        "amount": 46937000
+      },
+      {
+        "month": "2026.3",
+        "amount": 52030000
+      }
+    ],
+    "activeMonthCount": 10,
+    "totalSales": 527729400,
+    "avgMonthlySales": 52772940,
+    "proposedCreditLimit": 106000000,
+    "maxMonth": "2025.7",
+    "maxSales": 96668000,
+    "minActiveMonth": "2025.9",
+    "minActiveSales": 46376000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "4598600472",
+    "customerName": "주식회사 오주케미칼",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 40392000
+      },
+      {
+        "month": "2025.7",
+        "amount": 62040000
+      },
+      {
+        "month": "2025.8",
+        "amount": 55242000
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 3,
+    "totalSales": 157674000,
+    "avgMonthlySales": 52558000,
+    "proposedCreditLimit": 106000000,
+    "maxMonth": "2025.7",
+    "maxSales": 62040000,
+    "minActiveMonth": "2025.6",
+    "minActiveSales": 40392000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1248707784",
+    "customerName": "(주)세경산업",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 39864000
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 52041000
+      },
+      {
+        "month": "2025.10",
+        "amount": 33033000
+      },
+      {
+        "month": "2025.11",
+        "amount": 34303500
+      },
+      {
+        "month": "2025.12",
+        "amount": 69872000
+      },
+      {
+        "month": "2026.1",
+        "amount": 50028000
+      },
+      {
+        "month": "2026.2",
+        "amount": 65007250
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 7,
+    "totalSales": 344148750,
+    "avgMonthlySales": 49164107,
+    "proposedCreditLimit": 99000000,
+    "maxMonth": "2025.12",
+    "maxSales": 69872000,
+    "minActiveMonth": "2025.10",
+    "minActiveSales": 33033000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1248644725",
+    "customerName": "마스텍 주식회사",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 40906250
+      },
+      {
+        "month": "2025.7",
+        "amount": 25198250
+      },
+      {
+        "month": "2025.8",
+        "amount": 44786500
+      },
+      {
+        "month": "2025.9",
+        "amount": 47635500
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 46750000
+      },
+      {
+        "month": "2025.12",
+        "amount": 49414750
+      },
+      {
+        "month": "2026.1",
+        "amount": 58066250
+      },
+      {
+        "month": "2026.2",
+        "amount": 69300000
+      },
+      {
+        "month": "2026.3",
+        "amount": 55550000
+      }
+    ],
+    "activeMonthCount": 9,
+    "totalSales": 437607500,
+    "avgMonthlySales": 48623056,
+    "proposedCreditLimit": 98000000,
+    "maxMonth": "2026.2",
+    "maxSales": 69300000,
+    "minActiveMonth": "2025.7",
+    "minActiveSales": 25198250,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1341658276",
+    "customerName": "일성화학",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 46992000
+      },
+      {
+        "month": "2025.7",
+        "amount": 46464000
+      },
+      {
+        "month": "2025.8",
+        "amount": 92928000
+      },
+      {
+        "month": "2025.9",
+        "amount": 45936000
+      },
+      {
+        "month": "2025.10",
+        "amount": 24948000
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 47366000
+      },
+      {
+        "month": "2026.2",
+        "amount": 22704000
+      },
+      {
+        "month": "2026.3",
+        "amount": 51216000
+      }
+    ],
+    "activeMonthCount": 8,
+    "totalSales": 378554000,
+    "avgMonthlySales": 47319250,
+    "proposedCreditLimit": 95000000,
+    "maxMonth": "2025.8",
+    "maxSales": 92928000,
+    "minActiveMonth": "2026.2",
+    "minActiveSales": 22704000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1260880393",
+    "customerName": "태림기업",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 59994000
+      },
+      {
+        "month": "2025.7",
+        "amount": 62898000
+      },
+      {
+        "month": "2025.8",
+        "amount": 46717000
+      },
+      {
+        "month": "2025.9",
+        "amount": 53944000
+      },
+      {
+        "month": "2025.10",
+        "amount": 44572000
+      },
+      {
+        "month": "2025.11",
+        "amount": 41316000
+      },
+      {
+        "month": "2025.12",
+        "amount": 34837000
+      },
+      {
+        "month": "2026.1",
+        "amount": 27885000
+      },
+      {
+        "month": "2026.2",
+        "amount": 33902000
+      },
+      {
+        "month": "2026.3",
+        "amount": 41855000
+      }
+    ],
+    "activeMonthCount": 10,
+    "totalSales": 447920000,
+    "avgMonthlySales": 44792000,
+    "proposedCreditLimit": 90000000,
+    "maxMonth": "2025.7",
+    "maxSales": 62898000,
+    "minActiveMonth": "2026.1",
+    "minActiveSales": 27885000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1381162059",
+    "customerName": "주영산업사",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 50160000
+      },
+      {
+        "month": "2025.7",
+        "amount": 33440000
+      },
+      {
+        "month": "2025.8",
+        "amount": 32912000
+      },
+      {
+        "month": "2025.9",
+        "amount": 32560000
+      },
+      {
+        "month": "2025.10",
+        "amount": 36630000
+      },
+      {
+        "month": "2025.11",
+        "amount": 40700000
+      },
+      {
+        "month": "2025.12",
+        "amount": 48840000
+      },
+      {
+        "month": "2026.1",
+        "amount": 48840000
+      },
+      {
+        "month": "2026.2",
+        "amount": 36630000
+      },
+      {
+        "month": "2026.3",
+        "amount": 40590000
+      }
+    ],
+    "activeMonthCount": 10,
+    "totalSales": 401302000,
+    "avgMonthlySales": 40130200,
+    "proposedCreditLimit": 81000000,
+    "maxMonth": "2025.6",
+    "maxSales": 50160000,
+    "minActiveMonth": "2025.9",
+    "minActiveSales": 32560000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "2918700873",
+    "customerName": "주식회사 원폴리텍",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 38940000
+      },
+      {
+        "month": "2025.10",
+        "amount": 28776000
+      },
+      {
+        "month": "2025.11",
+        "amount": 52668000
+      },
+      {
+        "month": "2025.12",
+        "amount": 35640000
+      },
+      {
+        "month": "2026.1",
+        "amount": 52140000
+      },
+      {
+        "month": "2026.2",
+        "amount": 40370000
+      },
+      {
+        "month": "2026.3",
+        "amount": 28050000
+      }
+    ],
+    "activeMonthCount": 7,
+    "totalSales": 276584000,
+    "avgMonthlySales": 39512000,
+    "proposedCreditLimit": 80000000,
+    "maxMonth": "2025.11",
+    "maxSales": 52668000,
+    "minActiveMonth": "2026.3",
+    "minActiveSales": 28050000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "8538803087",
+    "customerName": "주식회사 케이포유",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 38568750
+      }
+    ],
+    "activeMonthCount": 1,
+    "totalSales": 38568750,
+    "avgMonthlySales": 38568750,
+    "proposedCreditLimit": 78000000,
+    "maxMonth": "2026.3",
+    "maxSales": 38568750,
+    "minActiveMonth": "2026.3",
+    "minActiveSales": 38568750,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "2298138692",
+    "customerName": "(주)에스폴리텍",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 38203000
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 1,
+    "totalSales": 38203000,
+    "avgMonthlySales": 38203000,
+    "proposedCreditLimit": 77000000,
+    "maxMonth": "2025.11",
+    "maxSales": 38203000,
+    "minActiveMonth": "2025.11",
+    "minActiveSales": 38203000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1240269478",
+    "customerName": "신성화인텍",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 33495000
+      },
+      {
+        "month": "2025.7",
+        "amount": 35403500
+      },
+      {
+        "month": "2025.8",
+        "amount": 28094000
+      },
+      {
+        "month": "2025.9",
+        "amount": 66892375
+      },
+      {
+        "month": "2025.10",
+        "amount": 37041125
+      },
+      {
+        "month": "2025.11",
+        "amount": 48067250
+      },
+      {
+        "month": "2025.12",
+        "amount": 39957500
+      },
+      {
+        "month": "2026.1",
+        "amount": 30416650
+      },
+      {
+        "month": "2026.2",
+        "amount": 36258750
+      },
+      {
+        "month": "2026.3",
+        "amount": 21936750
+      }
+    ],
+    "activeMonthCount": 10,
+    "totalSales": 377562900,
+    "avgMonthlySales": 37756290,
+    "proposedCreditLimit": 76000000,
+    "maxMonth": "2025.9",
+    "maxSales": 66892375,
+    "minActiveMonth": "2026.3",
+    "minActiveSales": 21936750,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1248674646",
+    "customerName": "(주)아모스 안성",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 52998000
+      },
+      {
+        "month": "2025.7",
+        "amount": 26730000
+      },
+      {
+        "month": "2025.8",
+        "amount": 23827925
+      },
+      {
+        "month": "2025.9",
+        "amount": 75964075
+      },
+      {
+        "month": "2025.10",
+        "amount": 12540000
+      },
+      {
+        "month": "2025.11",
+        "amount": 15312000
+      },
+      {
+        "month": "2025.12",
+        "amount": 11110000
+      },
+      {
+        "month": "2026.1",
+        "amount": 50292000
+      },
+      {
+        "month": "2026.2",
+        "amount": 26532000
+      },
+      {
+        "month": "2026.3",
+        "amount": 68640000
+      }
+    ],
+    "activeMonthCount": 10,
+    "totalSales": 363946000,
+    "avgMonthlySales": 36394600,
+    "proposedCreditLimit": 73000000,
+    "maxMonth": "2025.9",
+    "maxSales": 75964075,
+    "minActiveMonth": "2025.12",
+    "minActiveSales": 11110000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1813001469",
+    "customerName": "이에이치",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 55301400
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 38808000
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 7276500
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 3,
+    "totalSales": 101385900,
+    "avgMonthlySales": 33795300,
+    "proposedCreditLimit": 68000000,
+    "maxMonth": "2025.7",
+    "maxSales": 55301400,
+    "minActiveMonth": "2026.1",
+    "minActiveSales": 7276500,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1258155953",
+    "customerName": "주식회사 카이노스",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 24816000
+      },
+      {
+        "month": "2025.7",
+        "amount": 24816000
+      },
+      {
+        "month": "2025.8",
+        "amount": 27918000
+      },
+      {
+        "month": "2025.9",
+        "amount": 27918000
+      },
+      {
+        "month": "2025.10",
+        "amount": 31020000
+      },
+      {
+        "month": "2025.11",
+        "amount": 38896000
+      },
+      {
+        "month": "2025.12",
+        "amount": 44880000
+      },
+      {
+        "month": "2026.1",
+        "amount": 35904000
+      },
+      {
+        "month": "2026.2",
+        "amount": 26928000
+      },
+      {
+        "month": "2026.3",
+        "amount": 39864000
+      }
+    ],
+    "activeMonthCount": 10,
+    "totalSales": 322960000,
+    "avgMonthlySales": 32296000,
+    "proposedCreditLimit": 65000000,
+    "maxMonth": "2025.12",
+    "maxSales": 44880000,
+    "minActiveMonth": "2025.6",
+    "minActiveSales": 24816000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1348690814",
+    "customerName": "주식회사 대일화학",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 20449000
+      },
+      {
+        "month": "2025.7",
+        "amount": 55055000
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 32571000
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 34710500
+      },
+      {
+        "month": "2025.12",
+        "amount": 15592500
+      },
+      {
+        "month": "2026.1",
+        "amount": 32950500
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 28586250
+      }
+    ],
+    "activeMonthCount": 7,
+    "totalSales": 219914750,
+    "avgMonthlySales": 31416393,
+    "proposedCreditLimit": 63000000,
+    "maxMonth": "2025.7",
+    "maxSales": 55055000,
+    "minActiveMonth": "2025.12",
+    "minActiveSales": 15592500,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "7193200333",
+    "customerName": "지구산업",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 21340000
+      },
+      {
+        "month": "2025.7",
+        "amount": 23210000
+      },
+      {
+        "month": "2025.8",
+        "amount": 44220000
+      },
+      {
+        "month": "2025.9",
+        "amount": 52448000
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 43560000
+      },
+      {
+        "month": "2025.12",
+        "amount": 3410000
+      },
+      {
+        "month": "2026.1",
+        "amount": 22660000
+      },
+      {
+        "month": "2026.2",
+        "amount": 20900000
+      },
+      {
+        "month": "2026.3",
+        "amount": 49060000
+      }
+    ],
+    "activeMonthCount": 9,
+    "totalSales": 280808000,
+    "avgMonthlySales": 31200889,
+    "proposedCreditLimit": 63000000,
+    "maxMonth": "2025.9",
+    "maxSales": 52448000,
+    "minActiveMonth": "2025.12",
+    "minActiveSales": 3410000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "4368601779",
+    "customerName": "주식회사 이에스지케미칼",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 25421000
+      },
+      {
+        "month": "2025.7",
+        "amount": 23760000
+      },
+      {
+        "month": "2025.8",
+        "amount": 26796000
+      },
+      {
+        "month": "2025.9",
+        "amount": 39226000
+      },
+      {
+        "month": "2025.10",
+        "amount": 13379300
+      },
+      {
+        "month": "2025.11",
+        "amount": 31204250
+      },
+      {
+        "month": "2025.12",
+        "amount": 41888000
+      },
+      {
+        "month": "2026.1",
+        "amount": 24753025
+      },
+      {
+        "month": "2026.2",
+        "amount": 39710000
+      },
+      {
+        "month": "2026.3",
+        "amount": 31962700
+      }
+    ],
+    "activeMonthCount": 10,
+    "totalSales": 298100275,
+    "avgMonthlySales": 29810028,
+    "proposedCreditLimit": 60000000,
+    "maxMonth": "2025.12",
+    "maxSales": 41888000,
+    "minActiveMonth": "2025.10",
+    "minActiveSales": 13379300,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "5367700118",
+    "customerName": "크린듀",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 38940000
+      },
+      {
+        "month": "2025.7",
+        "amount": 20460000
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 2,
+    "totalSales": 59400000,
+    "avgMonthlySales": 29700000,
+    "proposedCreditLimit": 60000000,
+    "maxMonth": "2025.6",
+    "maxSales": 38940000,
+    "minActiveMonth": "2025.7",
+    "minActiveSales": 20460000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1258112779",
+    "customerName": "(주)주풍테크",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 19272000
+      },
+      {
+        "month": "2025.7",
+        "amount": 21879000
+      },
+      {
+        "month": "2025.8",
+        "amount": 18480000
+      },
+      {
+        "month": "2025.9",
+        "amount": 18480000
+      },
+      {
+        "month": "2025.10",
+        "amount": 14058000
+      },
+      {
+        "month": "2025.11",
+        "amount": 13035000
+      },
+      {
+        "month": "2025.12",
+        "amount": 49434000
+      },
+      {
+        "month": "2026.1",
+        "amount": 41813750
+      },
+      {
+        "month": "2026.2",
+        "amount": 54502250
+      },
+      {
+        "month": "2026.3",
+        "amount": 40342500
+      }
+    ],
+    "activeMonthCount": 10,
+    "totalSales": 291296500,
+    "avgMonthlySales": 29129650,
+    "proposedCreditLimit": 59000000,
+    "maxMonth": "2026.2",
+    "maxSales": 54502250,
+    "minActiveMonth": "2025.11",
+    "minActiveSales": 13035000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1288188550",
+    "customerName": "(주)모드켐",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 39733100
+      },
+      {
+        "month": "2025.7",
+        "amount": 24065250
+      },
+      {
+        "month": "2025.8",
+        "amount": 33132000
+      },
+      {
+        "month": "2025.9",
+        "amount": 22110000
+      },
+      {
+        "month": "2025.10",
+        "amount": 23232000
+      },
+      {
+        "month": "2025.11",
+        "amount": 22836000
+      },
+      {
+        "month": "2025.12",
+        "amount": 21780000
+      },
+      {
+        "month": "2026.1",
+        "amount": 21780000
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 48840000
+      }
+    ],
+    "activeMonthCount": 9,
+    "totalSales": 257508350,
+    "avgMonthlySales": 28612039,
+    "proposedCreditLimit": 58000000,
+    "maxMonth": "2026.3",
+    "maxSales": 48840000,
+    "minActiveMonth": "2025.12",
+    "minActiveSales": 21780000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1270190482",
+    "customerName": "승진기업사",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 26037000
+      },
+      {
+        "month": "2025.7",
+        "amount": 18612000
+      },
+      {
+        "month": "2025.8",
+        "amount": 8712000
+      },
+      {
+        "month": "2025.9",
+        "amount": 18216000
+      },
+      {
+        "month": "2025.10",
+        "amount": 27918000
+      },
+      {
+        "month": "2025.11",
+        "amount": 45474000
+      },
+      {
+        "month": "2025.12",
+        "amount": 50534000
+      },
+      {
+        "month": "2026.1",
+        "amount": 34122000
+      },
+      {
+        "month": "2026.2",
+        "amount": 31416000
+      },
+      {
+        "month": "2026.3",
+        "amount": 20592000
+      }
+    ],
+    "activeMonthCount": 10,
+    "totalSales": 281633000,
+    "avgMonthlySales": 28163300,
+    "proposedCreditLimit": 57000000,
+    "maxMonth": "2025.12",
+    "maxSales": 50534000,
+    "minActiveMonth": "2025.8",
+    "minActiveSales": 8712000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "2208125278",
+    "customerName": "(주)일진레이텍",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 27731000
+      },
+      {
+        "month": "2025.7",
+        "amount": 36356100
+      },
+      {
+        "month": "2025.8",
+        "amount": 13775850
+      },
+      {
+        "month": "2025.9",
+        "amount": 8767000
+      },
+      {
+        "month": "2025.10",
+        "amount": 21086175
+      },
+      {
+        "month": "2025.11",
+        "amount": 21384000
+      },
+      {
+        "month": "2025.12",
+        "amount": 7393650
+      },
+      {
+        "month": "2026.1",
+        "amount": 34340625
+      },
+      {
+        "month": "2026.2",
+        "amount": 44145200
+      },
+      {
+        "month": "2026.3",
+        "amount": 43183800
+      }
+    ],
+    "activeMonthCount": 10,
+    "totalSales": 258163400,
+    "avgMonthlySales": 25816340,
+    "proposedCreditLimit": 52000000,
+    "maxMonth": "2026.2",
+    "maxSales": 44145200,
+    "minActiveMonth": "2025.12",
+    "minActiveSales": 7393650,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1248150445",
+    "customerName": "금성에이스산업(주)",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 24750000
+      },
+      {
+        "month": "2025.7",
+        "amount": 24200000
+      },
+      {
+        "month": "2025.8",
+        "amount": 19360000
+      },
+      {
+        "month": "2025.9",
+        "amount": 24200000
+      },
+      {
+        "month": "2025.10",
+        "amount": 12100000
+      },
+      {
+        "month": "2025.11",
+        "amount": 24200000
+      },
+      {
+        "month": "2025.12",
+        "amount": 15675000
+      },
+      {
+        "month": "2026.1",
+        "amount": 30580000
+      },
+      {
+        "month": "2026.2",
+        "amount": 21890000
+      },
+      {
+        "month": "2026.3",
+        "amount": 46860000
+      }
+    ],
+    "activeMonthCount": 10,
+    "totalSales": 243815000,
+    "avgMonthlySales": 24381500,
+    "proposedCreditLimit": 49000000,
+    "maxMonth": "2026.3",
+    "maxSales": 46860000,
+    "minActiveMonth": "2025.10",
+    "minActiveSales": 12100000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1248128341",
+    "customerName": "에스디코리아 주식회사",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 305800
+      },
+      {
+        "month": "2025.7",
+        "amount": 25300000
+      },
+      {
+        "month": "2025.8",
+        "amount": 25207600
+      },
+      {
+        "month": "2025.9",
+        "amount": 24750000
+      },
+      {
+        "month": "2025.10",
+        "amount": 24750000
+      },
+      {
+        "month": "2025.11",
+        "amount": 24923800
+      },
+      {
+        "month": "2025.12",
+        "amount": 24420000
+      },
+      {
+        "month": "2026.1",
+        "amount": 24420000
+      },
+      {
+        "month": "2026.2",
+        "amount": 24420000
+      },
+      {
+        "month": "2026.3",
+        "amount": 26620000
+      }
+    ],
+    "activeMonthCount": 10,
+    "totalSales": 225117200,
+    "avgMonthlySales": 22511720,
+    "proposedCreditLimit": 46000000,
+    "maxMonth": "2026.3",
+    "maxSales": 26620000,
+    "minActiveMonth": "2025.6",
+    "minActiveSales": 305800,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1332265417",
+    "customerName": "부일산업",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 21000000
+      },
+      {
+        "month": "2026.1",
+        "amount": 21000000
+      },
+      {
+        "month": "2026.2",
+        "amount": 21000000
+      },
+      {
+        "month": "2026.3",
+        "amount": 26900000
+      }
+    ],
+    "activeMonthCount": 4,
+    "totalSales": 89900000,
+    "avgMonthlySales": 22475000,
+    "proposedCreditLimit": 45000000,
+    "maxMonth": "2026.3",
+    "maxSales": 26900000,
+    "minActiveMonth": "2025.12",
+    "minActiveSales": 21000000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "4178150857",
+    "customerName": "주식회사 애니켐",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 20515000
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 6600000
+      },
+      {
+        "month": "2025.10",
+        "amount": 30206008
+      },
+      {
+        "month": "2025.11",
+        "amount": 8250000
+      },
+      {
+        "month": "2025.12",
+        "amount": 8923200
+      },
+      {
+        "month": "2026.1",
+        "amount": 36471875
+      },
+      {
+        "month": "2026.2",
+        "amount": 41687250
+      },
+      {
+        "month": "2026.3",
+        "amount": 23457500
+      }
+    ],
+    "activeMonthCount": 8,
+    "totalSales": 176110833,
+    "avgMonthlySales": 22013854,
+    "proposedCreditLimit": 45000000,
+    "maxMonth": "2026.2",
+    "maxSales": 41687250,
+    "minActiveMonth": "2025.9",
+    "minActiveSales": 6600000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "6098701864",
+    "customerName": "주식회사 자프",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 23298000
+      },
+      {
+        "month": "2025.7",
+        "amount": 26697000
+      },
+      {
+        "month": "2025.8",
+        "amount": 23490500
+      },
+      {
+        "month": "2025.9",
+        "amount": 11088000
+      },
+      {
+        "month": "2025.10",
+        "amount": 17974000
+      },
+      {
+        "month": "2025.11",
+        "amount": 14938000
+      },
+      {
+        "month": "2025.12",
+        "amount": 29545175
+      },
+      {
+        "month": "2026.1",
+        "amount": 25605525
+      },
+      {
+        "month": "2026.2",
+        "amount": 25080000
+      },
+      {
+        "month": "2026.3",
+        "amount": 23166000
+      }
+    ],
+    "activeMonthCount": 10,
+    "totalSales": 220882200,
+    "avgMonthlySales": 22088220,
+    "proposedCreditLimit": 45000000,
+    "maxMonth": "2025.12",
+    "maxSales": 29545175,
+    "minActiveMonth": "2025.9",
+    "minActiveSales": 11088000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "3018112878",
+    "customerName": "(주)그린제약",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 21560000
+      },
+      {
+        "month": "2025.7",
+        "amount": 24706000
+      },
+      {
+        "month": "2025.8",
+        "amount": 18876000
+      },
+      {
+        "month": "2025.9",
+        "amount": 24706000
+      },
+      {
+        "month": "2025.10",
+        "amount": 18876000
+      },
+      {
+        "month": "2025.11",
+        "amount": 21560000
+      },
+      {
+        "month": "2025.12",
+        "amount": 21560000
+      },
+      {
+        "month": "2026.1",
+        "amount": 18876000
+      },
+      {
+        "month": "2026.2",
+        "amount": 18876000
+      },
+      {
+        "month": "2026.3",
+        "amount": 23100000
+      }
+    ],
+    "activeMonthCount": 10,
+    "totalSales": 212696000,
+    "avgMonthlySales": 21269600,
+    "proposedCreditLimit": 43000000,
+    "maxMonth": "2025.7",
+    "maxSales": 24706000,
+    "minActiveMonth": "2025.8",
+    "minActiveSales": 18876000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1273679908",
+    "customerName": "세봉산업",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 12870000
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 31680000
+      },
+      {
+        "month": "2025.10",
+        "amount": 10560000
+      },
+      {
+        "month": "2025.11",
+        "amount": 23232000
+      },
+      {
+        "month": "2025.12",
+        "amount": 29568000
+      },
+      {
+        "month": "2026.1",
+        "amount": 6336000
+      },
+      {
+        "month": "2026.2",
+        "amount": 29568000
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 7,
+    "totalSales": 143814000,
+    "avgMonthlySales": 20544857,
+    "proposedCreditLimit": 42000000,
+    "maxMonth": "2025.9",
+    "maxSales": 31680000,
+    "minActiveMonth": "2026.1",
+    "minActiveSales": 6336000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1261582818",
+    "customerName": "보성포리공업",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 19140000
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 19965000
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 2,
+    "totalSales": 39105000,
+    "avgMonthlySales": 19552500,
+    "proposedCreditLimit": 40000000,
+    "maxMonth": "2025.8",
+    "maxSales": 19965000,
+    "minActiveMonth": "2025.6",
+    "minActiveSales": 19140000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "6648101215",
+    "customerName": "주식회사 에스디인더스트리",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 23556500
+      },
+      {
+        "month": "2025.7",
+        "amount": 9735000
+      },
+      {
+        "month": "2025.8",
+        "amount": 19470000
+      },
+      {
+        "month": "2025.9",
+        "amount": 29167050
+      },
+      {
+        "month": "2025.10",
+        "amount": 9680000
+      },
+      {
+        "month": "2025.11",
+        "amount": 19140000
+      },
+      {
+        "month": "2025.12",
+        "amount": 18810000
+      },
+      {
+        "month": "2026.1",
+        "amount": 19360000
+      },
+      {
+        "month": "2026.2",
+        "amount": 19360000
+      },
+      {
+        "month": "2026.3",
+        "amount": 21560000
+      }
+    ],
+    "activeMonthCount": 10,
+    "totalSales": 189838550,
+    "avgMonthlySales": 18983855,
+    "proposedCreditLimit": 38000000,
+    "maxMonth": "2025.9",
+    "maxSales": 29167050,
+    "minActiveMonth": "2025.10",
+    "minActiveSales": 9680000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1371317268",
+    "customerName": "동화비니루",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 11327250
+      },
+      {
+        "month": "2025.11",
+        "amount": 28586250
+      },
+      {
+        "month": "2025.12",
+        "amount": 9306000
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 3,
+    "totalSales": 49219500,
+    "avgMonthlySales": 16406500,
+    "proposedCreditLimit": 33000000,
+    "maxMonth": "2025.11",
+    "maxSales": 28586250,
+    "minActiveMonth": "2025.12",
+    "minActiveSales": 9306000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "2478700110",
+    "customerName": "(주)달리팩",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 20691000
+      },
+      {
+        "month": "2025.7",
+        "amount": 18392000
+      },
+      {
+        "month": "2025.8",
+        "amount": 18128000
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 4136000
+      },
+      {
+        "month": "2025.11",
+        "amount": 17952000
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 13464000
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 17248000
+      }
+    ],
+    "activeMonthCount": 7,
+    "totalSales": 110011000,
+    "avgMonthlySales": 15715857,
+    "proposedCreditLimit": 32000000,
+    "maxMonth": "2025.6",
+    "maxSales": 20691000,
+    "minActiveMonth": "2025.10",
+    "minActiveSales": 4136000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "3038148839",
+    "customerName": "(주)에스에스씨",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 10285000
+      },
+      {
+        "month": "2025.7",
+        "amount": 10285000
+      },
+      {
+        "month": "2025.8",
+        "amount": 20350000
+      },
+      {
+        "month": "2025.9",
+        "amount": 6039000
+      },
+      {
+        "month": "2025.10",
+        "amount": 20130000
+      },
+      {
+        "month": "2025.11",
+        "amount": 12078000
+      },
+      {
+        "month": "2025.12",
+        "amount": 10922175
+      },
+      {
+        "month": "2026.1",
+        "amount": 9900000
+      },
+      {
+        "month": "2026.2",
+        "amount": 19800000
+      },
+      {
+        "month": "2026.3",
+        "amount": 29590000
+      }
+    ],
+    "activeMonthCount": 10,
+    "totalSales": 149379175,
+    "avgMonthlySales": 14937918,
+    "proposedCreditLimit": 30000000,
+    "maxMonth": "2026.3",
+    "maxSales": 29590000,
+    "minActiveMonth": "2025.9",
+    "minActiveSales": 6039000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "5048620098",
+    "customerName": "주식회사 선우티앤에프",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 19723000
+      },
+      {
+        "month": "2025.7",
+        "amount": 12551000
+      },
+      {
+        "month": "2025.8",
+        "amount": 14388000
+      },
+      {
+        "month": "2025.9",
+        "amount": 12089000
+      },
+      {
+        "month": "2025.10",
+        "amount": 10362000
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 5,
+    "totalSales": 69113000,
+    "avgMonthlySales": 13822600,
+    "proposedCreditLimit": 28000000,
+    "maxMonth": "2025.6",
+    "maxSales": 19723000,
+    "minActiveMonth": "2025.10",
+    "minActiveSales": 10362000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1181065676",
+    "customerName": "화성산업",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 13530000
+      }
+    ],
+    "activeMonthCount": 1,
+    "totalSales": 13530000,
+    "avgMonthlySales": 13530000,
+    "proposedCreditLimit": 28000000,
+    "maxMonth": "2026.3",
+    "maxSales": 13530000,
+    "minActiveMonth": "2026.3",
+    "minActiveSales": 13530000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "133-81-26987",
+    "customerName": "동양수지공업(주)",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 7804500
+      },
+      {
+        "month": "2025.7",
+        "amount": 10224500
+      },
+      {
+        "month": "2025.8",
+        "amount": 12326875
+      },
+      {
+        "month": "2025.9",
+        "amount": 7396125
+      },
+      {
+        "month": "2025.10",
+        "amount": 32802000
+      },
+      {
+        "month": "2025.11",
+        "amount": 7350750
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 6,
+    "totalSales": 77904750,
+    "avgMonthlySales": 12984125,
+    "proposedCreditLimit": 26000000,
+    "maxMonth": "2025.10",
+    "maxSales": 32802000,
+    "minActiveMonth": "2025.11",
+    "minActiveSales": 7350750,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "126-81-41317",
+    "customerName": "제이에스유화(주)",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 11550000
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 1,
+    "totalSales": 11550000,
+    "avgMonthlySales": 11550000,
+    "proposedCreditLimit": 24000000,
+    "maxMonth": "2026.1",
+    "maxSales": 11550000,
+    "minActiveMonth": "2026.1",
+    "minActiveSales": 11550000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1330479969",
+    "customerName": "세왕산업사",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 18251200
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 3784000
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 2,
+    "totalSales": 22035200,
+    "avgMonthlySales": 11017600,
+    "proposedCreditLimit": 23000000,
+    "maxMonth": "2025.11",
+    "maxSales": 18251200,
+    "minActiveMonth": "2026.1",
+    "minActiveSales": 3784000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1400404879",
+    "customerName": "일성케미칼",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 1958000
+      },
+      {
+        "month": "2025.7",
+        "amount": 32670000
+      },
+      {
+        "month": "2025.8",
+        "amount": 30522250
+      },
+      {
+        "month": "2025.9",
+        "amount": 3498000
+      },
+      {
+        "month": "2025.10",
+        "amount": 1914000
+      },
+      {
+        "month": "2025.11",
+        "amount": 1881000
+      },
+      {
+        "month": "2025.12",
+        "amount": 1881000
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 7,
+    "totalSales": 74324250,
+    "avgMonthlySales": 10617750,
+    "proposedCreditLimit": 22000000,
+    "maxMonth": "2025.7",
+    "maxSales": 32670000,
+    "minActiveMonth": "2025.11",
+    "minActiveSales": 1881000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "4958600876",
+    "customerName": "주식회사 원진포리머",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 8536000
+      },
+      {
+        "month": "2025.7",
+        "amount": 5170000
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 10340000
+      },
+      {
+        "month": "2025.10",
+        "amount": 10340000
+      },
+      {
+        "month": "2025.11",
+        "amount": 22748000
+      },
+      {
+        "month": "2025.12",
+        "amount": 13442000
+      },
+      {
+        "month": "2026.1",
+        "amount": 5170000
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 9152000
+      }
+    ],
+    "activeMonthCount": 8,
+    "totalSales": 84898000,
+    "avgMonthlySales": 10612250,
+    "proposedCreditLimit": 22000000,
+    "maxMonth": "2025.11",
+    "maxSales": 22748000,
+    "minActiveMonth": "2025.7",
+    "minActiveSales": 5170000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "2418101614",
+    "customerName": "주식회사 유진하이텍",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 673750
+      },
+      {
+        "month": "2025.7",
+        "amount": 10626000
+      },
+      {
+        "month": "2025.8",
+        "amount": 10428000
+      },
+      {
+        "month": "2025.9",
+        "amount": 10296000
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 10098000
+      },
+      {
+        "month": "2025.12",
+        "amount": 20196000
+      },
+      {
+        "month": "2026.1",
+        "amount": 10098000
+      },
+      {
+        "month": "2026.2",
+        "amount": 10487400
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 8,
+    "totalSales": 82903150,
+    "avgMonthlySales": 10362894,
+    "proposedCreditLimit": 21000000,
+    "maxMonth": "2025.12",
+    "maxSales": 20196000,
+    "minActiveMonth": "2025.6",
+    "minActiveSales": 673750,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1410342729",
+    "customerName": "선원테크",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 18436000
+      },
+      {
+        "month": "2025.7",
+        "amount": 6237000
+      },
+      {
+        "month": "2025.8",
+        "amount": 10296000
+      },
+      {
+        "month": "2025.9",
+        "amount": 6061000
+      },
+      {
+        "month": "2025.10",
+        "amount": 14839000
+      },
+      {
+        "month": "2025.11",
+        "amount": 8316000
+      },
+      {
+        "month": "2025.12",
+        "amount": 8272000
+      },
+      {
+        "month": "2026.1",
+        "amount": 8272000
+      },
+      {
+        "month": "2026.2",
+        "amount": 8272000
+      },
+      {
+        "month": "2026.3",
+        "amount": 9306000
+      }
+    ],
+    "activeMonthCount": 10,
+    "totalSales": 98307000,
+    "avgMonthlySales": 9830700,
+    "proposedCreditLimit": 20000000,
+    "maxMonth": "2025.6",
+    "maxSales": 18436000,
+    "minActiveMonth": "2025.9",
+    "minActiveSales": 6061000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "8258700792",
+    "customerName": "주식회사 성일기업",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 9361000
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 10978000
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 9548000
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 9548000
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 4,
+    "totalSales": 39435000,
+    "avgMonthlySales": 9858750,
+    "proposedCreditLimit": 20000000,
+    "maxMonth": "2025.8",
+    "maxSales": 10978000,
+    "minActiveMonth": "2025.6",
+    "minActiveSales": 9361000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "6398800107",
+    "customerName": "주식회사 태림기업",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 10692000
+      },
+      {
+        "month": "2025.7",
+        "amount": 10692000
+      },
+      {
+        "month": "2025.8",
+        "amount": 1749000
+      },
+      {
+        "month": "2025.9",
+        "amount": 6864000
+      },
+      {
+        "month": "2025.10",
+        "amount": 17160000
+      },
+      {
+        "month": "2025.11",
+        "amount": 8415000
+      },
+      {
+        "month": "2025.12",
+        "amount": 10098000
+      },
+      {
+        "month": "2026.1",
+        "amount": 10098000
+      },
+      {
+        "month": "2026.2",
+        "amount": 10098000
+      },
+      {
+        "month": "2026.3",
+        "amount": 9515000
+      }
+    ],
+    "activeMonthCount": 10,
+    "totalSales": 95381000,
+    "avgMonthlySales": 9538100,
+    "proposedCreditLimit": 20000000,
+    "maxMonth": "2025.10",
+    "maxSales": 17160000,
+    "minActiveMonth": "2025.8",
+    "minActiveSales": 1749000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1058159649",
+    "customerName": "한국엔지니어링플라스틱(주)",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 17028000
+      },
+      {
+        "month": "2025.7",
+        "amount": 8514000
+      },
+      {
+        "month": "2025.8",
+        "amount": 8939700
+      },
+      {
+        "month": "2025.9",
+        "amount": 8514000
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 4257000
+      },
+      {
+        "month": "2025.12",
+        "amount": 8514000
+      },
+      {
+        "month": "2026.1",
+        "amount": 8294000
+      },
+      {
+        "month": "2026.2",
+        "amount": 8294000
+      },
+      {
+        "month": "2026.3",
+        "amount": 12441000
+      }
+    ],
+    "activeMonthCount": 9,
+    "totalSales": 84795700,
+    "avgMonthlySales": 9421744,
+    "proposedCreditLimit": 19000000,
+    "maxMonth": "2025.6",
+    "maxSales": 17028000,
+    "minActiveMonth": "2025.11",
+    "minActiveSales": 4257000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1298674414",
+    "customerName": "주식회사 두두월드",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 11770000
+      },
+      {
+        "month": "2025.7",
+        "amount": 18568000
+      },
+      {
+        "month": "2025.8",
+        "amount": 9284000
+      },
+      {
+        "month": "2025.9",
+        "amount": 4642000
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 11495000
+      },
+      {
+        "month": "2026.1",
+        "amount": 6897000
+      },
+      {
+        "month": "2026.2",
+        "amount": 4598000
+      },
+      {
+        "month": "2026.3",
+        "amount": 2519000
+      }
+    ],
+    "activeMonthCount": 8,
+    "totalSales": 69773000,
+    "avgMonthlySales": 8721625,
+    "proposedCreditLimit": 18000000,
+    "maxMonth": "2025.7",
+    "maxSales": 18568000,
+    "minActiveMonth": "2026.3",
+    "minActiveSales": 2519000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1388180894",
+    "customerName": "주식회사 서울하이텍",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 9724000
+      },
+      {
+        "month": "2025.7",
+        "amount": 9350000
+      },
+      {
+        "month": "2025.8",
+        "amount": 7398600
+      },
+      {
+        "month": "2025.9",
+        "amount": 10483000
+      },
+      {
+        "month": "2025.10",
+        "amount": 7194000
+      },
+      {
+        "month": "2025.11",
+        "amount": 9592000
+      },
+      {
+        "month": "2025.12",
+        "amount": 9460000
+      },
+      {
+        "month": "2026.1",
+        "amount": 7095000
+      },
+      {
+        "month": "2026.2",
+        "amount": 7095000
+      },
+      {
+        "month": "2026.3",
+        "amount": 7755000
+      }
+    ],
+    "activeMonthCount": 10,
+    "totalSales": 85146600,
+    "avgMonthlySales": 8514660,
+    "proposedCreditLimit": 18000000,
+    "maxMonth": "2025.9",
+    "maxSales": 10483000,
+    "minActiveMonth": "2026.1",
+    "minActiveSales": 7095000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "3078141110",
+    "customerName": "태성에컴스주식회사",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 14130600
+      },
+      {
+        "month": "2025.7",
+        "amount": 5573700
+      },
+      {
+        "month": "2025.8",
+        "amount": 14036000
+      },
+      {
+        "month": "2025.9",
+        "amount": 6468000
+      },
+      {
+        "month": "2025.10",
+        "amount": 4785000
+      },
+      {
+        "month": "2025.11",
+        "amount": 6926700
+      },
+      {
+        "month": "2025.12",
+        "amount": 1947000
+      },
+      {
+        "month": "2026.1",
+        "amount": 9372000
+      },
+      {
+        "month": "2026.2",
+        "amount": 10142000
+      },
+      {
+        "month": "2026.3",
+        "amount": 15906000
+      }
+    ],
+    "activeMonthCount": 10,
+    "totalSales": 89287000,
+    "avgMonthlySales": 8928700,
+    "proposedCreditLimit": 18000000,
+    "maxMonth": "2026.3",
+    "maxSales": 15906000,
+    "minActiveMonth": "2025.12",
+    "minActiveSales": 1947000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1060381525",
+    "customerName": "REDRUN(레드런)",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 8998000
+      },
+      {
+        "month": "2025.7",
+        "amount": 9196000
+      },
+      {
+        "month": "2025.8",
+        "amount": 9064000
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 8976000
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 7392000
+      }
+    ],
+    "activeMonthCount": 5,
+    "totalSales": 43626000,
+    "avgMonthlySales": 8725200,
+    "proposedCreditLimit": 18000000,
+    "maxMonth": "2025.7",
+    "maxSales": 9196000,
+    "minActiveMonth": "2026.3",
+    "minActiveSales": 7392000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1071989569",
+    "customerName": "신성수지상사",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 5060000
+      },
+      {
+        "month": "2025.7",
+        "amount": 9867000
+      },
+      {
+        "month": "2025.8",
+        "amount": 6215000
+      },
+      {
+        "month": "2025.9",
+        "amount": 6193000
+      },
+      {
+        "month": "2025.10",
+        "amount": 6193000
+      },
+      {
+        "month": "2025.11",
+        "amount": 4369750
+      },
+      {
+        "month": "2025.12",
+        "amount": 12485550
+      },
+      {
+        "month": "2026.1",
+        "amount": 11484000
+      },
+      {
+        "month": "2026.2",
+        "amount": 6820000
+      },
+      {
+        "month": "2026.3",
+        "amount": 11781000
+      }
+    ],
+    "activeMonthCount": 10,
+    "totalSales": 80468300,
+    "avgMonthlySales": 8046830,
+    "proposedCreditLimit": 17000000,
+    "maxMonth": "2025.12",
+    "maxSales": 12485550,
+    "minActiveMonth": "2025.11",
+    "minActiveSales": 4369750,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "5038195418",
+    "customerName": "주식회사 퍼시픽인더스트리",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 269500
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 16678750
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 2,
+    "totalSales": 16948250,
+    "avgMonthlySales": 8474125,
+    "proposedCreditLimit": 17000000,
+    "maxMonth": "2025.11",
+    "maxSales": 16678750,
+    "minActiveMonth": "2025.9",
+    "minActiveSales": 269500,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1248186865",
+    "customerName": "(주)예그린제과",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 8008000
+      },
+      {
+        "month": "2025.9",
+        "amount": 7946400
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 7854000
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 7854000
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 4,
+    "totalSales": 31662400,
+    "avgMonthlySales": 7915600,
+    "proposedCreditLimit": 16000000,
+    "maxMonth": "2025.8",
+    "maxSales": 8008000,
+    "minActiveMonth": "2025.12",
+    "minActiveSales": 7854000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1248662612",
+    "customerName": "(주)우영인더스트리",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 4620000
+      },
+      {
+        "month": "2025.10",
+        "amount": 13200000
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 8800000
+      },
+      {
+        "month": "2026.3",
+        "amount": 5060000
+      }
+    ],
+    "activeMonthCount": 4,
+    "totalSales": 31680000,
+    "avgMonthlySales": 7920000,
+    "proposedCreditLimit": 16000000,
+    "maxMonth": "2025.10",
+    "maxSales": 13200000,
+    "minActiveMonth": "2025.9",
+    "minActiveSales": 4620000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "6078177653",
+    "customerName": "(주)화승네트웍스",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 10362000
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 6732000
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 6732000
+      },
+      {
+        "month": "2025.12",
+        "amount": 6732000
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 6600000
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 5,
+    "totalSales": 37158000,
+    "avgMonthlySales": 7431600,
+    "proposedCreditLimit": 15000000,
+    "maxMonth": "2025.7",
+    "maxSales": 10362000,
+    "minActiveMonth": "2026.2",
+    "minActiveSales": 6600000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1338130012",
+    "customerName": "성도케미칼(주)",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 748000
+      },
+      {
+        "month": "2025.7",
+        "amount": 8833000
+      },
+      {
+        "month": "2025.8",
+        "amount": 446600
+      },
+      {
+        "month": "2025.9",
+        "amount": 2783000
+      },
+      {
+        "month": "2025.10",
+        "amount": 4920300
+      },
+      {
+        "month": "2025.11",
+        "amount": 6308500
+      },
+      {
+        "month": "2025.12",
+        "amount": 2255000
+      },
+      {
+        "month": "2026.1",
+        "amount": 13596000
+      },
+      {
+        "month": "2026.2",
+        "amount": 24013000
+      },
+      {
+        "month": "2026.3",
+        "amount": 5060000
+      }
+    ],
+    "activeMonthCount": 10,
+    "totalSales": 68963400,
+    "avgMonthlySales": 6896340,
+    "proposedCreditLimit": 14000000,
+    "maxMonth": "2026.2",
+    "maxSales": 24013000,
+    "minActiveMonth": "2025.8",
+    "minActiveSales": 446600,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1274126064",
+    "customerName": "태양파우다",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 6435000
+      },
+      {
+        "month": "2025.7",
+        "amount": 4290000
+      },
+      {
+        "month": "2025.8",
+        "amount": 6336000
+      },
+      {
+        "month": "2025.9",
+        "amount": 4290000
+      },
+      {
+        "month": "2025.10",
+        "amount": 8580000
+      },
+      {
+        "month": "2025.11",
+        "amount": 4290000
+      },
+      {
+        "month": "2025.12",
+        "amount": 8580000
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 8580000
+      },
+      {
+        "month": "2026.3",
+        "amount": 9460000
+      }
+    ],
+    "activeMonthCount": 9,
+    "totalSales": 60841000,
+    "avgMonthlySales": 6760111,
+    "proposedCreditLimit": 14000000,
+    "maxMonth": "2026.3",
+    "maxSales": 9460000,
+    "minActiveMonth": "2025.7",
+    "minActiveSales": 4290000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "3038104258",
+    "customerName": "플라맥스 주식회사",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 8580000
+      },
+      {
+        "month": "2025.7",
+        "amount": 4224000
+      },
+      {
+        "month": "2025.8",
+        "amount": 2112000
+      },
+      {
+        "month": "2025.9",
+        "amount": 8404000
+      },
+      {
+        "month": "2025.10",
+        "amount": 8404000
+      },
+      {
+        "month": "2025.11",
+        "amount": 10450000
+      },
+      {
+        "month": "2025.12",
+        "amount": 4136000
+      },
+      {
+        "month": "2026.1",
+        "amount": 6204000
+      },
+      {
+        "month": "2026.2",
+        "amount": 10340000
+      },
+      {
+        "month": "2026.3",
+        "amount": 6864000
+      }
+    ],
+    "activeMonthCount": 10,
+    "totalSales": 69718000,
+    "avgMonthlySales": 6971800,
+    "proposedCreditLimit": 14000000,
+    "maxMonth": "2025.11",
+    "maxSales": 10450000,
+    "minActiveMonth": "2025.8",
+    "minActiveSales": 2112000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1268602911",
+    "customerName": "(주)선운",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 6105000
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 1,
+    "totalSales": 6105000,
+    "avgMonthlySales": 6105000,
+    "proposedCreditLimit": 13000000,
+    "maxMonth": "2025.12",
+    "maxSales": 6105000,
+    "minActiveMonth": "2025.12",
+    "minActiveSales": 6105000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1248641859",
+    "customerName": "(주)썸텍",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 673750
+      },
+      {
+        "month": "2025.7",
+        "amount": 11660000
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 2,
+    "totalSales": 12333750,
+    "avgMonthlySales": 6166875,
+    "proposedCreditLimit": 13000000,
+    "maxMonth": "2025.7",
+    "maxSales": 11660000,
+    "minActiveMonth": "2025.6",
+    "minActiveSales": 673750,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1338139430",
+    "customerName": "주식회사 부경글로벌",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 5254700
+      },
+      {
+        "month": "2025.7",
+        "amount": 19409500
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 2409000
+      },
+      {
+        "month": "2025.10",
+        "amount": 1265000
+      },
+      {
+        "month": "2025.11",
+        "amount": 14927000
+      },
+      {
+        "month": "2025.12",
+        "amount": 929500
+      },
+      {
+        "month": "2026.1",
+        "amount": 2798400
+      },
+      {
+        "month": "2026.2",
+        "amount": 3339600
+      },
+      {
+        "month": "2026.3",
+        "amount": 2918300
+      }
+    ],
+    "activeMonthCount": 9,
+    "totalSales": 53251000,
+    "avgMonthlySales": 5916778,
+    "proposedCreditLimit": 12000000,
+    "maxMonth": "2025.7",
+    "maxSales": 19409500,
+    "minActiveMonth": "2025.12",
+    "minActiveSales": 929500,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "6368100074",
+    "customerName": "주식회사 태원",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 7128000
+      },
+      {
+        "month": "2025.7",
+        "amount": 5346000
+      },
+      {
+        "month": "2025.8",
+        "amount": 1749000
+      },
+      {
+        "month": "2025.9",
+        "amount": 3432000
+      },
+      {
+        "month": "2025.10",
+        "amount": 8580000
+      },
+      {
+        "month": "2025.11",
+        "amount": 5049000
+      },
+      {
+        "month": "2025.12",
+        "amount": 5049000
+      },
+      {
+        "month": "2026.1",
+        "amount": 5049000
+      },
+      {
+        "month": "2026.2",
+        "amount": 5049000
+      },
+      {
+        "month": "2026.3",
+        "amount": 3806000
+      }
+    ],
+    "activeMonthCount": 10,
+    "totalSales": 50237000,
+    "avgMonthlySales": 5023700,
+    "proposedCreditLimit": 11000000,
+    "maxMonth": "2025.10",
+    "maxSales": 8580000,
+    "minActiveMonth": "2025.8",
+    "minActiveSales": 1749000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "6720302629",
+    "customerName": "반석기업",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 6171000
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 4070000
+      },
+      {
+        "month": "2025.12",
+        "amount": 4070000
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 4070000
+      },
+      {
+        "month": "2026.3",
+        "amount": 4510000
+      }
+    ],
+    "activeMonthCount": 5,
+    "totalSales": 22891000,
+    "avgMonthlySales": 4578200,
+    "proposedCreditLimit": 10000000,
+    "maxMonth": "2025.8",
+    "maxSales": 6171000,
+    "minActiveMonth": "2025.11",
+    "minActiveSales": 4070000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1380561985",
+    "customerName": "경기프라스틱",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 6512000
+      },
+      {
+        "month": "2026.1",
+        "amount": 1406625
+      },
+      {
+        "month": "2026.2",
+        "amount": 7221500
+      },
+      {
+        "month": "2026.3",
+        "amount": 2035000
+      }
+    ],
+    "activeMonthCount": 4,
+    "totalSales": 17175125,
+    "avgMonthlySales": 4293781,
+    "proposedCreditLimit": 9000000,
+    "maxMonth": "2026.2",
+    "maxSales": 7221500,
+    "minActiveMonth": "2026.1",
+    "minActiveSales": 1406625,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1300270999",
+    "customerName": "은진화학",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 2288000
+      },
+      {
+        "month": "2025.7",
+        "amount": 4829000
+      },
+      {
+        "month": "2025.8",
+        "amount": 4763000
+      },
+      {
+        "month": "2025.9",
+        "amount": 6985000
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 4488000
+      },
+      {
+        "month": "2025.12",
+        "amount": 4741000
+      },
+      {
+        "month": "2026.1",
+        "amount": 4741000
+      },
+      {
+        "month": "2026.2",
+        "amount": 2244000
+      },
+      {
+        "month": "2026.3",
+        "amount": 5181000
+      }
+    ],
+    "activeMonthCount": 9,
+    "totalSales": 40260000,
+    "avgMonthlySales": 4473333,
+    "proposedCreditLimit": 9000000,
+    "maxMonth": "2025.9",
+    "maxSales": 6985000,
+    "minActiveMonth": "2026.2",
+    "minActiveSales": 2244000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "3128160948",
+    "customerName": "(주)나봇케미칼",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 2475000
+      },
+      {
+        "month": "2025.7",
+        "amount": 2475000
+      },
+      {
+        "month": "2025.8",
+        "amount": 363000
+      },
+      {
+        "month": "2025.9",
+        "amount": 4840000
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 7744000
+      },
+      {
+        "month": "2025.12",
+        "amount": 5082000
+      },
+      {
+        "month": "2026.1",
+        "amount": 2420000
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 5280000
+      }
+    ],
+    "activeMonthCount": 8,
+    "totalSales": 30679000,
+    "avgMonthlySales": 3834875,
+    "proposedCreditLimit": 8000000,
+    "maxMonth": "2025.11",
+    "maxSales": 7744000,
+    "minActiveMonth": "2025.8",
+    "minActiveSales": 363000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "3128137938",
+    "customerName": "(주)대산하이텍",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 3850000
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 1,
+    "totalSales": 3850000,
+    "avgMonthlySales": 3850000,
+    "proposedCreditLimit": 8000000,
+    "maxMonth": "2025.7",
+    "maxSales": 3850000,
+    "minActiveMonth": "2025.7",
+    "minActiveSales": 3850000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "3038144911",
+    "customerName": "주식회사 중원G.L.B",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 2640000
+      },
+      {
+        "month": "2025.7",
+        "amount": 2640000
+      },
+      {
+        "month": "2025.8",
+        "amount": 5280000
+      },
+      {
+        "month": "2025.9",
+        "amount": 7920000
+      },
+      {
+        "month": "2025.10",
+        "amount": 2640000
+      },
+      {
+        "month": "2025.11",
+        "amount": 2640000
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 2818750
+      },
+      {
+        "month": "2026.2",
+        "amount": 2640000
+      },
+      {
+        "month": "2026.3",
+        "amount": 3410000
+      }
+    ],
+    "activeMonthCount": 9,
+    "totalSales": 32628750,
+    "avgMonthlySales": 3625417,
+    "proposedCreditLimit": 8000000,
+    "maxMonth": "2025.9",
+    "maxSales": 7920000,
+    "minActiveMonth": "2025.6",
+    "minActiveSales": 2640000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "3018159382",
+    "customerName": "(주)피이플렉스",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 2090000
+      },
+      {
+        "month": "2025.7",
+        "amount": 4136000
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 2035000
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 4455000
+      }
+    ],
+    "activeMonthCount": 4,
+    "totalSales": 12716000,
+    "avgMonthlySales": 3179000,
+    "proposedCreditLimit": 7000000,
+    "maxMonth": "2026.3",
+    "maxSales": 4455000,
+    "minActiveMonth": "2025.12",
+    "minActiveSales": 2035000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1986000674",
+    "customerName": "블레스정밀",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 3884100
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 3767500
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 3767500
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 1760000
+      },
+      {
+        "month": "2026.1",
+        "amount": 1760000
+      },
+      {
+        "month": "2026.2",
+        "amount": 2347400
+      },
+      {
+        "month": "2026.3",
+        "amount": 3960000
+      }
+    ],
+    "activeMonthCount": 7,
+    "totalSales": 21246500,
+    "avgMonthlySales": 3035214,
+    "proposedCreditLimit": 7000000,
+    "maxMonth": "2026.3",
+    "maxSales": 3960000,
+    "minActiveMonth": "2025.12",
+    "minActiveSales": 1760000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1258527417",
+    "customerName": "한일프라콘(주)안성공장",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 4862000
+      },
+      {
+        "month": "2025.7",
+        "amount": 2431000
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 2431000
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 4862000
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 2431000
+      },
+      {
+        "month": "2026.3",
+        "amount": 2706000
+      }
+    ],
+    "activeMonthCount": 6,
+    "totalSales": 19723000,
+    "avgMonthlySales": 3287167,
+    "proposedCreditLimit": 7000000,
+    "maxMonth": "2025.6",
+    "maxSales": 4862000,
+    "minActiveMonth": "2025.7",
+    "minActiveSales": 2431000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1076875632",
+    "customerName": "금강수지",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 2596000
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 1,
+    "totalSales": 2596000,
+    "avgMonthlySales": 2596000,
+    "proposedCreditLimit": 6000000,
+    "maxMonth": "2025.6",
+    "maxSales": 2596000,
+    "minActiveMonth": "2025.6",
+    "minActiveSales": 2596000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1358135463",
+    "customerName": "나노캠텍 주식회사",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 2530000
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 2530000
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 2,
+    "totalSales": 5060000,
+    "avgMonthlySales": 2530000,
+    "proposedCreditLimit": 6000000,
+    "maxMonth": "2025.7",
+    "maxSales": 2530000,
+    "minActiveMonth": "2025.7",
+    "minActiveSales": 2530000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1192266915",
+    "customerName": "대광포리머",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 2513500
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 1,
+    "totalSales": 2513500,
+    "avgMonthlySales": 2513500,
+    "proposedCreditLimit": 6000000,
+    "maxMonth": "2025.11",
+    "maxSales": 2513500,
+    "minActiveMonth": "2025.11",
+    "minActiveSales": 2513500,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1078159306",
+    "customerName": "삼호켐싸나(주)",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 697125
+      },
+      {
+        "month": "2025.8",
+        "amount": 2813250
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 3630000
+      },
+      {
+        "month": "2026.1",
+        "amount": 3410000
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 4,
+    "totalSales": 10550375,
+    "avgMonthlySales": 2637594,
+    "proposedCreditLimit": 6000000,
+    "maxMonth": "2025.12",
+    "maxSales": 3630000,
+    "minActiveMonth": "2025.7",
+    "minActiveSales": 697125,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1132364731",
+    "customerName": "탑전자",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 1936000
+      },
+      {
+        "month": "2025.7",
+        "amount": 1936000
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 1903000
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 3801875
+      },
+      {
+        "month": "2026.1",
+        "amount": 1870000
+      },
+      {
+        "month": "2026.2",
+        "amount": 4323000
+      },
+      {
+        "month": "2026.3",
+        "amount": 2090000
+      }
+    ],
+    "activeMonthCount": 7,
+    "totalSales": 17859875,
+    "avgMonthlySales": 2551411,
+    "proposedCreditLimit": 6000000,
+    "maxMonth": "2026.2",
+    "maxSales": 4323000,
+    "minActiveMonth": "2026.1",
+    "minActiveSales": 1870000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1148604901",
+    "customerName": "한폴 주식회사",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 2640000
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 1,
+    "totalSales": 2640000,
+    "avgMonthlySales": 2640000,
+    "proposedCreditLimit": 6000000,
+    "maxMonth": "2026.1",
+    "maxSales": 2640000,
+    "minActiveMonth": "2026.1",
+    "minActiveSales": 2640000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1190273456",
+    "customerName": "동남화학",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 2189000
+      }
+    ],
+    "activeMonthCount": 1,
+    "totalSales": 2189000,
+    "avgMonthlySales": 2189000,
+    "proposedCreditLimit": 5000000,
+    "maxMonth": "2026.3",
+    "maxSales": 2189000,
+    "minActiveMonth": "2026.3",
+    "minActiveSales": 2189000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1221572749",
+    "customerName": "드림켐텍",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 2607000
+      },
+      {
+        "month": "2025.8",
+        "amount": 281600
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 2976600
+      },
+      {
+        "month": "2026.1",
+        "amount": 2420000
+      },
+      {
+        "month": "2026.2",
+        "amount": 3822500
+      },
+      {
+        "month": "2026.3",
+        "amount": 150150
+      }
+    ],
+    "activeMonthCount": 6,
+    "totalSales": 12257850,
+    "avgMonthlySales": 2042975,
+    "proposedCreditLimit": 5000000,
+    "maxMonth": "2026.2",
+    "maxSales": 3822500,
+    "minActiveMonth": "2026.3",
+    "minActiveSales": 150150,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "6514500037",
+    "customerName": "본케미칼",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 1672000
+      },
+      {
+        "month": "2025.9",
+        "amount": 1672000
+      },
+      {
+        "month": "2025.10",
+        "amount": 5016000
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 1650000
+      },
+      {
+        "month": "2026.1",
+        "amount": 1672000
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 2307800
+      }
+    ],
+    "activeMonthCount": 6,
+    "totalSales": 13989800,
+    "avgMonthlySales": 2331633,
+    "proposedCreditLimit": 5000000,
+    "maxMonth": "2025.10",
+    "maxSales": 5016000,
+    "minActiveMonth": "2025.12",
+    "minActiveSales": 1650000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1325800763",
+    "customerName": "비엠케이",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 2123000
+      },
+      {
+        "month": "2025.9",
+        "amount": 2123000
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 2,
+    "totalSales": 4246000,
+    "avgMonthlySales": 2123000,
+    "proposedCreditLimit": 5000000,
+    "maxMonth": "2025.8",
+    "maxSales": 2123000,
+    "minActiveMonth": "2025.8",
+    "minActiveSales": 2123000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "126-86-28250",
+    "customerName": "성은폴리머 주식회사",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 2024000
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 2024000
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 1991000
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 3,
+    "totalSales": 6039000,
+    "avgMonthlySales": 2013000,
+    "proposedCreditLimit": 5000000,
+    "maxMonth": "2025.10",
+    "maxSales": 2024000,
+    "minActiveMonth": "2026.2",
+    "minActiveSales": 1991000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1084018891",
+    "customerName": "에스에스케미칼",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 2277000
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 1100000
+      },
+      {
+        "month": "2026.3",
+        "amount": 4081000
+      }
+    ],
+    "activeMonthCount": 3,
+    "totalSales": 7458000,
+    "avgMonthlySales": 2486000,
+    "proposedCreditLimit": 5000000,
+    "maxMonth": "2026.3",
+    "maxSales": 4081000,
+    "minActiveMonth": "2026.2",
+    "minActiveSales": 1100000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1360164426",
+    "customerName": "영일산업",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 3561250
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 1402500
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 2,
+    "totalSales": 4963750,
+    "avgMonthlySales": 2481875,
+    "proposedCreditLimit": 5000000,
+    "maxMonth": "2025.10",
+    "maxSales": 3561250,
+    "minActiveMonth": "2025.12",
+    "minActiveSales": 1402500,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1070895842",
+    "customerName": "정진포리머",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 2871000
+      },
+      {
+        "month": "2025.8",
+        "amount": 3946800
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 1489400
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 2651000
+      },
+      {
+        "month": "2026.2",
+        "amount": 44550
+      },
+      {
+        "month": "2026.3",
+        "amount": 3289000
+      }
+    ],
+    "activeMonthCount": 6,
+    "totalSales": 14291750,
+    "avgMonthlySales": 2381958,
+    "proposedCreditLimit": 5000000,
+    "maxMonth": "2025.8",
+    "maxSales": 3946800,
+    "minActiveMonth": "2026.2",
+    "minActiveSales": 44550,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1304729190",
+    "customerName": "제이켐",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 1706100
+      },
+      {
+        "month": "2025.10",
+        "amount": 2310000
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 2,
+    "totalSales": 4016100,
+    "avgMonthlySales": 2008050,
+    "proposedCreditLimit": 5000000,
+    "maxMonth": "2025.10",
+    "maxSales": 2310000,
+    "minActiveMonth": "2025.9",
+    "minActiveSales": 1706100,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "3038119921",
+    "customerName": "제일화학공업(주)",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 1870000
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 2332000
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 2332000
+      },
+      {
+        "month": "2026.2",
+        "amount": 1776500
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 4,
+    "totalSales": 8310500,
+    "avgMonthlySales": 2077625,
+    "proposedCreditLimit": 5000000,
+    "maxMonth": "2025.8",
+    "maxSales": 2332000,
+    "minActiveMonth": "2026.2",
+    "minActiveSales": 1776500,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1238608013",
+    "customerName": "주식회사 경진상사",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 2497000
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 2464000
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 2420000
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 3,
+    "totalSales": 7381000,
+    "avgMonthlySales": 2460333,
+    "proposedCreditLimit": 5000000,
+    "maxMonth": "2025.6",
+    "maxSales": 2497000,
+    "minActiveMonth": "2025.11",
+    "minActiveSales": 2420000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "7898701928",
+    "customerName": "지디알 주식회사",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 2123000
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 1,
+    "totalSales": 2123000,
+    "avgMonthlySales": 2123000,
+    "proposedCreditLimit": 5000000,
+    "maxMonth": "2025.7",
+    "maxSales": 2123000,
+    "minActiveMonth": "2025.7",
+    "minActiveSales": 2123000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1268110279",
+    "customerName": "(주)덕산",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 1936000
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 1972300
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 2,
+    "totalSales": 3908300,
+    "avgMonthlySales": 1954150,
+    "proposedCreditLimit": 4000000,
+    "maxMonth": "2026.2",
+    "maxSales": 1972300,
+    "minActiveMonth": "2025.12",
+    "minActiveSales": 1936000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "3615500109",
+    "customerName": "대현실업",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 1127500
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 2480500
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 2,
+    "totalSales": 3608000,
+    "avgMonthlySales": 1804000,
+    "proposedCreditLimit": 4000000,
+    "maxMonth": "2025.10",
+    "maxSales": 2480500,
+    "minActiveMonth": "2025.8",
+    "minActiveSales": 1127500,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "4374100919",
+    "customerName": "동일시스템",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 1815000
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 1727000
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 1727000
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 3,
+    "totalSales": 5269000,
+    "avgMonthlySales": 1756333,
+    "proposedCreditLimit": 4000000,
+    "maxMonth": "2025.8",
+    "maxSales": 1815000,
+    "minActiveMonth": "2025.12",
+    "minActiveSales": 1727000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1238620579",
+    "customerName": "우일산업 주식회사",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 2486000
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 88000
+      },
+      {
+        "month": "2025.9",
+        "amount": 1760000
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 1760000
+      },
+      {
+        "month": "2025.12",
+        "amount": 1512500
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 1760000
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 6,
+    "totalSales": 9366500,
+    "avgMonthlySales": 1561083,
+    "proposedCreditLimit": 4000000,
+    "maxMonth": "2025.6",
+    "maxSales": 2486000,
+    "minActiveMonth": "2025.8",
+    "minActiveSales": 88000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "6298601202",
+    "customerName": "주식회사 태승화학",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 393800
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 4052400
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 130900
+      }
+    ],
+    "activeMonthCount": 3,
+    "totalSales": 4577100,
+    "avgMonthlySales": 1525700,
+    "proposedCreditLimit": 4000000,
+    "maxMonth": "2025.12",
+    "maxSales": 4052400,
+    "minActiveMonth": "2026.3",
+    "minActiveSales": 130900,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1330576538",
+    "customerName": "대우비니루",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 385000
+      },
+      {
+        "month": "2025.12",
+        "amount": 1980000
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 2,
+    "totalSales": 2365000,
+    "avgMonthlySales": 1182500,
+    "proposedCreditLimit": 3000000,
+    "maxMonth": "2025.12",
+    "maxSales": 1980000,
+    "minActiveMonth": "2025.11",
+    "minActiveSales": 385000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "2538801203",
+    "customerName": "주식회사 서경케이블",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 1265000
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 1,
+    "totalSales": 1265000,
+    "avgMonthlySales": 1265000,
+    "proposedCreditLimit": 3000000,
+    "maxMonth": "2026.2",
+    "maxSales": 1265000,
+    "minActiveMonth": "2026.2",
+    "minActiveSales": 1265000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1430226505",
+    "customerName": "해성테크",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 1292500
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 815100
+      }
+    ],
+    "activeMonthCount": 2,
+    "totalSales": 2107600,
+    "avgMonthlySales": 1053800,
+    "proposedCreditLimit": 3000000,
+    "maxMonth": "2025.6",
+    "maxSales": 1292500,
+    "minActiveMonth": "2026.3",
+    "minActiveSales": 815100,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1198681034",
+    "customerName": "(주)뉴원글로벌",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 913000
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 1,
+    "totalSales": 913000,
+    "avgMonthlySales": 913000,
+    "proposedCreditLimit": 2000000,
+    "maxMonth": "2025.11",
+    "maxSales": 913000,
+    "minActiveMonth": "2025.11",
+    "minActiveSales": 913000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1233461324",
+    "customerName": "대신기업",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 646250
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 1,
+    "totalSales": 646250,
+    "avgMonthlySales": 646250,
+    "proposedCreditLimit": 2000000,
+    "maxMonth": "2025.8",
+    "maxSales": 646250,
+    "minActiveMonth": "2025.8",
+    "minActiveSales": 646250,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1340872822",
+    "customerName": "에이스텍",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 1034000
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 481250
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 2,
+    "totalSales": 1515250,
+    "avgMonthlySales": 757625,
+    "proposedCreditLimit": 2000000,
+    "maxMonth": "2025.9",
+    "maxSales": 1034000,
+    "minActiveMonth": "2025.12",
+    "minActiveSales": 481250,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1131272609",
+    "customerName": "태일화학",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 517000
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 1,
+    "totalSales": 517000,
+    "avgMonthlySales": 517000,
+    "proposedCreditLimit": 2000000,
+    "maxMonth": "2025.10",
+    "maxSales": 517000,
+    "minActiveMonth": "2025.10",
+    "minActiveSales": 517000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "5228602690",
+    "customerName": "(주)굿솔루션",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 49500
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 1,
+    "totalSales": 49500,
+    "avgMonthlySales": 49500,
+    "proposedCreditLimit": 1000000,
+    "maxMonth": "2025.9",
+    "maxSales": 49500,
+    "minActiveMonth": "2025.9",
+    "minActiveSales": 49500,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1078610797",
+    "customerName": "(주)수지태평양",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 415800
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 1,
+    "totalSales": 415800,
+    "avgMonthlySales": 415800,
+    "proposedCreditLimit": 1000000,
+    "maxMonth": "2025.6",
+    "maxSales": 415800,
+    "minActiveMonth": "2025.6",
+    "minActiveSales": 415800,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "123-81-84525",
+    "customerName": "(주)신성케미칼",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 60500
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 1,
+    "totalSales": 60500,
+    "avgMonthlySales": 60500,
+    "proposedCreditLimit": 1000000,
+    "maxMonth": "2025.11",
+    "maxSales": 60500,
+    "minActiveMonth": "2025.11",
+    "minActiveSales": 60500,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "3178111063",
+    "customerName": "(주)티에스피",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 143000
+      },
+      {
+        "month": "2025.10",
+        "amount": 213125
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 2,
+    "totalSales": 356125,
+    "avgMonthlySales": 178063,
+    "proposedCreditLimit": 1000000,
+    "maxMonth": "2025.10",
+    "maxSales": 213125,
+    "minActiveMonth": "2025.9",
+    "minActiveSales": 143000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1301883821",
+    "customerName": "계수정밀화학",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 264000
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 396000
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 768900
+      },
+      {
+        "month": "2026.1",
+        "amount": 125400
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 272800
+      }
+    ],
+    "activeMonthCount": 5,
+    "totalSales": 1827100,
+    "avgMonthlySales": 365420,
+    "proposedCreditLimit": 1000000,
+    "maxMonth": "2025.12",
+    "maxSales": 768900,
+    "minActiveMonth": "2026.1",
+    "minActiveSales": 125400,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "3128102517",
+    "customerName": "미래화학(주)",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 42075
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 1,
+    "totalSales": 42075,
+    "avgMonthlySales": 42075,
+    "proposedCreditLimit": 1000000,
+    "maxMonth": "2026.1",
+    "maxSales": 42075,
+    "minActiveMonth": "2026.1",
+    "minActiveSales": 42075,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1098132545",
+    "customerName": "삼우전자정밀(주)",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 286000
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 1,
+    "totalSales": 286000,
+    "avgMonthlySales": 286000,
+    "proposedCreditLimit": 1000000,
+    "maxMonth": "2025.12",
+    "maxSales": 286000,
+    "minActiveMonth": "2025.12",
+    "minActiveSales": 286000,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1312749643",
+    "customerName": "신천수지",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 150975
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 253000
+      },
+      {
+        "month": "2025.12",
+        "amount": 126500
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 3,
+    "totalSales": 530475,
+    "avgMonthlySales": 176825,
+    "proposedCreditLimit": 1000000,
+    "maxMonth": "2025.11",
+    "maxSales": 253000,
+    "minActiveMonth": "2025.12",
+    "minActiveSales": 126500,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "4028215272",
+    "customerName": "전북대학교산학협력단",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 85800
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 1,
+    "totalSales": 85800,
+    "avgMonthlySales": 85800,
+    "proposedCreditLimit": 1000000,
+    "maxMonth": "2025.9",
+    "maxSales": 85800,
+    "minActiveMonth": "2025.9",
+    "minActiveSales": 85800,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "2560801137",
+    "customerName": "제이피트리풀",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 46750
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 1,
+    "totalSales": 46750,
+    "avgMonthlySales": 46750,
+    "proposedCreditLimit": 1000000,
+    "maxMonth": "2026.2",
+    "maxSales": 46750,
+    "minActiveMonth": "2026.2",
+    "minActiveSales": 46750,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1288662031",
+    "customerName": "주식회사 이루화학",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 117150
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 1,
+    "totalSales": 117150,
+    "avgMonthlySales": 117150,
+    "proposedCreditLimit": 1000000,
+    "maxMonth": "2026.2",
+    "maxSales": 117150,
+    "minActiveMonth": "2026.2",
+    "minActiveSales": 117150,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1248741481",
+    "customerName": "주식회사 정진플라넷",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 302500
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 1,
+    "totalSales": 302500,
+    "avgMonthlySales": 302500,
+    "proposedCreditLimit": 1000000,
+    "maxMonth": "2025.8",
+    "maxSales": 302500,
+    "minActiveMonth": "2025.8",
+    "minActiveSales": 302500,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1098632332",
+    "customerName": "주식회사 티엠티에스",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 154825
+      },
+      {
+        "month": "2025.12",
+        "amount": 86900
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 2,
+    "totalSales": 241725,
+    "avgMonthlySales": 120863,
+    "proposedCreditLimit": 1000000,
+    "maxMonth": "2025.11",
+    "maxSales": 154825,
+    "minActiveMonth": "2025.12",
+    "minActiveSales": 86900,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "7118101170",
+    "customerName": "주식회사 한주시트",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 136400
+      },
+      {
+        "month": "2026.2",
+        "amount": 354750
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 2,
+    "totalSales": 491150,
+    "avgMonthlySales": 245575,
+    "proposedCreditLimit": 1000000,
+    "maxMonth": "2026.2",
+    "maxSales": 354750,
+    "minActiveMonth": "2026.1",
+    "minActiveSales": 136400,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "1178116264",
+    "customerName": "한국삼진화성(주)",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 323400
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 646800
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 0
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 2,
+    "totalSales": 970200,
+    "avgMonthlySales": 485100,
+    "proposedCreditLimit": 1000000,
+    "maxMonth": "2025.8",
+    "maxSales": 646800,
+    "minActiveMonth": "2025.6",
+    "minActiveSales": 323400,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  },
+  {
+    "customerCode": "8468102214",
+    "customerName": "한국폴리아세탈 주식회사",
+    "monthlySales": [
+      {
+        "month": "2025.6",
+        "amount": 0
+      },
+      {
+        "month": "2025.7",
+        "amount": 0
+      },
+      {
+        "month": "2025.8",
+        "amount": 0
+      },
+      {
+        "month": "2025.9",
+        "amount": 0
+      },
+      {
+        "month": "2025.10",
+        "amount": 0
+      },
+      {
+        "month": "2025.11",
+        "amount": 0
+      },
+      {
+        "month": "2025.12",
+        "amount": 0
+      },
+      {
+        "month": "2026.1",
+        "amount": 0
+      },
+      {
+        "month": "2026.2",
+        "amount": 414700
+      },
+      {
+        "month": "2026.3",
+        "amount": 0
+      }
+    ],
+    "activeMonthCount": 1,
+    "totalSales": 414700,
+    "avgMonthlySales": 414700,
+    "proposedCreditLimit": 1000000,
+    "maxMonth": "2026.2",
+    "maxSales": 414700,
+    "minActiveMonth": "2026.2",
+    "minActiveSales": 414700,
+    "creditRiskTier": "STANDARD",
+    "note": ""
+  }
+]
