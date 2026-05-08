@@ -235,6 +235,10 @@ model Order {
   /// Raw text of incoming order (for AI parsing in 2nd MVP)
   rawOrderText              String?
   memo                      String?
+  /// 소프트 삭제: 직원만 가능, 삭제 내역은 /admin/orders/deleted 에서 조회 가능
+  deletedAt                 DateTime?
+  deletedById               String?
+  deleteReason              String?
   /// 오더 수락 전 여신 시뮬레이션 결과 (단가 × 수량 합계)
   estimatedAmount           Float?
   createdAt                 DateTime      @default(now())

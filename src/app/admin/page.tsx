@@ -29,6 +29,7 @@ export default async function AdminHome() {
             where: { status: { in: ['SHIPPED', 'COMPLETED'] }, updatedAt: { gte: today, lt: tomorrow } },
         }),
         prisma.order.findMany({
+            where: { deletedAt: null },
             orderBy: { createdAt: 'desc' },
             take: 20,
             include: {
@@ -112,6 +113,12 @@ export default async function AdminHome() {
                             className="inline-flex items-center gap-2 rounded-xl bg-white border border-red-300 px-3 py-2.5 text-xs font-semibold text-red-600 shadow-sm hover:bg-red-50"
                         >
                             🛡 여신 초과 승인
+                        </Link>
+                        <Link
+                            href="/admin/orders/deleted"
+                            className="inline-flex items-center gap-2 rounded-xl bg-white border border-slate-300 px-3 py-2.5 text-xs font-semibold text-slate-500 shadow-sm hover:bg-slate-50"
+                        >
+                            🗑 삭제 내역
                         </Link>
                         <Link
                             href="/admin/orders/new"

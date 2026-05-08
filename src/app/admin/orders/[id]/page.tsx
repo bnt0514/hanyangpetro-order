@@ -6,6 +6,7 @@ import { prisma } from '@/lib/db';
 import { statusLabel, statusColor, fmtDate, fmtDateTime, fmtNumber } from '@/lib/orders';
 import { ArrowLeft, Building2, MapPin, Calendar, FileText, Clock, User } from 'lucide-react';
 import StatusActions from './StatusActions';
+import DeleteOrderButton from './DeleteOrderButton';
 import CreditSimulationPanel from '@/app/admin/credit/CreditSimulationPanel';
 
 export const dynamic = 'force-dynamic';
@@ -172,10 +173,15 @@ export default async function AdminOrderDetail({
                 )}
 
                 {/* 액션 */}
-                <StatusActions
-                    orderId={order.id}
-                    currentStatus={order.status}
-                />
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div className="flex-1">
+                        <StatusActions
+                            orderId={order.id}
+                            currentStatus={order.status}
+                        />
+                    </div>
+                    <DeleteOrderButton orderId={order.id} />
+                </div>
 
                 {/* 이력 */}
                 <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">

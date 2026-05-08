@@ -4,11 +4,8 @@ import { useState, useTransition } from 'react';
 import { Save, Loader2, Info } from 'lucide-react';
 import {
     upsertPriceAdjustment,
-    BRANDS,
-    PRODUCT_GROUPS,
-    type Brand,
-    type ProductGroup,
 } from '@/app/admin/credit/actions';
+import { BRANDS, PRODUCT_GROUPS, type Brand, type ProductGroup } from '@/lib/price-constants';
 
 type AdjMap = Record<string, Record<string, number>>; // brand → productGroup → delta
 
@@ -96,10 +93,10 @@ export default function PriceAdjustmentClient({
                                                 placeholder="0"
                                                 onChange={(e) => set(brand as Brand, group as ProductGroup, e.target.value)}
                                                 className={`w-24 text-right px-2 py-1.5 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 ${val > 0
-                                                        ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
-                                                        : val < 0
-                                                            ? 'border-red-300 bg-red-50 text-red-700'
-                                                            : 'border-slate-200 bg-white text-slate-500'
+                                                    ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+                                                    : val < 0
+                                                        ? 'border-red-300 bg-red-50 text-red-700'
+                                                        : 'border-slate-200 bg-white text-slate-500'
                                                     }`}
                                             />
                                         </td>

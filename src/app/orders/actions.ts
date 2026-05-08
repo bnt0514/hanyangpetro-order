@@ -249,3 +249,52 @@ export async function cancelOwnOrder(orderId: string): Promise<ChangeStatusResul
     }
 }
 
+// ─────────────────────────────────────────────────────────────
+// 주문 소프트 삭제 (직원 전용)
+// 삭제 후에도 /admin/orders/deleted 에서 조회 가능
+// ─────────────────────────────────────────────────────────────
+export async function softDeleteOrder(
+    orderId: string,
+    reason: string,
+): Promise<ChangeStatusResult> {
+    const session = await auth();
+    if (!session?.user) return { ok: false, error: '로그인이 필요합니다.' };
+    if (session.user.userKind !== 'staff') {
+        return { ok: false, error: '직원만 주문을 삭제할 수 있습니다.' };
+    }
+    if (!reason?.trim()) return { ok: false, error: '삭제 사유를 입력해주세요.' };
+
+    const order = await prisma.order.findUnique({ where: { id: orderId } });
+    if (!order) return { ok: false, error: '주문을 찾을 수 없습니다.' };
+    if (order.deletedAt) return { ok: false, error: '이미 삭제된 주문입니다.' };
+
+    try {
+        await prisma.$transaction(async (tx) => {
+            await tx.order.update({
+                where: { id: orderId },
+                data: {
+                    deletedAt: new Date(),
+                    deletedById: session.user.id,
+                    deleteReason: reason.trim(),
+                },
+            });
+            await tx.orderStatusHistory.create({
+                data: {
+                    orderId,
+                    previousStatus: order.status,
+                    newStatus: 'DELETED',
+                    changedByUserId: session.user.id,
+                    changeReason: `[삭제] ${reason.trim()}`,
+                },
+            });
+        });
+        revalidatePath('/admin');
+        revalidatePath(`/admin/orders/${orderId}`);
+        revalidatePath('/admin/orders/deleted');
+        return { ok: true };
+    } catch (e) {
+        console.error('softDeleteOrder failed:', e);
+        return { ok: false, error: '삭제 중 오류가 발생했습니다.' };
+    }
+}
+

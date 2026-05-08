@@ -3,14 +3,9 @@
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { revalidatePath } from 'next/cache';
+import type { Brand, ProductGroup } from '@/lib/price-constants';
 
-// ─────────────────────────────────────────────────────────────
-// 브랜드 / 제품군 목록
-// ─────────────────────────────────────────────────────────────
-export const BRANDS = ['한화', '롯데', 'LG', '대한유화', '기타'] as const;
-export const PRODUCT_GROUPS = ['LDPE', 'LLDPE', 'EVA', 'HDPE', 'mLLDPE', '기타'] as const;
-export type Brand = (typeof BRANDS)[number];
-export type ProductGroup = (typeof PRODUCT_GROUPS)[number];
+// BRANDS, PRODUCT_GROUPS는 src/lib/price-constants.ts 에서 import해서 사용하세요.
 
 // ─────────────────────────────────────────────────────────────
 // 현재 실효 단가 계산
