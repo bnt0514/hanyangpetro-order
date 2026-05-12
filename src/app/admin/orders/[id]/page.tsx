@@ -3,11 +3,16 @@ import { redirect, notFound } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { prisma } from '@/lib/db';
+import HanwhaDispatchDetails, { type HanwhaDispatchDetailRow } from '@/components/HanwhaDispatchDetails';
+import { hanwhaDriverInfo, joinHanwhaDriverInfo, parseHanwhaMaterialFromMemo } from '@/lib/hanwha-dispatch';
 import { statusLabel, statusColor, fmtDate, fmtDateTime, fmtNumber } from '@/lib/orders';
-import { ArrowLeft, Building2, MapPin, Calendar, FileText, Clock, User } from 'lucide-react';
+import { ArrowLeft, Building2, MapPin, Calendar, FileText, Clock } from 'lucide-react';
 import StatusActions from './StatusActions';
 import DeleteOrderButton from './DeleteOrderButton';
+import StaffStatusOverride from './StaffStatusOverride';
+import ItemQuantityEditor from './ItemQuantityEditor';
 import CreditSimulationPanel from '@/app/admin/credit/CreditSimulationPanel';
+import BackButton from '@/components/BackButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,7 +34,6 @@ export default async function AdminOrderDetail({
             items: { include: { product: true } },
             requestedByUser: { select: { name: true, role: true } },
             requestedByCustomerUser: { select: { name: true } },
-            salesRep: { select: { name: true } },
             statusHistory: {
                 orderBy: { createdAt: 'asc' },
                 include: { changedByUser: { select: { name: true } } },
@@ -38,6 +42,33 @@ export default async function AdminOrderDetail({
     });
 
     if (!order) notFound();
+
+    const hanwhaRows = await prisma.hanwhaDispatchRow.findMany({
+        where: { matchedOrderId: order.id },
+        orderBy: [{ createdAt: 'asc' }],
+    });
+    const hanwhaDispatches = hanwhaRows.length === 0
+        ? await prisma.dispatch.findMany({
+            where: { orderId: order.id, carrierName: '한화 H-CRM' },
+            orderBy: [{ createdAt: 'asc' }],
+        })
+        : [];
+    const dispatchDetails: HanwhaDispatchDetailRow[] = hanwhaRows.length > 0
+        ? hanwhaRows.map((row) => ({
+            id: row.id,
+            materialNameRaw: row.materialNameRaw,
+            materialName: row.materialName,
+            quantityTon: row.quantityKg,
+            driverInfo: hanwhaDriverInfo(row.rawCells),
+        }))
+        : hanwhaDispatches.map((dispatch) => ({
+            id: dispatch.id,
+            materialNameRaw: dispatch.hanwhaMaterialNameRaw ?? parseHanwhaMaterialFromMemo(dispatch.memo),
+            materialName: dispatch.hanwhaMaterialName ?? parseHanwhaMaterialFromMemo(dispatch.memo),
+            quantityTon: dispatch.hanwhaQuantityTon,
+            driverInfo: joinHanwhaDriverInfo(dispatch.vehicleNumber, dispatch.driverName, dispatch.driverPhone),
+        }));
+    const orderQuantityTon = order.items.reduce((sum, item) => sum + item.requestedQuantity, 0);
 
     return (
         <div className="min-h-screen">
@@ -111,9 +142,6 @@ export default async function AdminOrderDetail({
                         <Info icon={<Calendar size={14} />} label="요청 도착일">
                             {fmtDate(order.requestedDeliveryDate)}
                         </Info>
-                        <Info icon={<User size={14} />} label="영업담당">
-                            {order.salesRep?.name ?? '-'}
-                        </Info>
                         {order.memo && (
                             <Info icon={<FileText size={14} />} label="메모">
                                 <span className="whitespace-pre-wrap">{order.memo}</span>
@@ -121,6 +149,8 @@ export default async function AdminOrderDetail({
                         )}
                     </div>
                 </section>
+
+                <HanwhaDispatchDetails rows={dispatchDetails} orderQuantityTon={orderQuantityTon} />
 
                 {/* 품목 */}
                 <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -136,6 +166,7 @@ export default async function AdminOrderDetail({
                                     <th className="px-6 py-3 text-right">요청수량</th>
                                     <th className="px-6 py-3 text-right">승인수량</th>
                                     <th className="px-6 py-3 text-right">출고수량</th>
+                                    <th className="px-6 py-3 text-right">수량 수정</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
@@ -159,6 +190,13 @@ export default async function AdminOrderDetail({
                                             {it.shippedQuantity != null
                                                 ? `${fmtNumber(it.shippedQuantity)} ${it.unit}`
                                                 : '-'}
+                                        </td>
+                                        <td className="px-6 py-3 text-right">
+                                            <ItemQuantityEditor
+                                                itemId={it.id}
+                                                currentQuantity={it.requestedQuantity}
+                                                unit={it.unit}
+                                            />
                                         </td>
                                     </tr>
                                 ))}
@@ -185,9 +223,12 @@ export default async function AdminOrderDetail({
 
                 {/* 이력 */}
                 <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                    <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
-                        <Clock size={16} className="text-slate-500" />
-                        <h2 className="font-semibold text-slate-800">상태 이력</h2>
+                    <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between gap-3 flex-wrap">
+                        <div className="flex items-center gap-2">
+                            <Clock size={16} className="text-slate-500" />
+                            <h2 className="font-semibold text-slate-800">상태 이력</h2>
+                        </div>
+                        <StaffStatusOverride orderId={order.id} currentStatus={order.status} />
                     </div>
                     <ul className="divide-y divide-slate-100">
                         {order.statusHistory.map((h) => (
@@ -199,9 +240,6 @@ export default async function AdminOrderDetail({
                                     className={`inline-flex rounded-full px-2 py-0.5 text-xs ${statusColor(h.newStatus)}`}
                                 >
                                     {statusLabel(h.newStatus)}
-                                </span>
-                                <span className="text-xs text-slate-500">
-                                    {h.previousStatus ? `← ${statusLabel(h.previousStatus)}` : '최초'}
                                 </span>
                                 <span className="text-xs text-slate-400 ml-auto">
                                     {h.changedByUser?.name ?? '-'}
@@ -216,6 +254,7 @@ export default async function AdminOrderDetail({
                     </ul>
                 </section>
             </main>
+            <BackButton />
         </div>
     );
 }

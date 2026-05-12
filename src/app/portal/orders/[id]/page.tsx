@@ -3,9 +3,12 @@ import { redirect, notFound } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { prisma } from '@/lib/db';
+import HanwhaDispatchDetails, { type HanwhaDispatchDetailRow } from '@/components/HanwhaDispatchDetails';
+import { hanwhaDriverInfo, joinHanwhaDriverInfo, parseHanwhaMaterialFromMemo } from '@/lib/hanwha-dispatch';
 import { statusLabel, statusColor, fmtDate, fmtDateTime, fmtNumber } from '@/lib/orders';
 import { ArrowLeft, MapPin, Calendar, FileText, Clock } from 'lucide-react';
 import CancelButton from './CancelButton';
+import BackButton from '@/components/BackButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,6 +34,33 @@ export default async function PortalOrderDetail({
     });
 
     if (!order || order.customerId !== session.user.customerId) notFound();
+
+    const dispatchRows = await prisma.hanwhaDispatchRow.findMany({
+        where: { matchedOrderId: order.id },
+        orderBy: [{ createdAt: 'asc' }],
+    });
+    const hanwhaDispatches = dispatchRows.length === 0
+        ? await prisma.dispatch.findMany({
+            where: { orderId: order.id, carrierName: '한화 H-CRM' },
+            orderBy: [{ createdAt: 'asc' }],
+        })
+        : [];
+    const dispatchDetails: HanwhaDispatchDetailRow[] = dispatchRows.length > 0
+        ? dispatchRows.map((row) => ({
+            id: row.id,
+            materialNameRaw: row.materialNameRaw,
+            materialName: row.materialName,
+            quantityTon: row.quantityKg,
+            driverInfo: hanwhaDriverInfo(row.rawCells),
+        }))
+        : hanwhaDispatches.map((dispatch) => ({
+            id: dispatch.id,
+            materialNameRaw: dispatch.hanwhaMaterialNameRaw ?? parseHanwhaMaterialFromMemo(dispatch.memo),
+            materialName: dispatch.hanwhaMaterialName ?? parseHanwhaMaterialFromMemo(dispatch.memo),
+            quantityTon: dispatch.hanwhaQuantityTon,
+            driverInfo: joinHanwhaDriverInfo(dispatch.vehicleNumber, dispatch.driverName, dispatch.driverPhone),
+        }));
+    const orderQuantityTon = order.items.reduce((sum, item) => sum + item.requestedQuantity, 0);
 
     return (
         <div className="min-h-screen">
@@ -96,6 +126,8 @@ export default async function PortalOrderDetail({
                     </div>
                 </section>
 
+                <HanwhaDispatchDetails rows={dispatchDetails} orderQuantityTon={orderQuantityTon} />
+
                 {/* 품목 */}
                 <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                     <div className="px-6 py-4 border-b border-slate-100">
@@ -160,6 +192,7 @@ export default async function PortalOrderDetail({
                     </ul>
                 </section>
             </main>
+            <BackButton />
         </div>
     );
 }

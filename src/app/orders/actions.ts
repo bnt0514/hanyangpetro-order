@@ -3,6 +3,7 @@
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { revalidatePath } from 'next/cache';
+import { OrderStatus } from '@/shared/enums';
 
 export type OrderItemInput = { productId: string; quantity: number };
 export type CreateOrderInput = {
@@ -201,6 +202,108 @@ export async function changeOrderStatus(
     } catch (e) {
         console.error('changeOrderStatus failed:', e);
         return { ok: false, error: '상태 변경 중 오류가 발생했습니다.' };
+    }
+}
+
+export async function manualChangeOrderStatus(
+    orderId: string,
+    nextStatus: string,
+    reason: string,
+): Promise<ChangeStatusResult> {
+    const session = await auth();
+    if (!session?.user) return { ok: false, error: '로그인이 필요합니다.' };
+    if (session.user.userKind !== 'staff') {
+        return { ok: false, error: '직원만 상태를 변경할 수 있습니다.' };
+    }
+    if (!reason?.trim()) return { ok: false, error: '상태 변경 사유를 입력해주세요.' };
+
+    const allowedStatuses = Object.values(OrderStatus) as string[];
+    if (!allowedStatuses.includes(nextStatus)) {
+        return { ok: false, error: '존재하지 않는 주문 상태입니다.' };
+    }
+
+    const order = await prisma.order.findUnique({ where: { id: orderId } });
+    if (!order || order.deletedAt) return { ok: false, error: '주문을 찾을 수 없습니다.' };
+    if (order.status === nextStatus) return { ok: false, error: '이미 같은 상태입니다.' };
+
+    try {
+        await prisma.$transaction(async (tx) => {
+            await tx.order.update({
+                where: { id: orderId },
+                data: { status: nextStatus },
+            });
+            await tx.orderStatusHistory.create({
+                data: {
+                    orderId,
+                    previousStatus: order.status,
+                    newStatus: nextStatus,
+                    changedByUserId: session.user.id,
+                    changeReason: `[직원 수동변경] ${reason.trim()}`,
+                },
+            });
+        });
+        revalidatePath('/admin');
+        revalidatePath(`/admin/orders/${orderId}`);
+        revalidatePath('/portal');
+        return { ok: true };
+    } catch (e) {
+        console.error('manualChangeOrderStatus failed:', e);
+        return { ok: false, error: '상태 변경 중 오류가 발생했습니다.' };
+    }
+}
+
+export async function updateOrderItemQuantity(
+    itemId: string,
+    nextQuantity: number,
+    reason: string,
+): Promise<ChangeStatusResult> {
+    const session = await auth();
+    if (!session?.user) return { ok: false, error: '로그인이 필요합니다.' };
+    if (session.user.userKind !== 'staff') {
+        return { ok: false, error: '직원만 수량을 수정할 수 있습니다.' };
+    }
+    if (!Number.isFinite(nextQuantity) || nextQuantity <= 0) {
+        return { ok: false, error: '수량은 0보다 커야 합니다.' };
+    }
+    if (!reason?.trim()) return { ok: false, error: '수량 수정 사유를 입력해주세요.' };
+
+    const item = await prisma.orderItem.findUnique({
+        where: { id: itemId },
+        include: { order: true, product: { select: { productName: true } } },
+    });
+    if (!item || item.order.deletedAt) return { ok: false, error: '주문 품목을 찾을 수 없습니다.' };
+    if (item.requestedQuantity === nextQuantity) return { ok: false, error: '이미 같은 수량입니다.' };
+
+    const previousQuantity = item.requestedQuantity;
+    const approvedQuantity = item.approvedQuantity === previousQuantity ? nextQuantity : item.approvedQuantity;
+
+    try {
+        await prisma.$transaction(async (tx) => {
+            await tx.orderItem.update({
+                where: { id: itemId },
+                data: {
+                    requestedQuantity: nextQuantity,
+                    approvedQuantity,
+                },
+            });
+            await tx.orderStatusHistory.create({
+                data: {
+                    orderId: item.orderId,
+                    previousStatus: item.order.status,
+                    newStatus: item.order.status,
+                    changedByUserId: session.user.id,
+                    changeReason: `[수량 수정] ${item.product.productName}: ${previousQuantity}${item.unit} → ${nextQuantity}${item.unit} / ${reason.trim()}`,
+                },
+            });
+        });
+        revalidatePath('/admin');
+        revalidatePath(`/admin/orders/${item.orderId}`);
+        revalidatePath('/portal');
+        revalidatePath(`/portal/orders/${item.orderId}`);
+        return { ok: true };
+    } catch (e) {
+        console.error('updateOrderItemQuantity failed:', e);
+        return { ok: false, error: '수량 수정 중 오류가 발생했습니다.' };
     }
 }
 

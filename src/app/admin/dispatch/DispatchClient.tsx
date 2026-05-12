@@ -3,11 +3,11 @@
 import { useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import BackButton from '@/components/BackButton';
 import {
     Calendar,
     Search,
     RefreshCw,
-    Trash2,
     AlertCircle,
     Loader2,
     Package,
@@ -18,8 +18,9 @@ import {
 import {
     fetchHanwhaDispatch,
     refetchHanwhaDispatch,
-    clearHanwhaDispatch,
+    matchHanwhaDispatchRow,
 } from '@/app/dispatch/actions';
+import { hanwhaDriverInfo } from '@/lib/hanwha-dispatch';
 import { fmtDateTime, fmtNumber } from '@/lib/orders';
 
 export interface DispatchRowVM {
@@ -30,6 +31,8 @@ export interface DispatchRowVM {
     materialNameRaw: string | null;
     quantityKg: number | null;
     rawCells: string[];
+    matchedOrderId: string | null;
+    matchedAt: string | null;
 }
 
 export interface DispatchSnapshotVM {
@@ -40,50 +43,111 @@ export interface DispatchSnapshotVM {
     rows: DispatchRowVM[];
 }
 
+export interface MatchCandidateVM {
+    id: string;
+    orderNo: string;
+    customerName: string;
+    customerCode: string;
+    addressLabel: string;
+    addressLine1: string;
+    requestedDeliveryDate: string | null;
+    itemSummary: string;
+}
+
 export default function DispatchClient({
     defaultDate,
     initial,
     canManageCredentials,
+    matchCandidates,
 }: {
     defaultDate: string;
     initial: DispatchSnapshotVM | null;
     canManageCredentials: boolean;
+    matchCandidates: MatchCandidateVM[];
 }) {
     const router = useRouter();
     const [date, setDate] = useState(defaultDate);
     const [pending, startTransition] = useTransition();
+    const [matchPending, startMatchTransition] = useTransition();
+    const [snapshot, setSnapshot] = useState<DispatchSnapshotVM | null>(initial);
+    const [selectedOrders, setSelectedOrders] = useState<Record<string, string>>({});
     const [error, setError] = useState<string | null>(null);
     const [info, setInfo] = useState<string | null>(null);
 
-    function go(action: 'fetch' | 'refetch' | 'clear') {
+    function go(action: 'fetch' | 'refetch') {
         setError(null);
         setInfo(null);
         startTransition(async () => {
             let r;
             if (action === 'fetch') r = await fetchHanwhaDispatch(date);
-            else if (action === 'refetch') r = await refetchHanwhaDispatch(date);
-            else r = await clearHanwhaDispatch(date);
+            else r = await refetchHanwhaDispatch(date);
 
             if (!r.ok) {
                 setError(r.error);
                 return;
             }
-            if (action === 'clear') {
-                setInfo('저장된 데이터를 삭제했습니다.');
-            } else if ('cached' in r) {
+            if ('cached' in r) {
                 setInfo(
                     r.cached
                         ? `캐시에서 ${r.rowCount}건을 표시합니다. (재조회를 누르면 한화 사이트에서 새로 가져옵니다)`
                         : `한화 사이트에서 새로 가져온 ${r.rowCount}건을 저장했습니다.`,
                 );
+                setSnapshot(r.snapshot);
             }
             // URL의 date 파라미터 업데이트 + 데이터 재로드
             router.push(`/admin/dispatch?date=${date}`);
+            if (action !== 'fetch' || !('cached' in r) || !r.cached) router.refresh();
+        });
+    }
+
+    function doMatch(rowId: string, orderId: string) {
+        setError(null);
+        setInfo(null);
+        startMatchTransition(async () => {
+            const r = await matchHanwhaDispatchRow(rowId, orderId);
+            if (!r.ok) { setError(r.error); return; }
+            const orderNo = matchCandidates.find((o) => o.id === orderId)?.orderNo ?? orderId;
+            setInfo(`배차 라인과 [${orderNo}]을 매칭했습니다.`);
+            setSnapshot((prev) => prev
+                ? { ...prev, rows: prev.rows.map((row) => row.id === rowId ? { ...row, matchedOrderId: orderId, matchedAt: new Date().toISOString() } : row) }
+                : prev);
             router.refresh();
         });
     }
 
-    const grouped = groupByIndoChi(initial?.rows ?? []);
+    function match(rowId: string) {
+        const orderId = selectedOrders[rowId];
+        if (!orderId) { setError('매칭할 주문을 선택해주세요.'); return; }
+        doMatch(rowId, orderId);
+    }
+
+    function autoMatch(rowId: string, indoChiName: string) {
+        const keywords = indoChiName
+            .split(/[\s,./()\[\]]/)
+            .filter((w) => w.length >= 2)
+            .map((w) => w.toLowerCase());
+
+        const hits = matchCandidates.filter((o) => {
+            const hay = [o.customerName, o.addressLabel, o.addressLine1].join(' ').toLowerCase();
+            return keywords.some((kw) => hay.includes(kw));
+        });
+
+        if (hits.length === 0) {
+            setError(`「${indoChiName}」에 매칭되는 배차대기 주문이 없습니다. 수동매칭을 이용해주세요.`);
+            return;
+        }
+        if (hits.length === 1) {
+            doMatch(rowId, hits[0].id);
+            return;
+        }
+        setError(
+            `「${indoChiName}」 매칭 가능한 주문이 ${hits.length}건 있습니다. ` +
+            `(${hits.map((o) => o.orderNo).join(', ')}) ` +
+            `아래 드롭다운에서 주문을 선택 후 매칭 버튼을 눌러주세요.`
+        );
+    }
+
+    const grouped = groupByIndoChi(snapshot?.rows ?? []);
 
     return (
         <div className="mt-6 space-y-6">
@@ -116,27 +180,19 @@ export default function DispatchClient({
                         배차 조회
                     </button>
                     {initial && (
-                        <>
+                        <div className="ml-4 border-l border-slate-200 pl-4">
                             <button
                                 type="button"
-                                onClick={() => go('refetch')}
+                                onClick={() => {
+                                    if (!window.confirm('정말 한화 사이트에서 배차 내역을 새로 불러올까요? 기존 조회 내역은 새 데이터로 교체됩니다.')) return;
+                                    go('refetch');
+                                }}
                                 disabled={pending}
                                 className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white px-3 py-2 text-sm font-semibold shadow-sm disabled:opacity-60"
                             >
                                 <RefreshCw size={14} /> 재조회
                             </button>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    if (!window.confirm('저장된 데이터를 삭제하시겠습니까?')) return;
-                                    go('clear');
-                                }}
-                                disabled={pending}
-                                className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white text-red-600 hover:bg-red-50 px-3 py-2 text-sm font-semibold disabled:opacity-60"
-                            >
-                                <Trash2 size={14} /> 삭제
-                            </button>
-                        </>
+                        </div>
                     )}
                 </div>
 
@@ -161,14 +217,14 @@ export default function DispatchClient({
             </section>
 
             {/* 결과 */}
-            {!initial ? (
+            {!snapshot ? (
                 <div className="bg-slate-50 rounded-2xl border border-dashed border-slate-300 p-12 text-center text-sm text-slate-400">
                     아직 조회된 데이터가 없습니다. 위 &quot;배차 조회&quot;를 눌러주세요.
                 </div>
             ) : (
                 <>
                     {/* 인증 실패 배너 (최우선) */}
-                    {initial.status === 'AUTH_FAILED' && (
+                    {snapshot.status === 'AUTH_FAILED' && (
                         <div className="rounded-2xl border-2 border-red-300 bg-red-50 p-5">
                             <div className="flex items-start gap-3">
                                 <ShieldAlert size={24} className="text-red-600 shrink-0 mt-0.5" />
@@ -196,10 +252,10 @@ export default function DispatchClient({
 
                     <div className="text-xs text-slate-500 flex items-center gap-3">
                         <span>
-                            마지막 조회: {fmtDateTime(initial.fetchedAt)} · 인도처 {grouped.length}곳 · 라인 {initial.rowCount}건
+                            마지막 조회: {fmtDateTime(snapshot.fetchedAt)} · 인도처 {grouped.length}곳 · 라인 {snapshot.rowCount}건
                         </span>
-                        {initial.status === 'FAILED' && (
-                            <span className="text-red-600">⚠ {initial.errorMessage}</span>
+                        {snapshot.status === 'FAILED' && (
+                            <span className="text-red-600">⚠ {snapshot.errorMessage}</span>
                         )}
                     </div>
 
@@ -228,7 +284,7 @@ export default function DispatchClient({
                                                 {g.indoChiName}
                                             </h2>
                                             <span className="text-xs text-slate-500">
-                                                라인 {g.lines.length}건 · 합계 {fmtNumber(total)} kg
+                                                라인 {g.lines.length}건 · 합계 {fmtNumber(total)} TON
                                             </span>
                                         </header>
                                         <div className="overflow-x-auto">
@@ -238,8 +294,9 @@ export default function DispatchClient({
                                                         <th className="px-4 py-2 w-10">#</th>
                                                         <th className="px-4 py-2">자재명</th>
                                                         <th className="px-4 py-2">한양 표기</th>
-                                                        <th className="px-4 py-2 text-right">수량(kg)</th>
-                                                        <th className="px-4 py-2">기타 정보</th>
+                                                        <th className="px-4 py-2 text-right">수량(TON)</th>
+                                                        <th className="px-4 py-2">기사정보</th>
+                                                        <th className="px-4 py-2 min-w-80">주문 매칭</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-slate-100">
@@ -260,10 +317,49 @@ export default function DispatchClient({
                                                                     : '-'}
                                                             </td>
                                                             <td className="px-4 py-2 text-xs text-slate-400">
-                                                                {l.rawCells
-                                                                    .filter((_, idx) => idx !== 2 && idx !== 6)
-                                                                    .filter((v) => v && v.length > 0)
-                                                                    .join(' · ')}
+                                                                {hanwhaDriverInfo(l.rawCells)}
+                                                            </td>
+                                                            <td className="px-4 py-2">
+                                                                <div className="space-y-1.5">
+                                                                    {l.matchedOrderId && (
+                                                                        <div className="text-xs text-emerald-700 font-semibold flex items-center gap-1">
+                                                                            <CheckCircle2 size={12} />
+                                                                            {matchCandidates.find((o) => o.id === l.matchedOrderId)?.orderNo ?? l.matchedOrderId}
+                                                                            <span className="ml-1 text-slate-400 font-normal">(추가 매칭 가능)</span>
+                                                                        </div>
+                                                                    )}
+                                                                    <div className="flex items-center gap-2">
+                                                                        <button
+                                                                            type="button"
+                                                                            disabled={matchPending}
+                                                                            onClick={() => autoMatch(l.id, l.indoChiName)}
+                                                                            className="rounded-lg bg-blue-500 hover:bg-blue-600 px-2.5 py-1.5 text-xs font-semibold text-white disabled:opacity-50 shrink-0"
+                                                                        >
+                                                                            자동
+                                                                        </button>
+                                                                        <select
+                                                                            value={selectedOrders[l.id] ?? ''}
+                                                                            onChange={(e) => setSelectedOrders((prev) => ({ ...prev, [l.id]: e.target.value }))}
+                                                                            disabled={matchPending}
+                                                                            className="min-w-52 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs outline-none focus:border-blue-500 disabled:opacity-60"
+                                                                        >
+                                                                            <option value="">{l.matchedOrderId ? '추가 매칭할 주문 선택' : '수동 선택'}</option>
+                                                                            {matchCandidates.map((o) => (
+                                                                                <option key={o.id} value={o.id}>
+                                                                                    {o.orderNo} · {o.customerName} · {o.addressLabel}
+                                                                                </option>
+                                                                            ))}
+                                                                        </select>
+                                                                        <button
+                                                                            type="button"
+                                                                            disabled={matchPending || !selectedOrders[l.id]}
+                                                                            onClick={() => match(l.id)}
+                                                                            className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 shrink-0"
+                                                                        >
+                                                                            매칭
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
                                                             </td>
                                                         </tr>
                                                     ))}
@@ -277,6 +373,7 @@ export default function DispatchClient({
                     )}
                 </>
             )}
+            <BackButton />
         </div>
     );
 }

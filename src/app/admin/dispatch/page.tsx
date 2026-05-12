@@ -32,6 +32,16 @@ export default async function AdminDispatchPage({
         },
     });
 
+    const dispatchWaitingOrders = await prisma.order.findMany({
+        where: { status: { in: ['DISPATCH_WAITING', 'DISPATCH_COMPLETED'] }, deletedAt: null },
+        orderBy: [{ requestedDeliveryDate: 'asc' }, { createdAt: 'desc' }],
+        include: {
+            customer: { select: { companyName: true, customerCode: true } },
+            deliveryAddress: { select: { label: true, addressLine1: true } },
+            items: { include: { product: { select: { productName: true, productCode: true } } } },
+        },
+    });
+
     const initial = snapshot
         ? {
             fetchedAt: snapshot.fetchedAt.toISOString(),
@@ -46,9 +56,24 @@ export default async function AdminDispatchPage({
                 materialNameRaw: r.materialNameRaw,
                 quantityKg: r.quantityKg,
                 rawCells: JSON.parse(r.rawCells) as string[],
+                matchedOrderId: r.matchedOrderId,
+                matchedAt: r.matchedAt?.toISOString() ?? null,
             })),
         }
         : null;
+
+    const matchCandidates = dispatchWaitingOrders.map((o) => ({
+        id: o.id,
+        orderNo: o.orderNo,
+        customerName: o.customer.companyName,
+        customerCode: o.customer.customerCode,
+        addressLabel: o.deliveryAddress.label,
+        addressLine1: o.deliveryAddress.addressLine1,
+        requestedDeliveryDate: o.requestedDeliveryDate?.toISOString() ?? null,
+        itemSummary: o.items
+            .map((it) => `${it.product.productName} ${it.requestedQuantity}${it.unit}`)
+            .join(', '),
+    }));
 
     return (
         <div className="min-h-screen">
@@ -85,7 +110,12 @@ export default async function AdminDispatchPage({
                     같은 날짜는 한 번만 조회되며, 이후에는 저장된 데이터를 즉시 표시합니다.
                 </p>
 
-                <DispatchClient defaultDate={defaultDate} initial={initial} canManageCredentials={canManageHanwhaCredentials(session.user.role)} />
+                <DispatchClient
+                    defaultDate={defaultDate}
+                    initial={initial}
+                    canManageCredentials={canManageHanwhaCredentials(session.user.role)}
+                    matchCandidates={matchCandidates}
+                />
             </main>
         </div>
     );

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { prisma } from '@/lib/db';
 import { statusLabel, statusColor, fmtDate, fmtDateTime, fmtNumber } from '@/lib/orders';
 import { Plus, Package } from 'lucide-react';
+import BackButton from '@/components/BackButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -187,6 +188,7 @@ export default async function PortalHome() {
                     🔒 비밀번호는 사업자번호 숫자입니다. 추후 설정에서 변경할 수 있습니다.
                 </div>
             </main>
+            <BackButton />
         </div>
     );
 }

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { prisma } from '@/lib/db';
 import { statusLabel, statusColor, fmtDate, fmtDateTime, fmtNumber } from '@/lib/orders';
 import { Plus, Package, Clock, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import BackButton from '@/components/BackButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -242,6 +243,7 @@ export default async function AdminHome() {
                     )}
                 </section>
             </main>
+            <BackButton />
         </div>
     );
 }

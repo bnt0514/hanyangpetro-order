@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { prisma } from '@/lib/db';
 import { ArrowLeft, TrendingUp } from 'lucide-react';
 import PriceAdjustmentClient from './PriceAdjustmentClient';
+import BackButton from '@/components/BackButton';
 import BasePriceSection from './BasePriceSection';
 
 export const dynamic = 'force-dynamic';
@@ -98,6 +99,7 @@ export default async function PricesPage({
                     <BasePriceSection products={products} />
                 </section>
             </main>
+            <BackButton />
         </div>
     );
 }

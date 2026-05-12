@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { ArrowLeft } from 'lucide-react';
 import { prisma } from '@/lib/db';
 import OrderForm from '@/components/OrderForm';
+import BackButton from '@/components/BackButton';
 
 export default async function StaffNewOrderPage() {
     const session = await auth();
@@ -50,6 +51,7 @@ export default async function StaffNewOrderPage() {
                     <OrderForm mode="staff" customerOptions={customerOptions} />
                 </div>
             </main>
+            <BackButton />
         </div>
     );
 }

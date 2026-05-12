@@ -2,6 +2,7 @@
 
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { extractHanwhaDriverFields } from '@/lib/hanwha-dispatch';
 import { revalidatePath } from 'next/cache';
 import { scrapeHanwhaDispatch } from '@/lib/hanwha-scraper';
 import {
@@ -10,10 +11,56 @@ import {
     getHanwhaUsername,
     setHanwhaPassword,
 } from '@/lib/hanwha-credentials';
+import { OrderStatus } from '@/shared/enums';
+
+export type DispatchRowVM = {
+    id: string;
+    indoChiIndex: number;
+    indoChiName: string;
+    materialName: string | null;
+    materialNameRaw: string | null;
+    quantityKg: number | null;
+    rawCells: string[];
+    matchedOrderId: string | null;
+    matchedAt: string | null;
+};
+
+export type DispatchSnapshotVM = {
+    fetchedAt: string;
+    status: string;
+    errorMessage: string | null;
+    rowCount: number;
+    rows: DispatchRowVM[];
+};
 
 export type DispatchFetchResult =
-    | { ok: true; snapshotId: string; rowCount: number; cached: boolean }
+    | { ok: true; snapshotId: string; rowCount: number; cached: boolean; snapshot: DispatchSnapshotVM }
     | { ok: false; error: string; errorCode?: string };
+
+async function getSnapshotById(snapshotId: string): Promise<DispatchSnapshotVM> {
+    const snapshot = await prisma.hanwhaDispatchSnapshot.findUniqueOrThrow({
+        where: { id: snapshotId },
+        include: { rows: { orderBy: [{ indoChiIndex: 'asc' }, { id: 'asc' }] } },
+    });
+
+    return {
+        fetchedAt: snapshot.fetchedAt.toISOString(),
+        status: snapshot.status,
+        errorMessage: snapshot.errorMessage,
+        rowCount: snapshot.rowCount,
+        rows: snapshot.rows.map((r) => ({
+            id: r.id,
+            indoChiIndex: r.indoChiIndex,
+            indoChiName: r.indoChiName,
+            materialName: r.materialName,
+            materialNameRaw: r.materialNameRaw,
+            quantityKg: r.quantityKg,
+            rawCells: JSON.parse(r.rawCells) as string[],
+            matchedOrderId: r.matchedOrderId,
+            matchedAt: r.matchedAt?.toISOString() ?? null,
+        })),
+    };
+}
 
 /**
  * 한화 H-CRM에서 해당 일자 배차 정보를 가져온다.
@@ -44,7 +91,13 @@ export async function fetchHanwhaDispatch(
             select: { id: true, rowCount: true, status: true },
         });
         if (cached && cached.status === 'OK') {
-            return { ok: true, snapshotId: cached.id, rowCount: cached.rowCount, cached: true };
+            return {
+                ok: true,
+                snapshotId: cached.id,
+                rowCount: cached.rowCount,
+                cached: true,
+                snapshot: await getSnapshotById(cached.id),
+            };
         }
     }
 
@@ -116,7 +169,13 @@ export async function fetchHanwhaDispatch(
     });
 
     revalidatePath('/admin/dispatch');
-    return { ok: true, snapshotId: snapshot.id, rowCount: totalRows, cached: false };
+    return {
+        ok: true,
+        snapshotId: snapshot.id,
+        rowCount: totalRows,
+        cached: false,
+        snapshot: await getSnapshotById(snapshot.id),
+    };
 }
 
 /** 캐시된 스냅샷을 비우고 강제 재조회 */
@@ -133,6 +192,141 @@ export async function clearHanwhaDispatch(isoDate: string) {
     const dispatchDate = new Date(isoDate + 'T00:00:00');
     await prisma.hanwhaDispatchSnapshot.deleteMany({ where: { dispatchDate } });
     revalidatePath('/admin/dispatch');
+    return { ok: true as const };
+}
+
+export async function matchHanwhaDispatchRow(rowId: string, orderId: string) {
+    const session = await auth();
+    if (!session?.user || session.user.userKind !== 'staff') {
+        return { ok: false as const, error: '직원만 배차 매칭을 할 수 있습니다.' };
+    }
+
+    const [row, order] = await Promise.all([
+        prisma.hanwhaDispatchRow.findUnique({
+            where: { id: rowId },
+            include: { snapshot: { select: { dispatchDate: true } } },
+        }),
+        prisma.order.findUnique({ where: { id: orderId }, include: { items: true } }),
+    ]);
+
+    if (!row) return { ok: false as const, error: '배차 라인을 찾을 수 없습니다.' };
+    if (!order || order.deletedAt) return { ok: false as const, error: '주문을 찾을 수 없습니다.' };
+
+    const dispatchableStatuses: string[] = [
+        OrderStatus.DISPATCH_WAITING,
+        OrderStatus.DISPATCH_COMPLETED,
+        OrderStatus.APPROVED,
+    ];
+    if (!dispatchableStatuses.includes(order.status)) {
+        return {
+            ok: false as const,
+            error: `현재 주문 상태(${order.status})에서는 배차 매칭을 할 수 없습니다. 배차 대기/완료 상태여야 합니다.`,
+        };
+    }
+
+    // 이미 DISPATCH_COMPLETED면 상태 변경 없이 배차 기록만 추가 (N:1 주문←→배차)
+    const alreadyDispatched = order.status === OrderStatus.DISPATCH_COMPLETED;
+    const driverFields = extractHanwhaDriverFields(row.rawCells);
+
+    const now = new Date();
+    await prisma.$transaction(async (tx) => {
+        await tx.hanwhaDispatchRow.update({
+            where: { id: rowId },
+            data: {
+                matchedOrderId: orderId,
+                matchedAt: now,
+                matchedByUserId: session.user.id,
+            },
+        });
+        await tx.dispatch.create({
+            data: {
+                orderId,
+                dispatchStatus: 'DISPATCH_COMPLETED',
+                plannedDispatchDate: row.snapshot.dispatchDate,
+                dispatchAttemptCount: 1,
+                carrierName: '한화 H-CRM',
+                hanwhaDispatchRowId: row.id,
+                hanwhaMaterialNameRaw: row.materialNameRaw,
+                hanwhaMaterialName: row.materialName,
+                hanwhaQuantityTon: row.quantityKg,
+                hanwhaRawCells: row.rawCells,
+                vehicleNumber: driverFields.vehicleNumber,
+                driverName: driverFields.driverName,
+                driverPhone: driverFields.driverPhone,
+                shareWithCustomer: true,
+                memo: `한화 배차 라인 매칭: ${row.indoChiName} / ${row.materialName ?? row.materialNameRaw ?? '-'}`,
+            },
+        });
+        if (!alreadyDispatched) {
+            await tx.order.update({
+                where: { id: orderId },
+                data: { status: OrderStatus.DISPATCH_COMPLETED },
+            });
+            await tx.orderStatusHistory.create({
+                data: {
+                    orderId,
+                    previousStatus: order.status,
+                    newStatus: OrderStatus.DISPATCH_COMPLETED,
+                    changedByUserId: session.user.id,
+                    changeReason: `한화 배차 조회 라인 매칭 (${row.indoChiName})`,
+                },
+            });
+        } else {
+            // 추가 배차 라인 매칭 이력만 남김
+            await tx.orderStatusHistory.create({
+                data: {
+                    orderId,
+                    previousStatus: order.status,
+                    newStatus: order.status,
+                    changedByUserId: session.user.id,
+                    changeReason: `추가 배차 라인 매칭 (${row.indoChiName} / ${row.materialName ?? row.materialNameRaw ?? '-'})`,
+                },
+            });
+        }
+    });
+
+    revalidatePath('/admin');
+    revalidatePath('/admin/dispatch');
+    revalidatePath(`/admin/orders/${orderId}`);
+    return { ok: true as const };
+}
+
+export async function confirmOrderReceipt(orderId: string, reason?: string) {
+    const session = await auth();
+    if (!session?.user || session.user.userKind !== 'staff') {
+        return { ok: false as const, error: '직원만 입고 완료 처리할 수 있습니다.' };
+    }
+
+    const order = await prisma.order.findUnique({ where: { id: orderId } });
+    if (!order || order.deletedAt) return { ok: false as const, error: '주문을 찾을 수 없습니다.' };
+
+    await prisma.$transaction(async (tx) => {
+        await tx.deliveryReceipt.create({
+            data: {
+                orderId,
+                receiptStatus: 'CONFIRMED',
+                confirmedByUserId: session.user.id,
+                confirmedAt: new Date(),
+                memo: reason?.trim() || '직원 입고 완료 처리',
+            },
+        });
+        await tx.order.update({
+            where: { id: orderId },
+            data: { status: OrderStatus.COMPLETED },
+        });
+        await tx.orderStatusHistory.create({
+            data: {
+                orderId,
+                previousStatus: order.status,
+                newStatus: OrderStatus.COMPLETED,
+                changedByUserId: session.user.id,
+                changeReason: reason?.trim() || '입고 완료 처리',
+            },
+        });
+    });
+
+    revalidatePath('/admin');
+    revalidatePath(`/admin/orders/${orderId}`);
     return { ok: true as const };
 }
 

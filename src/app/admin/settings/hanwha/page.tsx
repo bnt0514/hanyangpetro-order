@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { canManageHanwhaCredentials, getHanwhaPasswordMeta, getHanwhaUsername } from '@/lib/hanwha-credentials';
 import { prisma } from '@/lib/db';
 import HanwhaCredentialClient from './HanwhaCredentialClient';
+import BackButton from '@/components/BackButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -71,6 +72,7 @@ export default async function HanwhaSettingsPage() {
                     updatedByName={lastUpdaterName}
                 />
             </main>
+            <BackButton />
         </div>
     );
 }

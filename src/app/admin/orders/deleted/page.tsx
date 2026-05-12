@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { prisma } from '@/lib/db';
 import { ArrowLeft, Trash2 } from 'lucide-react';
 import { statusLabel, statusColor, fmtDate, fmtDateTime } from '@/lib/orders';
+import BackButton from '@/components/BackButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -97,6 +98,7 @@ export default async function DeletedOrdersPage() {
                     </div>
                 )}
             </main>
+            <BackButton />
         </div>
     );
 }

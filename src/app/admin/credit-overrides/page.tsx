@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { prisma } from '@/lib/db';
 import { ArrowLeft, ShieldAlert } from 'lucide-react';
 import { OverrideRow } from './OverrideList';
+import BackButton from '@/components/BackButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -91,6 +92,7 @@ export default async function CreditOverridesPage() {
                     </section>
                 )}
             </main>
+            <BackButton />
         </div>
     );
 }

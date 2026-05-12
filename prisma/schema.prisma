@@ -339,6 +339,11 @@ model Dispatch {
   vehicleNumber        String?
   driverName           String?
   driverPhone          String?
+  hanwhaDispatchRowId  String?
+  hanwhaMaterialNameRaw String?
+  hanwhaMaterialName   String?
+  hanwhaQuantityTon    Float?
+  hanwhaRawCells       String?
   failureReason        String?
   nextRetryDate        DateTime?
   /// 차량/기사 ?�보�?거래처에게도 ?�내?��? ?��? (?�책??보통 false)
@@ -349,6 +354,7 @@ model Dispatch {
 
   @@index([orderId])
   @@index([dispatchStatus])
+  @@index([hanwhaDispatchRowId])
   @@index([nextRetryDate])
 }
 
@@ -513,11 +519,16 @@ model HanwhaDispatchRow {
   quantityKg      Float?
   /// Line ���� ��� ��(td)�� �״�� ����. �÷� �߰�/���� ���濡�� �� ����.
   rawCells        String   // JSON-stringified string[]
+  /// 이 배차 라인과 매칭된 한양 주문
+  matchedOrderId  String?
+  matchedAt       DateTime?
+  matchedByUserId String?
   createdAt       DateTime @default(now())
 
   @@index([snapshotId])
   @@index([indoChiName])
   @@index([materialName])
+  @@index([matchedOrderId])
 }
 
 // =====================================================================
