@@ -17,6 +17,10 @@ interface Props {
     required?: boolean;
     disabled?: boolean;
     emptyText?: string;
+    /** value가 비어있을 때 input에 표시할 기본 텍스트 (예: 거래처명 자동 채우기) */
+    defaultText?: string;
+    /** 옵션 매칭 없이 자유 텍스트가 입력된 채로 확정될 때 호출 */
+    onFreeText?: (text: string) => void;
 }
 
 /* ── 매칭 정규화 ────────────────────────────────────────────
@@ -45,6 +49,8 @@ export default function Combobox({
     required,
     disabled,
     emptyText = '결과 없음',
+    defaultText,
+    onFreeText,
 }: Props) {
     const id = useId();
     const wrapRef = useRef<HTMLDivElement>(null);
@@ -56,14 +62,15 @@ export default function Combobox({
         [options, value],
     );
 
-    const [text, setText] = useState(valueLabel);
+    const [text, setText] = useState(valueLabel || defaultText || '');
     const [open, setOpen] = useState(false);
     const [hi, setHi] = useState(0);
 
     // 외부에서 value 바뀐 경우에만 input sync (사용자 타이핑 중에는 차단)
+    // value가 비어 있으면 defaultText를 표시
     useEffect(() => {
-        if (!isTypingRef.current) setText(valueLabel);
-    }, [valueLabel]);
+        if (!isTypingRef.current) setText(valueLabel || defaultText || '');
+    }, [valueLabel, defaultText]);
 
     // 외부 클릭 → 닫기
     useEffect(() => {
@@ -113,11 +120,13 @@ export default function Combobox({
         [onChange],
     );
 
-    /** 입력 텍스트가 옵션과 일치하면 자동 커밋. 아니면 필터 결과 1순위 채택. */
+    /** 입력 텍스트가 옵션과 일치하면 자동 커밋. 아니면 필터 결과 1순위 채택.
+     * 아무 옵션도 없을 경우 onFreeText 콜백 호출. */
     function commit() {
         const q = normalize(text);
         if (q === '') {
             if (value) onChange('', '');
+            onFreeText?.('');
             return;
         }
         const exact = options.find(
@@ -125,11 +134,15 @@ export default function Combobox({
         );
         if (exact) {
             select(exact);
+            onFreeText?.(text);
             return;
         }
         if (filtered.length > 0) {
             select(filtered[Math.min(hi, filtered.length - 1)]);
+            return;
         }
+        // 매칭되는 옵션이 전혀 없음 → 자유 텍스트 확정
+        onFreeText?.(text);
     }
 
     function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -201,8 +214,8 @@ export default function Combobox({
                                     }}
                                     onMouseEnter={() => setHi(idx)}
                                     className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm transition ${idx === hi
-                                            ? 'bg-blue-50 text-blue-700'
-                                            : 'text-slate-700 hover:bg-slate-50'
+                                        ? 'bg-blue-50 text-blue-700'
+                                        : 'text-slate-700 hover:bg-slate-50'
                                         }`}
                                 >
                                     <span className="truncate">{opt.label}</span>

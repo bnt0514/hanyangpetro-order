@@ -1,29 +1,42 @@
-'use client';
+﻿'use client';
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { updateOrderItemQuantity } from '@/app/orders/actions';
+import { updateOrderItem } from '@/app/orders/actions';
+import Combobox from '@/components/Combobox';
+
+export type ProductOption = { id: string; productName: string; productCode: string };
 
 export default function ItemQuantityEditor({
     itemId,
+    currentProductId,
     currentQuantity,
     unit,
+    products,
 }: {
     itemId: string;
+    currentProductId: string;
     currentQuantity: number;
     unit: string;
+    products: ProductOption[];
 }) {
     const router = useRouter();
+    const [productId, setProductId] = useState(currentProductId);
     const [quantity, setQuantity] = useState(String(currentQuantity));
     const [reason, setReason] = useState('');
     const [message, setMessage] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
+    const productOptions = products.map((product) => ({
+        value: product.id,
+        label: product.productName,
+        sublabel: product.productCode,
+    }));
 
     function submit() {
         setMessage(null);
         const nextQuantity = Number(quantity);
         startTransition(async () => {
-            const result = await updateOrderItemQuantity(itemId, nextQuantity, reason);
+            const result = await updateOrderItem(itemId, productId, nextQuantity, reason);
             if (!result.ok) {
                 setMessage(result.error);
                 return;
@@ -36,6 +49,18 @@ export default function ItemQuantityEditor({
 
     return (
         <div className="ml-auto flex max-w-xs flex-col items-end gap-1.5">
+            {/* 품목 선택 */}
+            <div className="w-full text-left">
+                <Combobox
+                    options={productOptions}
+                    value={productId}
+                    onChange={(value: string) => setProductId(value)}
+                    placeholder="제품명/코드 입력"
+                    emptyText="일치하는 제품이 없습니다"
+                    disabled={pending}
+                />
+            </div>
+            {/* 수량 입력 */}
             <div className="flex items-center justify-end gap-1.5">
                 <input
                     type="number"
@@ -48,6 +73,7 @@ export default function ItemQuantityEditor({
                 />
                 <span className="text-xs text-slate-400">{unit}</span>
             </div>
+            {/* 사유 + 저장 */}
             <div className="flex items-center justify-end gap-1.5">
                 <input
                     type="text"
@@ -63,7 +89,7 @@ export default function ItemQuantityEditor({
                     disabled={pending}
                     className="rounded-lg bg-slate-800 px-2.5 py-1 text-xs font-semibold text-white hover:bg-slate-900 disabled:opacity-60"
                 >
-                    수정
+                    저장
                 </button>
             </div>
             {message && <p className="text-[11px] text-slate-500">{message}</p>}

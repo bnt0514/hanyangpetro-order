@@ -3,6 +3,7 @@
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { extractHanwhaDriverFields } from '@/lib/hanwha-dispatch';
+import { isSameQuantity } from '@/lib/product-matching';
 import { revalidatePath } from 'next/cache';
 import { scrapeHanwhaDispatch } from '@/lib/hanwha-scraper';
 import {
@@ -206,7 +207,16 @@ export async function matchHanwhaDispatchRow(rowId: string, orderId: string) {
             where: { id: rowId },
             include: { snapshot: { select: { dispatchDate: true } } },
         }),
-        prisma.order.findUnique({ where: { id: orderId }, include: { items: true } }),
+        prisma.order.findUnique({
+            where: { id: orderId },
+            include: {
+                items: true,
+                dispatches: {
+                    where: { carrierName: '한화 H-CRM' },
+                    select: { id: true, hanwhaQuantityTon: true, hanwhaDispatchRowId: true },
+                },
+            },
+        }),
     ]);
 
     if (!row) return { ok: false as const, error: '배차 라인을 찾을 수 없습니다.' };
@@ -227,6 +237,25 @@ export async function matchHanwhaDispatchRow(rowId: string, orderId: string) {
     // 이미 DISPATCH_COMPLETED면 상태 변경 없이 배차 기록만 추가 (N:1 주문←→배차)
     const alreadyDispatched = order.status === OrderStatus.DISPATCH_COMPLETED;
     const driverFields = extractHanwhaDriverFields(row.rawCells);
+    const orderQuantityTon = order.items.reduce((sum, item) => sum + item.requestedQuantity, 0);
+    const matchedQuantityTon = order.dispatches.reduce((sum, dispatch) => {
+        if (dispatch.hanwhaDispatchRowId === row.id) return sum;
+        return sum + (dispatch.hanwhaQuantityTon ?? 0);
+    }, 0);
+    const nextDispatchQuantityTon = row.quantityKg;
+
+    if (!Number.isFinite(nextDispatchQuantityTon)) {
+        return { ok: false as const, error: '한화 배차 라인의 수량을 확인할 수 없어 매칭할 수 없습니다.' };
+    }
+    if (matchedQuantityTon >= orderQuantityTon || isSameQuantity(matchedQuantityTon, orderQuantityTon)) {
+        return { ok: false as const, error: '이미 오더 전체 수량과 배차 전체 수량이 일치하여 추가 배차 매칭을 할 수 없습니다.' };
+    }
+    if (matchedQuantityTon + Number(nextDispatchQuantityTon) > orderQuantityTon + 0.0001) {
+        return {
+            ok: false as const,
+            error: `배차 수량이 오더 수량을 초과합니다. 오더 ${orderQuantityTon}TON / 기매칭 ${matchedQuantityTon}TON / 추가 ${nextDispatchQuantityTon}TON`,
+        };
+    }
 
     const now = new Date();
     await prisma.$transaction(async (tx) => {
@@ -288,6 +317,54 @@ export async function matchHanwhaDispatchRow(rowId: string, orderId: string) {
     revalidatePath('/admin');
     revalidatePath('/admin/dispatch');
     revalidatePath(`/admin/orders/${orderId}`);
+    return { ok: true as const };
+}
+
+export async function deleteHanwhaDispatchMatch(matchId: string) {
+    const session = await auth();
+    if (!session?.user || session.user.userKind !== 'staff') {
+        return { ok: false as const, error: '직원만 배차 매칭을 삭제할 수 있습니다.' };
+    }
+
+    const row = await prisma.hanwhaDispatchRow.findUnique({ where: { id: matchId } });
+    const dispatch = row
+        ? await prisma.dispatch.findFirst({ where: { hanwhaDispatchRowId: row.id, carrierName: '한화 H-CRM' } })
+        : await prisma.dispatch.findUnique({ where: { id: matchId } });
+
+    if (!row && !dispatch) return { ok: false as const, error: '삭제할 배차 매칭을 찾을 수 없습니다.' };
+
+    const orderId = row?.matchedOrderId ?? dispatch?.orderId;
+    if (!orderId) return { ok: false as const, error: '연결된 주문을 찾을 수 없습니다.' };
+
+    const order = await prisma.order.findUnique({ where: { id: orderId }, select: { status: true, deletedAt: true } });
+    if (!order || order.deletedAt) return { ok: false as const, error: '주문을 찾을 수 없습니다.' };
+
+    await prisma.$transaction(async (tx) => {
+        if (dispatch) {
+            await tx.dispatch.delete({ where: { id: dispatch.id } });
+        }
+        const rowId = row?.id ?? dispatch?.hanwhaDispatchRowId;
+        if (rowId) {
+            await tx.hanwhaDispatchRow.update({
+                where: { id: rowId },
+                data: { matchedOrderId: null, matchedAt: null, matchedByUserId: null },
+            });
+        }
+        await tx.orderStatusHistory.create({
+            data: {
+                orderId,
+                previousStatus: order.status,
+                newStatus: order.status,
+                changedByUserId: session.user.id,
+                changeReason: '[배차 매칭 삭제] 오매칭 정정으로 한화 배차 매칭을 삭제했습니다.',
+            },
+        });
+    });
+
+    revalidatePath('/admin');
+    revalidatePath('/admin/dispatch');
+    revalidatePath(`/admin/orders/${orderId}`);
+    revalidatePath(`/portal/orders/${orderId}`);
     return { ok: true as const };
 }
 

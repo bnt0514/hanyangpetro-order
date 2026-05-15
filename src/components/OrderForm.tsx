@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, Trash2, AlertCircle, CheckCircle2, Save } from 'lucide-react';
 import Combobox, { type ComboboxOption } from '@/components/Combobox';
@@ -11,6 +11,12 @@ type CustomerData = {
     products: ComboboxOption[];
 };
 
+type AddressComboboxOption = ComboboxOption & {
+    customerId: string;
+    customerName: string;
+    customerCode: string;
+};
+
 interface Props {
     /** 'customer' 모드: 거래처 픽스, 'staff' 모드: 거래처도 선택 */
     mode: 'customer' | 'staff';
@@ -18,9 +24,21 @@ interface Props {
     fixedCustomer?: { id: string; name: string };
     /** staff 모드에서 거래처 옵션 목록 */
     customerOptions?: ComboboxOption[];
+    /** staff 모드에서 거래처 선택 전에도 검색 가능한 전체 도착지 목록 */
+    allAddressOptions?: AddressComboboxOption[];
 }
 
 type LineItem = { key: number; productId: string; quantity: string };
+
+const AUTO_ADDRESS_PREFIX = '__auto_address__:';
+
+function makeAutoAddressId(customerId: string) {
+    return `${AUTO_ADDRESS_PREFIX}${customerId}`;
+}
+
+function isAutoAddressId(value: string) {
+    return value.startsWith(AUTO_ADDRESS_PREFIX);
+}
 
 function todayISO() {
     const d = new Date();
@@ -31,10 +49,16 @@ function tomorrowISO() {
     d.setDate(d.getDate() + 1);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
+function shiftDate(iso: string, days: number): string {
+    const d = new Date(iso + 'T00:00:00');
+    d.setDate(d.getDate() + days);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
-export default function OrderForm({ mode, fixedCustomer, customerOptions = [] }: Props) {
+export default function OrderForm({ mode, fixedCustomer, customerOptions = [], allAddressOptions = [] }: Props) {
     const router = useRouter();
     const [pending, start] = useTransition();
+    const pendingAddressIdRef = useRef<string | null>(null);
 
     const [customerId, setCustomerId] = useState(fixedCustomer?.id ?? '');
     const [data, setData] = useState<CustomerData | null>(null);
@@ -48,24 +72,57 @@ export default function OrderForm({ mode, fixedCustomer, customerOptions = [] }:
 
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
+    const [addressDefaultText, setAddressDefaultText] = useState('');
+    const [addressFreeText, setAddressFreeText] = useState('');
+    const selectedCustomerOption = customerOptions.find((customer) => customer.value === customerId);
+    const autoAddressOption = customerId && selectedCustomerOption
+        ? {
+            value: makeAutoAddressId(customerId),
+            label: selectedCustomerOption.label,
+            sublabel: `${selectedCustomerOption.sublabel ?? ''} · 도착지 자동 생성`.trim(),
+        }
+        : null;
+    const addressOptions = customerId
+        ? (data?.addresses?.length ? data.addresses : autoAddressOption ? [autoAddressOption] : [])
+        : allAddressOptions;
 
     // 거래처 변경 시 도착지/제품 다시 로드
     useEffect(() => {
         if (!customerId) {
-            setData(null);
-            setAddressId('');
+            queueMicrotask(() => {
+                setData(null);
+                setAddressId('');
+            });
             return;
         }
         let cancel = false;
-        setLoading(true);
+        queueMicrotask(() => !cancel && setLoading(true));
         fetch(`/api/customers/${customerId}/data`)
             .then((r) => r.json())
             .then((d) => {
                 if (cancel) return;
                 setData(d);
-                // 기본 도착지 자동 선택 (첫 번째 = isDefault desc 정렬됨)
-                if (d.addresses?.length > 0) setAddressId(d.addresses[0].value);
-                else setAddressId('');
+                const pendingAddressId = pendingAddressIdRef.current;
+                pendingAddressIdRef.current = null;
+                if (pendingAddressId && d.addresses?.some((address: ComboboxOption) => address.value === pendingAddressId)) {
+                    setAddressId(pendingAddressId);
+                    setAddressDefaultText('');
+                    setAddressFreeText('');
+                } else if (d.addresses?.length > 0) {
+                    setAddressId(d.addresses[0].value);
+                    setAddressDefaultText('');
+                    setAddressFreeText('');
+                } else {
+                    // 매칭된 도착지가 없으면 거래처명을 도착지 입력창에 자동 표시
+                    const customerName =
+                        customerOptions.find((c) => c.value === customerId)?.label ??
+                        allAddressOptions.find((a) => a.customerId === customerId)?.customerName ??
+                        fixedCustomer?.name ??
+                        '';
+                    setAddressId(makeAutoAddressId(customerId));
+                    setAddressDefaultText(customerName);
+                    setAddressFreeText(customerName);
+                }
             })
             .catch(() => setError('거래처 데이터 로드 실패'))
             .finally(() => !cancel && setLoading(false));
@@ -84,10 +141,46 @@ export default function OrderForm({ mode, fixedCustomer, customerOptions = [] }:
         setItems((prev) => prev.map((i) => (i.key === key ? { ...i, ...patch } : i)));
     }
 
+    function handleCustomerChange(value: string) {
+        pendingAddressIdRef.current = null;
+        setAddressDefaultText('');
+        setAddressFreeText('');
+        setCustomerId(value);
+    }
+
+    function handleAddressChange(value: string) {
+        setAddressId(value);
+
+        if (isAutoAddressId(value)) {
+            const selectedAddress = allAddressOptions.find((address) => address.value === value);
+            const autoText = selectedAddress?.customerName ?? selectedCustomerOption?.label ?? addressDefaultText;
+            setAddressDefaultText(autoText);
+            setAddressFreeText(autoText);
+            if (mode === 'staff' && selectedAddress && selectedAddress.customerId !== customerId) {
+                pendingAddressIdRef.current = value;
+                setCustomerId(selectedAddress.customerId);
+                setItems([{ key: Date.now(), productId: '', quantity: '' }]);
+            }
+            return;
+        }
+
+        setAddressFreeText('');
+        setAddressDefaultText('');
+        if (mode !== 'staff' || !value) return;
+
+        const selectedAddress = allAddressOptions.find((address) => address.value === value);
+        if (!selectedAddress) return;
+        if (selectedAddress.customerId !== customerId) {
+            pendingAddressIdRef.current = value;
+            setCustomerId(selectedAddress.customerId);
+            setItems([{ key: Date.now(), productId: '', quantity: '' }]);
+        }
+    }
+
     /** 누락된 필수 값을 정확히 알려줌. 다 되면 null. */
     function getMissingMsg(): string | null {
         if (!customerId) return '거래처를 선택해주세요.';
-        if (!addressId) return '도착지를 선택해주세요.';
+        if (!addressId && !addressFreeText.trim()) return '도착지를 선택해주세요.';
         if (!orderDate) return '주문일자를 입력해주세요.';
         if (!deliveryDate) return '도착일자를 입력해주세요.';
         for (let idx = 0; idx < items.length; idx++) {
@@ -115,9 +208,11 @@ export default function OrderForm({ mode, fixedCustomer, customerOptions = [] }:
             if (pending) return;
 
             start(async () => {
-                const res = await createOrder({
+                const autoAddress = isAutoAddressId(addressId);
+                const payload = {
                     customerId,
-                    deliveryAddressId: addressId,
+                    deliveryAddressId: autoAddress ? '' : addressId,
+                    deliveryAddressName: autoAddress || !addressId ? addressFreeText.trim() || addressDefaultText.trim() || undefined : undefined,
                     orderDate,
                     deliveryDate,
                     items: items.map((i) => ({
@@ -125,11 +220,21 @@ export default function OrderForm({ mode, fixedCustomer, customerOptions = [] }:
                         quantity: Number(i.quantity),
                     })),
                     memo: memo.trim() || undefined,
-                });
+                };
+                let res = await createOrder(payload);
+                if (!res.ok && 'duplicate' in res && res.duplicate) {
+                    const proceed = window.confirm(res.error);
+                    if (!proceed) {
+                        setError('중복 가능성이 있어 주문 저장을 취소했습니다.');
+                        return;
+                    }
+                    res = await createOrder({ ...payload, allowDuplicate: true });
+                }
                 if (res.ok) {
                     setSuccess(`주문 등록 완료 — 주문번호 ${res.orderNo}`);
                     // 폼 초기화 (거래처 모드면 거래처 유지)
                     setItems([{ key: Date.now(), productId: '', quantity: '' }]);
+                    setAddressFreeText('');
                     setMemo('');
                     setOrderDate(todayISO());
                     setDeliveryDate(tomorrowISO());
@@ -159,38 +264,86 @@ export default function OrderForm({ mode, fixedCustomer, customerOptions = [] }:
                     <Combobox
                         options={customerOptions}
                         value={customerId}
-                        onChange={(v: string) => setCustomerId(v)}
+                        onChange={(v: string) => handleCustomerChange(v)}
                         placeholder="거래처명의 일부를 입력하세요 (대소문자 무관, 포함만 되면 OK)"
                         emptyText="일치하는 거래처가 없습니다"
                     />
                 )}
             </div>
 
-            {/* 일자 2개 */}
+            {/* 일자 2개 + 하루씩 이동 버튼 */}
+            {/* 함께 이동 버튼 */}
+            <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-500 font-medium">주문일 + 도착일 함께</span>
+                <button
+                    type="button"
+                    onClick={() => {
+                        setOrderDate(shiftDate(orderDate, -1));
+                        setDeliveryDate(shiftDate(deliveryDate, -1));
+                    }}
+                    className="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50 active:bg-slate-100 transition"
+                >
+                    ◀ 하루 전
+                </button>
+                <button
+                    type="button"
+                    onClick={() => {
+                        setOrderDate(shiftDate(orderDate, 1));
+                        setDeliveryDate(shiftDate(deliveryDate, 1));
+                    }}
+                    className="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50 active:bg-slate-100 transition"
+                >
+                    하루 후 ▶
+                </button>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1.5">
                         주문일자<span className="text-red-500 ml-0.5">*</span>
                     </label>
-                    <input
-                        type="date"
-                        value={orderDate}
-                        onChange={(e) => setOrderDate(e.target.value)}
-                        required
-                        className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                    />
+                    <div className="flex items-center gap-1">
+                        <button
+                            type="button"
+                            onClick={() => setOrderDate(shiftDate(orderDate, -1))}
+                            className="shrink-0 rounded-md border border-slate-300 bg-white px-2.5 py-2.5 text-xs text-slate-600 hover:bg-slate-50 active:bg-slate-100 transition leading-none"
+                        >◀</button>
+                        <input
+                            type="date"
+                            value={orderDate}
+                            onChange={(e) => setOrderDate(e.target.value)}
+                            required
+                            className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                        />
+                        <button
+                            type="button"
+                            onClick={() => setOrderDate(shiftDate(orderDate, 1))}
+                            className="shrink-0 rounded-md border border-slate-300 bg-white px-2.5 py-2.5 text-xs text-slate-600 hover:bg-slate-50 active:bg-slate-100 transition leading-none"
+                        >▶</button>
+                    </div>
                 </div>
                 <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1.5">
                         도착일자<span className="text-red-500 ml-0.5">*</span>
                     </label>
-                    <input
-                        type="date"
-                        value={deliveryDate}
-                        onChange={(e) => setDeliveryDate(e.target.value)}
-                        required
-                        className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                    />
+                    <div className="flex items-center gap-1">
+                        <button
+                            type="button"
+                            onClick={() => setDeliveryDate(shiftDate(deliveryDate, -1))}
+                            className="shrink-0 rounded-md border border-slate-300 bg-white px-2.5 py-2.5 text-xs text-slate-600 hover:bg-slate-50 active:bg-slate-100 transition leading-none"
+                        >◀</button>
+                        <input
+                            type="date"
+                            value={deliveryDate}
+                            onChange={(e) => setDeliveryDate(e.target.value)}
+                            required
+                            className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                        />
+                        <button
+                            type="button"
+                            onClick={() => setDeliveryDate(shiftDate(deliveryDate, 1))}
+                            className="shrink-0 rounded-md border border-slate-300 bg-white px-2.5 py-2.5 text-xs text-slate-600 hover:bg-slate-50 active:bg-slate-100 transition leading-none"
+                        >▶</button>
+                    </div>
                 </div>
             </div>
 
@@ -198,17 +351,26 @@ export default function OrderForm({ mode, fixedCustomer, customerOptions = [] }:
             <Combobox
                 label="도착지"
                 required
-                options={data?.addresses ?? []}
+                options={addressOptions}
                 value={addressId}
-                onChange={(v: string) => setAddressId(v)}
+                defaultText={addressDefaultText}
+                onChange={(v: string) => handleAddressChange(v)}
+                onFreeText={(t) => {
+                    setAddressFreeText(t);
+                    if (!t.trim() && isAutoAddressId(addressId)) {
+                        setAddressFreeText(addressDefaultText);
+                    }
+                }}
                 placeholder={
-                    !customerId
-                        ? '먼저 거래처를 선택하세요'
-                        : loading
-                            ? '도착지 불러오는 중...'
-                            : '도착지명 입력 (한 글자만 입력해도 검색)'
+                    loading
+                        ? '도착지 불러오는 중...'
+                        : customerId
+                            ? '도착지명 입력 (한 글자만 입력해도 검색)'
+                            : mode === 'staff'
+                                ? '도착지명 입력 시 거래처 자동 선택'
+                                : '먼저 거래처를 선택하세요'
                 }
-                disabled={!customerId || loading}
+                disabled={(mode !== 'staff' && !customerId) || loading}
                 emptyText="등록된 도착지가 없습니다"
             />
 

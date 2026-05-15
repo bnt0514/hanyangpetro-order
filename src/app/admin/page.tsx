@@ -1,10 +1,10 @@
-import { auth, signOut } from '@/lib/auth';
+﻿import { auth, signOut } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { prisma } from '@/lib/db';
 import { statusLabel, statusColor, fmtDate, fmtDateTime, fmtNumber } from '@/lib/orders';
-import { Plus, Package, Clock, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Plus, Package, Clock, AlertTriangle, CheckCircle2, Building2 } from 'lucide-react';
 import BackButton from '@/components/BackButton';
 
 export const dynamic = 'force-dynamic';
@@ -126,6 +126,18 @@ export default async function AdminHome() {
                             className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
                         >
                             <Plus size={16} /> 신규 주문 등록
+                        </Link>
+                        <Link
+                            href="/admin/customers/new"
+                            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700"
+                        >
+                            <Building2 size={16} /> 신규업체 등록
+                        </Link>
+                        <Link
+                            href="/admin/customers"
+                            className="inline-flex items-center gap-2 rounded-xl bg-white border border-emerald-300 px-3 py-2.5 text-xs font-semibold text-emerald-700 shadow-sm hover:bg-emerald-50"
+                        >
+                            <Building2 size={14} /> 기존업체 수정
                         </Link>
                     </div>
                 </div>

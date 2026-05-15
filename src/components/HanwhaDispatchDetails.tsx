@@ -1,5 +1,6 @@
-import { Truck } from 'lucide-react';
+﻿import { Truck } from 'lucide-react';
 import { fmtNumber } from '@/lib/orders';
+import DeleteHanwhaDispatchMatchButton from '@/components/DeleteHanwhaDispatchMatchButton';
 
 export type HanwhaDispatchDetailRow = {
     id: string;
@@ -12,14 +13,18 @@ export type HanwhaDispatchDetailRow = {
 export default function HanwhaDispatchDetails({
     rows,
     orderQuantityTon,
+    showDeleteAction = false,
 }: {
     rows: HanwhaDispatchDetailRow[];
     orderQuantityTon?: number;
+    showDeleteAction?: boolean;
 }) {
     if (rows.length === 0) return null;
+
     const shippedQuantityTon = rows.reduce((sum, row) => sum + (row.quantityTon ?? 0), 0);
     const remainingQuantityTon = orderQuantityTon == null ? null : orderQuantityTon - shippedQuantityTon;
     const hasMismatch = remainingQuantityTon != null && Math.abs(remainingQuantityTon) > 0.0001;
+    const isOverShipped = remainingQuantityTon != null && remainingQuantityTon < -0.0001;
 
     return (
         <section className="bg-white rounded-2xl border border-cyan-200 shadow-sm overflow-hidden">
@@ -32,10 +37,10 @@ export default function HanwhaDispatchDetails({
             </div>
             {orderQuantityTon != null && (
                 <div className={`px-6 py-3 text-xs border-b ${hasMismatch ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-cyan-100 bg-white text-slate-500'}`}>
-                    주문수량 {fmtNumber(orderQuantityTon)} TON · 출고수량 {fmtNumber(shippedQuantityTon)} TON
+                    주문수량 {fmtNumber(orderQuantityTon)} TON · 배차수량 {fmtNumber(shippedQuantityTon)} TON
                     {hasMismatch && (
                         <span className="ml-2 font-semibold">
-                            미출고/차이 {fmtNumber(remainingQuantityTon)} TON
+                            {isOverShipped ? '초과배차' : '미배차'} 차이 {fmtNumber(Math.abs(remainingQuantityTon ?? 0))} TON
                         </span>
                     )}
                 </div>
@@ -49,22 +54,24 @@ export default function HanwhaDispatchDetails({
                             <th className="px-6 py-3">한양 표기</th>
                             <th className="px-6 py-3 text-right">수량(TON)</th>
                             <th className="px-6 py-3">기사정보</th>
+                            {showDeleteAction && <th className="px-6 py-3 text-right">관리</th>}
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                         {rows.map((row, index) => (
                             <tr key={row.id}>
                                 <td className="px-6 py-3 text-xs text-slate-400">{index + 1}</td>
-                                <td className="px-6 py-3 text-xs font-mono text-slate-600">
-                                    {row.materialNameRaw ?? '-'}
-                                </td>
-                                <td className="px-6 py-3 font-medium text-slate-800">
-                                    {row.materialName ?? '-'}
-                                </td>
+                                <td className="px-6 py-3 text-xs font-mono text-slate-600">{row.materialNameRaw ?? '-'}</td>
+                                <td className="px-6 py-3 font-medium text-slate-800">{row.materialName ?? '-'}</td>
                                 <td className="px-6 py-3 text-right text-slate-700">
                                     {row.quantityTon != null ? fmtNumber(row.quantityTon) : '-'}
                                 </td>
                                 <td className="px-6 py-3 text-xs text-slate-600">{row.driverInfo}</td>
+                                {showDeleteAction && (
+                                    <td className="px-6 py-3 text-right">
+                                        <DeleteHanwhaDispatchMatchButton matchId={row.id} />
+                                    </td>
+                                )}
                             </tr>
                         ))}
                     </tbody>

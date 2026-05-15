@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { prisma } from '@/lib/db';
 import { canManageHanwhaCredentials } from '@/lib/hanwha-credentials';
+import { matchProductToMaterial } from '@/lib/product-matching';
 import DispatchClient from './DispatchClient';
 
 export const dynamic = 'force-dynamic';
@@ -33,12 +34,20 @@ export default async function AdminDispatchPage({
     });
 
     const dispatchWaitingOrders = await prisma.order.findMany({
-        where: { status: { in: ['DISPATCH_WAITING', 'DISPATCH_COMPLETED'] }, deletedAt: null },
+        where: { status: { in: ['APPROVED', 'DISPATCH_WAITING', 'DISPATCH_COMPLETED'] }, deletedAt: null },
         orderBy: [{ requestedDeliveryDate: 'asc' }, { createdAt: 'desc' }],
         include: {
             customer: { select: { companyName: true, customerCode: true } },
             deliveryAddress: { select: { label: true, addressLine1: true } },
             items: { include: { product: { select: { productName: true, productCode: true } } } },
+            dispatches: {
+                where: { carrierName: '한화 H-CRM' },
+                select: {
+                    hanwhaMaterialName: true,
+                    hanwhaMaterialNameRaw: true,
+                    hanwhaQuantityTon: true,
+                },
+            },
         },
     });
 
@@ -73,6 +82,23 @@ export default async function AdminDispatchPage({
         itemSummary: o.items
             .map((it) => `${it.product.productName} ${it.requestedQuantity}${it.unit}`)
             .join(', '),
+        items: o.items.map((it) => {
+            const dispatchedQuantityTon = o.dispatches.reduce((sum, dispatch) => {
+                const matched = matchProductToMaterial(
+                    { productName: it.product.productName, productCode: it.product.productCode },
+                    { materialName: dispatch.hanwhaMaterialName, materialNameRaw: dispatch.hanwhaMaterialNameRaw },
+                );
+                return matched.matches ? sum + (dispatch.hanwhaQuantityTon ?? 0) : sum;
+            }, 0);
+            return {
+                productId: it.productId,
+                productName: it.product.productName,
+                productCode: it.product.productCode,
+                quantityTon: it.requestedQuantity,
+                dispatchedQuantityTon,
+                remainingQuantityTon: Math.max(0, it.requestedQuantity - dispatchedQuantityTon),
+            };
+        }),
     }));
 
     return (

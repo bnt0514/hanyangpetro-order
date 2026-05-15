@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useTransition } from 'react';
 import Link from 'next/link';
@@ -21,6 +21,7 @@ import {
     matchHanwhaDispatchRow,
 } from '@/app/dispatch/actions';
 import { hanwhaDriverInfo } from '@/lib/hanwha-dispatch';
+import { isSameQuantity, matchProductToMaterial } from '@/lib/product-matching';
 import { fmtDateTime, fmtNumber } from '@/lib/orders';
 
 export interface DispatchRowVM {
@@ -43,6 +44,15 @@ export interface DispatchSnapshotVM {
     rows: DispatchRowVM[];
 }
 
+export interface MatchCandidateItemVM {
+    productId: string;
+    productName: string;
+    productCode: string;
+    quantityTon: number;
+    dispatchedQuantityTon: number;
+    remainingQuantityTon: number;
+}
+
 export interface MatchCandidateVM {
     id: string;
     orderNo: string;
@@ -52,7 +62,14 @@ export interface MatchCandidateVM {
     addressLine1: string;
     requestedDeliveryDate: string | null;
     itemSummary: string;
+    items: MatchCandidateItemVM[];
 }
+
+type AutoMatchHit = {
+    order: MatchCandidateVM;
+    score: number;
+    reason: string;
+};
 
 export default function DispatchClient({
     defaultDate,
@@ -94,7 +111,6 @@ export default function DispatchClient({
                 );
                 setSnapshot(r.snapshot);
             }
-            // URL의 date 파라미터 업데이트 + 데이터 재로드
             router.push(`/admin/dispatch?date=${date}`);
             if (action !== 'fetch' || !('cached' in r) || !r.cached) router.refresh();
         });
@@ -121,28 +137,33 @@ export default function DispatchClient({
         doMatch(rowId, orderId);
     }
 
-    function autoMatch(rowId: string, indoChiName: string) {
-        const keywords = indoChiName
+    function autoMatch(line: DispatchRowVM) {
+        const keywords = line.indoChiName
             .split(/[\s,./()\[\]]/)
             .filter((w) => w.length >= 2)
             .map((w) => w.toLowerCase());
 
-        const hits = matchCandidates.filter((o) => {
-            const hay = [o.customerName, o.addressLabel, o.addressLine1].join(' ').toLowerCase();
-            return keywords.some((kw) => hay.includes(kw));
-        });
+        const scored = matchCandidates
+            .map((order) => scoreAutoMatch(order, line, keywords, date))
+            .filter((hit): hit is AutoMatchHit => hit !== null)
+            .sort((a, b) => b.score - a.score);
 
-        if (hits.length === 0) {
-            setError(`「${indoChiName}」에 매칭되는 배차대기 주문이 없습니다. 수동매칭을 이용해주세요.`);
+        if (scored.length === 0) {
+            setError(`「${line.indoChiName} / ${line.materialName ?? line.materialNameRaw ?? '-'}」에 품목·수량까지 맞는 배차대기 주문이 없습니다. 수동매칭을 이용해주세요.`);
             return;
         }
-        if (hits.length === 1) {
-            doMatch(rowId, hits[0].id);
+
+        const best = scored[0];
+        const tied = scored.filter((hit) => best.score - hit.score <= 10);
+        if (tied.length === 1 && best.score >= 100) {
+            doMatch(line.id, best.order.id);
             return;
         }
+
         setError(
-            `「${indoChiName}」 매칭 가능한 주문이 ${hits.length}건 있습니다. ` +
-            `(${hits.map((o) => o.orderNo).join(', ')}) ` +
+            `「${line.indoChiName} / ${line.materialName ?? line.materialNameRaw ?? '-'} ${line.quantityKg ?? '-'}TON」 ` +
+            `자동매칭 후보가 ${tied.length}건입니다. ` +
+            `(${tied.map((hit) => `${hit.order.orderNo}: ${hit.reason}`).join(', ')}) ` +
             `아래 드롭다운에서 주문을 선택 후 매칭 버튼을 눌러주세요.`
         );
     }
@@ -151,7 +172,6 @@ export default function DispatchClient({
 
     return (
         <div className="mt-6 space-y-6">
-            {/* 컨트롤 */}
             <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
                 <div className="flex items-end gap-3 flex-wrap">
                     <label className="block">
@@ -172,11 +192,7 @@ export default function DispatchClient({
                         disabled={pending}
                         className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 text-sm font-semibold shadow-sm disabled:opacity-60"
                     >
-                        {pending ? (
-                            <Loader2 size={16} className="animate-spin" />
-                        ) : (
-                            <Search size={16} />
-                        )}
+                        {pending ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
                         배차 조회
                     </button>
                     {initial && (
@@ -216,22 +232,18 @@ export default function DispatchClient({
                 )}
             </section>
 
-            {/* 결과 */}
             {!snapshot ? (
                 <div className="bg-slate-50 rounded-2xl border border-dashed border-slate-300 p-12 text-center text-sm text-slate-400">
                     아직 조회된 데이터가 없습니다. 위 &quot;배차 조회&quot;를 눌러주세요.
                 </div>
             ) : (
                 <>
-                    {/* 인증 실패 배너 (최우선) */}
                     {snapshot.status === 'AUTH_FAILED' && (
                         <div className="rounded-2xl border-2 border-red-300 bg-red-50 p-5">
                             <div className="flex items-start gap-3">
                                 <ShieldAlert size={24} className="text-red-600 shrink-0 mt-0.5" />
                                 <div className="flex-1">
-                                    <h3 className="font-bold text-red-800">
-                                        한화 H-CRM 자동 로그인 실패
-                                    </h3>
+                                    <h3 className="font-bold text-red-800">한화 H-CRM 자동 로그인 실패</h3>
                                     <p className="mt-1 text-sm text-red-700 leading-relaxed">
                                         한화 사이트 비밀번호가 변경된 것으로 보입니다. 담당자(<b>양희철 대표</b> /{' '}
                                         <b>차성식 관리자</b>)에게 새 비밀번호 등록을 요청해주세요.
@@ -266,21 +278,13 @@ export default function DispatchClient({
                     ) : (
                         <div className="space-y-4">
                             {grouped.map((g) => {
-                                const total = g.lines.reduce(
-                                    (s, l) => s + (l.quantityKg ?? 0),
-                                    0,
-                                );
+                                const total = g.lines.reduce((s, l) => s + (l.quantityKg ?? 0), 0);
                                 return (
-                                    <section
-                                        key={g.indoChiName + g.indoChiIndex}
-                                        className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"
-                                    >
+                                    <section key={g.indoChiName + g.indoChiIndex} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                                         <header className="px-6 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between gap-3 flex-wrap">
                                             <h2 className="font-semibold text-slate-800 flex items-center gap-2">
                                                 <Package size={16} className="text-slate-500" />
-                                                <span className="text-xs text-slate-400 font-mono">
-                                                    #{g.indoChiIndex}
-                                                </span>
+                                                <span className="text-xs text-slate-400 font-mono">#{g.indoChiIndex}</span>
                                                 {g.indoChiName}
                                             </h2>
                                             <span className="text-xs text-slate-500">
@@ -302,23 +306,11 @@ export default function DispatchClient({
                                                 <tbody className="divide-y divide-slate-100">
                                                     {g.lines.map((l, i) => (
                                                         <tr key={l.id} className="hover:bg-slate-50/60">
-                                                            <td className="px-4 py-2 text-xs text-slate-400">
-                                                                {i + 1}
-                                                            </td>
-                                                            <td className="px-4 py-2 text-xs font-mono text-slate-600">
-                                                                {l.materialNameRaw ?? '-'}
-                                                            </td>
-                                                            <td className="px-4 py-2 font-medium text-slate-800">
-                                                                {l.materialName ?? '-'}
-                                                            </td>
-                                                            <td className="px-4 py-2 text-right text-slate-700">
-                                                                {l.quantityKg != null
-                                                                    ? fmtNumber(l.quantityKg)
-                                                                    : '-'}
-                                                            </td>
-                                                            <td className="px-4 py-2 text-xs text-slate-400">
-                                                                {hanwhaDriverInfo(l.rawCells)}
-                                                            </td>
+                                                            <td className="px-4 py-2 text-xs text-slate-400">{i + 1}</td>
+                                                            <td className="px-4 py-2 text-xs font-mono text-slate-600">{l.materialNameRaw ?? '-'}</td>
+                                                            <td className="px-4 py-2 font-medium text-slate-800">{l.materialName ?? '-'}</td>
+                                                            <td className="px-4 py-2 text-right text-slate-700">{l.quantityKg != null ? fmtNumber(l.quantityKg) : '-'}</td>
+                                                            <td className="px-4 py-2 text-xs text-slate-400">{hanwhaDriverInfo(l.rawCells)}</td>
                                                             <td className="px-4 py-2">
                                                                 <div className="space-y-1.5">
                                                                     {l.matchedOrderId && (
@@ -332,7 +324,7 @@ export default function DispatchClient({
                                                                         <button
                                                                             type="button"
                                                                             disabled={matchPending}
-                                                                            onClick={() => autoMatch(l.id, l.indoChiName)}
+                                                                            onClick={() => autoMatch(l)}
                                                                             className="rounded-lg bg-blue-500 hover:bg-blue-600 px-2.5 py-1.5 text-xs font-semibold text-white disabled:opacity-50 shrink-0"
                                                                         >
                                                                             자동
@@ -346,7 +338,7 @@ export default function DispatchClient({
                                                                             <option value="">{l.matchedOrderId ? '추가 매칭할 주문 선택' : '수동 선택'}</option>
                                                                             {matchCandidates.map((o) => (
                                                                                 <option key={o.id} value={o.id}>
-                                                                                    {o.orderNo} · {o.customerName} · {o.addressLabel}
+                                                                                    {o.orderNo} · {o.customerName} · {o.addressLabel} · {o.itemSummary}
                                                                                 </option>
                                                                             ))}
                                                                         </select>
@@ -376,6 +368,61 @@ export default function DispatchClient({
             <BackButton />
         </div>
     );
+}
+
+function scoreAutoMatch(
+    order: MatchCandidateVM,
+    line: DispatchRowVM,
+    keywords: string[],
+    dispatchDate: string,
+): AutoMatchHit | null {
+    const hay = [order.customerName, order.addressLabel, order.addressLine1].join(' ').toLowerCase();
+    const addressHits = keywords.filter((kw) => hay.includes(kw));
+    if (addressHits.length === 0) return null;
+
+    const materialExists = Boolean(line.materialName || line.materialNameRaw);
+    const itemHits = order.items
+        .map((item) => {
+            const productMatch = matchProductToMaterial(
+                { productName: item.productName, productCode: item.productCode },
+                { materialName: line.materialName, materialNameRaw: line.materialNameRaw },
+            );
+            if (materialExists && !productMatch.matches) return null;
+
+            const lineQuantity = line.quantityKg;
+            const remainingQuantity = item.remainingQuantityTon;
+            if (Number.isFinite(lineQuantity) && remainingQuantity <= 0) return null;
+
+            let quantityScore = 0;
+            if (Number.isFinite(lineQuantity)) {
+                if (isSameQuantity(remainingQuantity, lineQuantity)) quantityScore += 40;
+                else if (remainingQuantity >= Number(lineQuantity)) quantityScore += 25;
+                if (isSameQuantity(item.quantityTon, lineQuantity)) quantityScore += 20;
+                else if (item.quantityTon > Number(lineQuantity)) quantityScore += 10;
+            }
+
+            return {
+                score: productMatch.score + quantityScore,
+                reason: `${productMatch.reason}, 잔량 ${fmtNumber(remainingQuantity)}TON / 주문 ${fmtNumber(item.quantityTon)}TON`,
+            };
+        })
+        .filter((hit): hit is { score: number; reason: string } => hit !== null)
+        .sort((a, b) => b.score - a.score);
+
+    if (itemHits.length === 0) return null;
+
+    const deliveryDate = order.requestedDeliveryDate?.slice(0, 10) ?? null;
+    const dateExact = deliveryDate === dispatchDate;
+    const bestItem = itemHits[0];
+    const score = (addressHits.length * 15) + (dateExact ? 35 : -30) + bestItem.score;
+
+    if (score < 70) return null;
+
+    return {
+        order,
+        score,
+        reason: `${dateExact ? '도착일 일치' : '도착일 불일치'}, ${bestItem.reason}`,
+    };
 }
 
 function groupByIndoChi(rows: DispatchRowVM[]) {

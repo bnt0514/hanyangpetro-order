@@ -1,4 +1,4 @@
-import { auth, signOut } from '@/lib/auth';
+﻿import { auth, signOut } from '@/lib/auth';
 import { redirect, notFound } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -11,6 +11,7 @@ import StatusActions from './StatusActions';
 import DeleteOrderButton from './DeleteOrderButton';
 import StaffStatusOverride from './StaffStatusOverride';
 import ItemQuantityEditor from './ItemQuantityEditor';
+import DeliveryDateEditor from './DeliveryDateEditor';
 import CreditSimulationPanel from '@/app/admin/credit/CreditSimulationPanel';
 import BackButton from '@/components/BackButton';
 
@@ -43,6 +44,12 @@ export default async function AdminOrderDetail({
 
     if (!order) notFound();
 
+    const products = await prisma.product.findMany({
+        where: { isActive: true },
+        select: { id: true, productName: true, productCode: true },
+        orderBy: { productName: 'asc' },
+    });
+
     const hanwhaRows = await prisma.hanwhaDispatchRow.findMany({
         where: { matchedOrderId: order.id },
         orderBy: [{ createdAt: 'asc' }],
@@ -69,6 +76,9 @@ export default async function AdminOrderDetail({
             driverInfo: joinHanwhaDriverInfo(dispatch.vehicleNumber, dispatch.driverName, dispatch.driverPhone),
         }));
     const orderQuantityTon = order.items.reduce((sum, item) => sum + item.requestedQuantity, 0);
+    const canStartHanwhaOrder = session.user.name === '양희철';
+    const requestedDeliveryDateValue = order.requestedDeliveryDate?.toISOString().slice(0, 10)
+        ?? new Date().toISOString().slice(0, 10);
 
     return (
         <div className="min-h-screen">
@@ -140,7 +150,10 @@ export default async function AdminOrderDetail({
                             </span>
                         </Info>
                         <Info icon={<Calendar size={14} />} label="요청 도착일">
-                            {fmtDate(order.requestedDeliveryDate)}
+                            <div className="space-y-1">
+                                <span className="block text-xs text-slate-500">현재 {fmtDate(order.requestedDeliveryDate)}</span>
+                                <DeliveryDateEditor orderId={order.id} currentDate={requestedDeliveryDateValue} />
+                            </div>
                         </Info>
                         {order.memo && (
                             <Info icon={<FileText size={14} />} label="메모">
@@ -150,7 +163,7 @@ export default async function AdminOrderDetail({
                     </div>
                 </section>
 
-                <HanwhaDispatchDetails rows={dispatchDetails} orderQuantityTon={orderQuantityTon} />
+                <HanwhaDispatchDetails rows={dispatchDetails} orderQuantityTon={orderQuantityTon} showDeleteAction />
 
                 {/* 품목 */}
                 <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -194,8 +207,10 @@ export default async function AdminOrderDetail({
                                         <td className="px-6 py-3 text-right">
                                             <ItemQuantityEditor
                                                 itemId={it.id}
+                                                currentProductId={it.productId}
                                                 currentQuantity={it.requestedQuantity}
                                                 unit={it.unit}
+                                                products={products}
                                             />
                                         </td>
                                     </tr>
@@ -216,6 +231,7 @@ export default async function AdminOrderDetail({
                         <StatusActions
                             orderId={order.id}
                             currentStatus={order.status}
+                            canStartHanwhaOrder={canStartHanwhaOrder}
                         />
                     </div>
                     <DeleteOrderButton orderId={order.id} />
