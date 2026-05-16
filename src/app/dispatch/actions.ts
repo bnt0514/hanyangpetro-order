@@ -6,6 +6,7 @@ import { extractHanwhaDriverFields } from '@/lib/hanwha-dispatch';
 import { isSameQuantity } from '@/lib/product-matching';
 import { revalidatePath } from 'next/cache';
 import { scrapeHanwhaDispatch } from '@/lib/hanwha-scraper';
+import { syncOrderWarehouseStockMovements } from '@/lib/warehouse-stock-sync';
 import {
     canManageHanwhaCredentials,
     getHanwhaPassword,
@@ -312,6 +313,7 @@ export async function matchHanwhaDispatchRow(rowId: string, orderId: string) {
                 },
             });
         }
+        await syncOrderWarehouseStockMovements(tx, orderId);
     });
 
     revalidatePath('/admin');
@@ -350,15 +352,23 @@ export async function deleteHanwhaDispatchMatch(matchId: string) {
                 data: { matchedOrderId: null, matchedAt: null, matchedByUserId: null },
             });
         }
+        const remainingDispatchCount = await tx.dispatch.count({ where: { orderId } });
+        const nextStatus = remainingDispatchCount === 0 && order.status === OrderStatus.DISPATCH_COMPLETED
+            ? OrderStatus.DISPATCH_WAITING
+            : order.status;
+        if (nextStatus !== order.status) {
+            await tx.order.update({ where: { id: orderId }, data: { status: nextStatus } });
+        }
         await tx.orderStatusHistory.create({
             data: {
                 orderId,
                 previousStatus: order.status,
-                newStatus: order.status,
+                newStatus: nextStatus,
                 changedByUserId: session.user.id,
                 changeReason: '[배차 매칭 삭제] 오매칭 정정으로 한화 배차 매칭을 삭제했습니다.',
             },
         });
+        await syncOrderWarehouseStockMovements(tx, orderId);
     });
 
     revalidatePath('/admin');
@@ -400,6 +410,7 @@ export async function confirmOrderReceipt(orderId: string, reason?: string) {
                 changeReason: reason?.trim() || '입고 완료 처리',
             },
         });
+        await syncOrderWarehouseStockMovements(tx, orderId);
     });
 
     revalidatePath('/admin');

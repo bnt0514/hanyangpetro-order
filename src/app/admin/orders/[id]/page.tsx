@@ -17,6 +17,13 @@ import BackButton from '@/components/BackButton';
 
 export const dynamic = 'force-dynamic';
 
+function normalizeCompanyName(value: string | null | undefined) {
+    return (value ?? '')
+        .replace(/주식\s*회사/g, '')
+        .replace(/\(주\)|㈜|\s|[()]/g, '')
+        .trim();
+}
+
 export default async function AdminOrderDetail({
     params,
 }: {
@@ -32,7 +39,7 @@ export default async function AdminOrderDetail({
         include: {
             customer: true,
             deliveryAddress: true,
-            items: { include: { product: true } },
+            items: { include: { product: true, salesEntity: true, purchaseEntity: true, purchaseSupplier: true } },
             requestedByUser: { select: { name: true, role: true } },
             requestedByCustomerUser: { select: { name: true } },
             statusHistory: {
@@ -46,8 +53,27 @@ export default async function AdminOrderDetail({
 
     const products = await prisma.product.findMany({
         where: { isActive: true },
-        select: { id: true, productName: true, productCode: true },
+        select: {
+            id: true,
+            productName: true,
+            productCode: true,
+            defaultSalesEntityId: true,
+            defaultPurchaseEntityId: true,
+            defaultSupplierId: true,
+        },
         orderBy: { productName: 'asc' },
+    });
+
+    const companyEntities = await prisma.companyEntity.findMany({
+        where: { isActive: true },
+        select: { id: true, code: true, displayName: true },
+        orderBy: { displayName: 'asc' },
+    });
+
+    const suppliers = await prisma.supplier.findMany({
+        where: { isActive: true },
+        select: { id: true, supplierName: true, contactPerson: true, phone: true },
+        orderBy: { supplierName: 'asc' },
     });
 
     const hanwhaRows = await prisma.hanwhaDispatchRow.findMany({
@@ -77,6 +103,7 @@ export default async function AdminOrderDetail({
         }));
     const orderQuantityTon = order.items.reduce((sum, item) => sum + item.requestedQuantity, 0);
     const canStartHanwhaOrder = session.user.name === '양희철';
+    const isInternalPurchaseOnly = normalizeCompanyName(order.customer.companyName) === '한양유화';
     const requestedDeliveryDateValue = order.requestedDeliveryDate?.toISOString().slice(0, 10)
         ?? new Date().toISOString().slice(0, 10);
 
@@ -147,7 +174,13 @@ export default async function AdminOrderDetail({
                             <span className="font-medium">{order.deliveryAddress.label}</span>
                             <span className="block text-xs text-slate-500">
                                 {order.deliveryAddress.addressLine1}
+                                {order.deliveryAddress.addressLine2 ? ` ${order.deliveryAddress.addressLine2}` : ''}
                             </span>
+                            {order.deliveryAddress.contactPhone && (
+                                <span className="block text-xs text-slate-500">
+                                    전화번호 {order.deliveryAddress.contactPhone}
+                                </span>
+                            )}
                         </Info>
                         <Info icon={<Calendar size={14} />} label="요청 도착일">
                             <div className="space-y-1">
@@ -177,9 +210,14 @@ export default async function AdminOrderDetail({
                                     <th className="px-6 py-3">제품명</th>
                                     <th className="px-6 py-3">제품코드</th>
                                     <th className="px-6 py-3 text-right">요청수량</th>
+                                    <th className="px-6 py-3">창고/직송</th>
+                                    <th className="px-6 py-3">매출주체</th>
+                                    <th className="px-6 py-3">매입처</th>
+                                    <th className="px-6 py-3 text-right">매출단가</th>
+                                    <th className="px-6 py-3 text-right">매입단가</th>
                                     <th className="px-6 py-3 text-right">승인수량</th>
                                     <th className="px-6 py-3 text-right">출고수량</th>
-                                    <th className="px-6 py-3 text-right">수량 수정</th>
+                                    <th className="px-6 py-3 text-right">품목 수정</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
@@ -193,6 +231,24 @@ export default async function AdminOrderDetail({
                                         </td>
                                         <td className="px-6 py-3 text-right text-slate-700">
                                             {fmtNumber(it.requestedQuantity)} {it.unit}
+                                        </td>
+                                        <td className="px-6 py-3 text-slate-600">
+                                            {it.fulfillmentType === 'WAREHOUSE' ? '창고' : it.fulfillmentType === 'DIRECT' ? '직송' : '미지정'}
+                                        </td>
+                                        <td className="px-6 py-3 text-slate-600">
+                                            {isInternalPurchaseOnly ? '-' : it.salesEntity?.displayName ?? '-'}
+                                        </td>
+                                        <td className="px-6 py-3 text-slate-600">
+                                            <span className="block">{it.purchaseSupplier?.supplierName ?? '-'}</span>
+                                            <span className={`mt-0.5 inline-flex rounded-full px-2 py-0.5 text-[11px] ${it.purchaseSupplierId && it.purchaseSupplierConfirmedAt ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+                                                {it.purchaseSupplierId && it.purchaseSupplierConfirmedAt ? '저장됨' : '확인 필요'}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-3 text-right text-slate-600">
+                                            {!isInternalPurchaseOnly && it.salesUnitPrice != null ? it.salesUnitPrice.toLocaleString('ko-KR') : '-'}
+                                        </td>
+                                        <td className="px-6 py-3 text-right text-slate-600">
+                                            {it.purchaseUnitPrice != null ? it.purchaseUnitPrice.toLocaleString('ko-KR') : '-'}
                                         </td>
                                         <td className="px-6 py-3 text-right text-slate-500">
                                             {it.approvedQuantity != null
@@ -209,8 +265,17 @@ export default async function AdminOrderDetail({
                                                 itemId={it.id}
                                                 currentProductId={it.productId}
                                                 currentQuantity={it.requestedQuantity}
+                                                currentSalesEntityId={it.salesEntityId ?? ''}
+                                                currentPurchaseEntityId={it.purchaseEntityId ?? ''}
+                                                currentPurchaseSupplierId={it.purchaseSupplierId ?? ''}
+                                                currentFulfillmentType={it.fulfillmentType ?? ''}
+                                                isInternalPurchaseOnly={isInternalPurchaseOnly}
+                                                currentSalesUnitPrice={it.salesUnitPrice}
+                                                currentPurchaseUnitPrice={it.purchaseUnitPrice}
                                                 unit={it.unit}
                                                 products={products}
+                                                companyEntities={companyEntities}
+                                                suppliers={suppliers}
                                             />
                                         </td>
                                     </tr>

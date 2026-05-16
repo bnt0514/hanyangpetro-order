@@ -2,7 +2,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Building2, Plus } from 'lucide-react';
+import { ArrowLeft, Building2, Plus, BookOpen } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -101,7 +101,13 @@ export default async function CustomersPage({
                                             {customer.isActive ? '사용중' : '중지'}
                                         </span>
                                     </td>
-                                    <td className="px-5 py-3 text-right">
+                                    <td className="px-5 py-3 text-right space-x-1">
+                                        <Link
+                                            href={`/admin/customers/${customer.id}/ledger`}
+                                            className="inline-flex items-center gap-1 rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50"
+                                        >
+                                            <BookOpen size={12} /> 원장
+                                        </Link>
                                         <Link
                                             href={`/admin/customers/${customer.id}`}
                                             className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"

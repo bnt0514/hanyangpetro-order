@@ -4,8 +4,9 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { prisma } from '@/lib/db';
 import { statusLabel, statusColor, fmtDate, fmtDateTime, fmtNumber } from '@/lib/orders';
-import { Plus, Package, Clock, AlertTriangle, CheckCircle2, Building2 } from 'lucide-react';
+import { Plus, Package, Clock, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import BackButton from '@/components/BackButton';
+import AdminNav from './AdminNav';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,6 +16,7 @@ export default async function AdminHome() {
     if (session.user.userKind !== 'staff') redirect('/portal');
 
     const isHanwhaManager = session.user.role === 'EXECUTIVE' || session.user.role === 'ADMIN';
+    const canManageCreditLimits = session.user.id === 'cmojpskkh0000994c99z7ro6d' || session.user.name === '양희철';
 
     // ── 통계 ────────────────────────────────────────────────
     const today = new Date();
@@ -83,64 +85,9 @@ export default async function AdminHome() {
             </header>
 
             <main className="max-w-7xl mx-auto p-6">
-                <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
-                    <h1 className="text-2xl font-bold text-slate-800">대시보드</h1>
-                    <div className="flex items-center gap-2 flex-wrap">
-                        <Link
-                            href="/admin/dispatch"
-                            className="inline-flex items-center gap-2 rounded-xl bg-white border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
-                        >
-                            🚚 한화 배차 조회
-                        </Link>
-                        {isHanwhaManager && (
-                            <Link
-                                href="/admin/settings/hanwha"
-                                className="inline-flex items-center gap-2 rounded-xl bg-white border border-slate-300 px-3 py-2.5 text-xs font-semibold text-slate-600 shadow-sm hover:bg-slate-50"
-                                title="한화 H-CRM 비밀번호 관리"
-                            >
-                                🔑 한화 비번
-                            </Link>
-                        )}
-                        {isHanwhaManager && (
-                            <Link
-                                href="/admin/prices"
-                                className="inline-flex items-center gap-2 rounded-xl bg-white border border-slate-300 px-3 py-2.5 text-xs font-semibold text-slate-600 shadow-sm hover:bg-slate-50"
-                            >
-                                📊 단가 관리
-                            </Link>
-                        )}
-                        <Link
-                            href="/admin/credit-overrides"
-                            className="inline-flex items-center gap-2 rounded-xl bg-white border border-red-300 px-3 py-2.5 text-xs font-semibold text-red-600 shadow-sm hover:bg-red-50"
-                        >
-                            🛡 여신 초과 승인
-                        </Link>
-                        <Link
-                            href="/admin/orders/deleted"
-                            className="inline-flex items-center gap-2 rounded-xl bg-white border border-slate-300 px-3 py-2.5 text-xs font-semibold text-slate-500 shadow-sm hover:bg-slate-50"
-                        >
-                            🗑 삭제 내역
-                        </Link>
-                        <Link
-                            href="/admin/orders/new"
-                            className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
-                        >
-                            <Plus size={16} /> 신규 주문 등록
-                        </Link>
-                        <Link
-                            href="/admin/customers/new"
-                            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700"
-                        >
-                            <Building2 size={16} /> 신규업체 등록
-                        </Link>
-                        <Link
-                            href="/admin/customers"
-                            className="inline-flex items-center gap-2 rounded-xl bg-white border border-emerald-300 px-3 py-2.5 text-xs font-semibold text-emerald-700 shadow-sm hover:bg-emerald-50"
-                        >
-                            <Building2 size={14} /> 기존업체 수정
-                        </Link>
-                    </div>
-                </div>
+                <h1 className="text-2xl font-bold text-slate-800 mb-4">대시보드</h1>
+
+                <AdminNav isHanwhaManager={isHanwhaManager} canManageCreditLimits={canManageCreditLimits} />
 
                 {/* 통계 카드 */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">

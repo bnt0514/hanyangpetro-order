@@ -14,42 +14,28 @@ datasource db {
 // Enums
 // ============================================================
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 // ============================================================
 // Users (internal employees)
 // ============================================================
 
 model User {
-  id           String   @id @default(cuid())
-  name         String
-  email        String?  @unique
-  loginId      String?  @unique
-  passwordHash String?
-  phone        String?
-  role         String
-  isActive     Boolean  @default(true)
-  backupUserId String?
-  backupUser   User?    @relation("UserBackup", fields: [backupUserId], references: [id])
-  backedUpBy   User[]   @relation("UserBackup")
-  creditTransactions    CreditTransaction[]    @relation("CreditTxCreatedBy")
-  overrideRequested     CreditOverrideRequest[] @relation("OverrideRequested")
-  overrideReviewed      CreditOverrideRequest[] @relation("OverrideReviewed")
-  priceAdjustments      PriceAdjustment[]       @relation("PriceAdjCreatedBy")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                 String                  @id @default(cuid())
+  name               String
+  email              String?                 @unique
+  loginId            String?                 @unique
+  passwordHash       String?
+  phone              String?
+  role               String
+  isActive           Boolean                 @default(true)
+  backupUserId       String?
+  backupUser         User?                   @relation("UserBackup", fields: [backupUserId], references: [id])
+  backedUpBy         User[]                  @relation("UserBackup")
+  creditTransactions CreditTransaction[]     @relation("CreditTxCreatedBy")
+  overrideRequested  CreditOverrideRequest[] @relation("OverrideRequested")
+  overrideReviewed   CreditOverrideRequest[] @relation("OverrideReviewed")
+  priceAdjustments   PriceAdjustment[]       @relation("PriceAdjCreatedBy")
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
 
   // relations
   customersAsDefaultRep Customer[]           @relation("CustomerDefaultRep")
@@ -63,6 +49,38 @@ model User {
 }
 
 // ============================================================
+// Managed company entities (sales/purchase principals)
+// ============================================================
+
+model CompanyEntity {
+  id                   String   @id @default(cuid())
+  code                 String   @unique
+  displayName          String
+  legalName            String?
+  businessNumber       String?
+  ecountCompanyCode    String?
+  click2002CompanyCode String?
+  isActive             Boolean  @default(true)
+  isDefaultSales       Boolean  @default(false)
+  isDefaultPurchase    Boolean  @default(false)
+  memo                 String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  defaultSalesProducts    Product[]              @relation("ProductDefaultSalesEntity")
+  defaultPurchaseProducts Product[]              @relation("ProductDefaultPurchaseEntity")
+  salesOrderItems         OrderItem[]            @relation("OrderItemSalesEntity")
+  purchaseOrderItems      OrderItem[]            @relation("OrderItemPurchaseEntity")
+  customerProductPrices   CustomerProductPrice[]
+  priceAdjustments        PriceAdjustment[]
+  ledgerEntries           LedgerEntry[]
+  warehouseStockSnapshots WarehouseStockSnapshot[]
+  warehouseStockMovements WarehouseStockMovement[]
+
+  @@index([isActive])
+}
+
+// ============================================================
 // Customers & Delivery Addresses
 // ============================================================
 
@@ -73,23 +91,31 @@ model Customer {
   businessNumber    String?
   defaultSalesRepId String?
   defaultSalesRep   User?    @relation("CustomerDefaultRep", fields: [defaultSalesRepId], references: [id])
-  creditLimit       Float  @default(0)
+  creditLimit           Float    @default(0)
+  creditInsuranceAmount Float    @default(0)
+  mortgageAmount        Float    @default(0)
+  /// A=우량(한도무제한) B=정상 C=선입금필수
+  creditGrade           String   @default("B")
   paymentTerms      String?
-  receivableAmount  Float  @default(0)
+  receivableAmount  Float    @default(0)
+  /// 기초 미수금 잔액 (기준일 스냅샷)
+  openingReceivable      Float?    @default(0)
+  openingReceivableDate  DateTime?
   isActive          Boolean  @default(true)
   memo              String?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  addresses         DeliveryAddress[]
-  orderableProducts CustomerProductWhitelist[]
-  customerUsers     CustomerUser[]
-  orders            Order[]
-  creditTransactions CreditTransaction[]
+  addresses             DeliveryAddress[]
+  orderableProducts     CustomerProductWhitelist[]
+  customerUsers         CustomerUser[]
+  orders                Order[]
+  creditTransactions    CreditTransaction[]
+  customerProductPrices CustomerProductPrice[]
+  ledgerEntries         LedgerEntry[]
 
   @@index([companyName])
 }
-
 
 /// ??거래처는 ?�러 ?�착지�?가�????�다.
 /// ?�착지�??�력?�도 거래처�? ??��?�할 ???�도�?addressLine1 ?�덱???�용.
@@ -120,25 +146,40 @@ model DeliveryAddress {
 // ============================================================
 
 model Product {
-  id                String    @id @default(cuid())
-  productCode       String    @unique
-  productName       String
-  manufacturer      String?
-  grade             String?
-  packagingType     String?
-  category          String?
-  ecountItemCode    String?
-  click2002ItemCode String?
-  defaultSupplierId String?
-  defaultSupplier   Supplier? @relation(fields: [defaultSupplierId], references: [id])
-  isActive          Boolean   @default(true)
-  memo              String?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id                      String         @id @default(cuid())
+  productCode             String         @unique
+  productName             String
+  manufacturer            String?
+  grade                   String?
+  packagingType           String?
+  category                String?
+  brand                   String?
+  productGroup            String?
+  ecountItemCode          String?
+  click2002ItemCode       String?
+  defaultSupplierId       String?
+  defaultSupplier         Supplier?      @relation(fields: [defaultSupplierId], references: [id])
+  defaultSalesEntityId    String?
+  defaultSalesEntity      CompanyEntity? @relation("ProductDefaultSalesEntity", fields: [defaultSalesEntityId], references: [id])
+  defaultPurchaseEntityId String?
+  defaultPurchaseEntity   CompanyEntity? @relation("ProductDefaultPurchaseEntity", fields: [defaultPurchaseEntityId], references: [id])
+  isActive                Boolean        @default(true)
+  memo                    String?
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime       @updatedAt
 
-  customerWhitelists CustomerProductWhitelist[]
-  orderItems         OrderItem[]
-  productPrice       ProductPrice?
+  customerWhitelists    CustomerProductWhitelist[]
+  orderItems            OrderItem[]
+  productPrice          ProductPrice?
+  customerProductPrices CustomerProductPrice[]
+  priceAdjustments      PriceAdjustment[]
+  ledgerEntries         LedgerEntry[]
+  warehouseStockSnapshots WarehouseStockSnapshot[]
+  warehouseStockMovements WarehouseStockMovement[]
+
+  @@index([defaultSalesEntityId])
+  @@index([defaultPurchaseEntityId])
+  @@index([brand, productGroup])
 }
 
 /// 거래�??�털 주문 ???�출???�품 ?�이?�리?�트.
@@ -166,19 +207,26 @@ model CustomerProductWhitelist {
 // ============================================================
 
 model Supplier {
-  id            String       @id @default(cuid())
+  id            String   @id @default(cuid())
   supplierName  String
-  supplierType  String  @default("DOMESTIC_OTHER")
+  businessNumber String?
+  supplierType  String   @default("DOMESTIC_OTHER")
   contactPerson String?
   phone         String?
   email         String?
   memo          String?
-  isActive      Boolean      @default(true)
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  isActive      Boolean  @default(true)
+  /// 기초 미지급금 잔액 (기준일 스냅샷)
+  openingPayable      Float?    @default(0)
+  openingPayableDate  DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   products Product[]
   orders   Order[]
+  orderItems OrderItem[] @relation("OrderItemPurchaseSupplier")
+  ledgerEntries LedgerEntry[]
+  creditTransactions CreditTransaction[]
 }
 
 // ============================================================
@@ -209,29 +257,29 @@ model CustomerUser {
 // ============================================================
 
 model Order {
-  id                        String        @id @default(cuid())
-  orderNo                   String        @unique
+  id                        String          @id @default(cuid())
+  orderNo                   String          @unique
   customerId                String
-  customer                  Customer      @relation(fields: [customerId], references: [id])
+  customer                  Customer        @relation(fields: [customerId], references: [id])
   deliveryAddressId         String
   deliveryAddress           DeliveryAddress @relation(fields: [deliveryAddressId], references: [id])
   requestedByUserId         String?
-  requestedByUser           User?         @relation("OrderRequestedBy", fields: [requestedByUserId], references: [id])
+  requestedByUser           User?           @relation("OrderRequestedBy", fields: [requestedByUserId], references: [id])
   requestedByCustomerUserId String?
-  requestedByCustomerUser   CustomerUser? @relation("OrderCustomerUserRequester", fields: [requestedByCustomerUserId], references: [id])
+  requestedByCustomerUser   CustomerUser?   @relation("OrderCustomerUserRequester", fields: [requestedByCustomerUserId], references: [id])
   salesRepId                String?
-  salesRep                  User?         @relation("OrderSalesRep", fields: [salesRepId], references: [id])
-  orderSource               String   @default("SALES_MANUAL")
-  status                    String   @default("REQUESTED")
-  priceStatus               String   @default("UNKNOWN")
+  salesRep                  User?           @relation("OrderSalesRep", fields: [salesRepId], references: [id])
+  orderSource               String          @default("SALES_MANUAL")
+  status                    String          @default("REQUESTED")
+  priceStatus               String          @default("UNKNOWN")
   requestedDeliveryDate     DateTime?
   confirmedDeliveryDate     DateTime?
   supplierType              String?
   supplierId                String?
-  supplier                  Supplier?     @relation(fields: [supplierId], references: [id])
+  supplier                  Supplier?       @relation(fields: [supplierId], references: [id])
   /// 0=normal, 1=warning, 2=danger (over credit limit)
-  creditWarningLevel        Int           @default(0)
-  customerNoticeRequired    Boolean       @default(true)
+  creditWarningLevel        Int             @default(0)
+  customerNoticeRequired    Boolean         @default(true)
   /// Raw text of incoming order (for AI parsing in 2nd MVP)
   rawOrderText              String?
   memo                      String?
@@ -241,8 +289,8 @@ model Order {
   deleteReason              String?
   /// 오더 수락 전 여신 시뮬레이션 결과 (단가 × 수량 합계)
   estimatedAmount           Float?
-  createdAt                 DateTime      @default(now())
-  updatedAt                 DateTime      @updatedAt
+  createdAt                 DateTime        @default(now())
+  updatedAt                 DateTime        @updatedAt
 
   items            OrderItem[]
   statusHistory    OrderStatusHistory[]
@@ -252,7 +300,8 @@ model Order {
   deliveryReceipts DeliveryReceipt[]
   erpInputItems    ErpInputItem[]
   notifications    NotificationLog[]
-  creditOverride     CreditOverrideRequest?
+  creditOverride   CreditOverrideRequest?
+  ledgerEntries    LedgerEntry[]
 
   @@index([customerId])
   @@index([status])
@@ -262,41 +311,155 @@ model Order {
 }
 
 model OrderItem {
-  id                String       @id @default(cuid())
-  orderId           String
-  order             Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId         String
-  product           Product      @relation(fields: [productId], references: [id])
-  requestedQuantity Float
-  approvedQuantity  Float?
-  shippedQuantity   Float?
-  receivedQuantity  Float?
-  unit              String @default("KG")
-  expectedPrice     Float?
-  confirmedPrice    Float?
+  id                 String         @id @default(cuid())
+  orderId            String
+  order              Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId          String
+  product            Product        @relation(fields: [productId], references: [id])
+  salesEntityId      String?
+  salesEntity        CompanyEntity? @relation("OrderItemSalesEntity", fields: [salesEntityId], references: [id])
+  purchaseEntityId   String?
+  purchaseEntity     CompanyEntity? @relation("OrderItemPurchaseEntity", fields: [purchaseEntityId], references: [id])
+  purchaseSupplierId String?
+  purchaseSupplier   Supplier?      @relation("OrderItemPurchaseSupplier", fields: [purchaseSupplierId], references: [id])
+  purchaseSupplierConfirmedAt DateTime?
+  /// WAREHOUSE=창고 입출고, DIRECT=직송. 기존 데이터 호환을 위해 nullable, 신규 입력은 필수 검증.
+  fulfillmentType   String?
+  requestedQuantity  Float
+  approvedQuantity   Float?
+  shippedQuantity    Float?
+  receivedQuantity   Float?
+  unit               String         @default("KG")
+  salesUnitPrice     Float?
+  purchaseUnitPrice  Float?
+  expectedPrice      Float?
+  confirmedPrice     Float?
   /// 여신 시뮬레이션 시 적용된 단가 (원/TON)
   estimatedUnitPrice Float?
-  priceStatus       String  @default("UNKNOWN")
-  memo              String?
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
+  priceStatus        String         @default("UNKNOWN")
+  priceMemo          String?
+  memo               String?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  ledgerEntries      LedgerEntry[]
+  stockMovements     WarehouseStockMovement[]
 
   @@index([orderId])
+  @@index([salesEntityId])
+  @@index([purchaseEntityId])
+  @@index([purchaseSupplierId])
+  @@index([productId])
+  @@index([fulfillmentType])
+}
+
+model OrderSequence {
+  orderDate DateTime @id
+  lastSeq   Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model LedgerEntry {
+  id               String         @id @default(cuid())
+  ledgerType       String // SALES | PURCHASE
+  transactionDate  DateTime
+  companyEntityId  String?
+  companyEntity    CompanyEntity? @relation(fields: [companyEntityId], references: [id])
+  customerId       String?
+  customer         Customer?      @relation(fields: [customerId], references: [id])
+  supplierId       String?
+  supplier         Supplier?      @relation(fields: [supplierId], references: [id])
+  counterpartyCode String?
+  counterpartyName String
+  productId        String?
+  product          Product?       @relation(fields: [productId], references: [id])
+  productCode      String?
+  productName      String
+  quantity         Float          @default(0)
+  unit             String         @default("TON")
+  unitPrice        Float?
+  supplyAmount     Float?
+  vatAmount        Float?
+  totalAmount      Float?
+  memo             String?
+  sourceType       String         @default("ECOUNT_IMPORT")
+  sourceFile       String?
+  sourceSheet      String?
+  sourceRowNumber  Int?
+  sourceHash       String         @unique
+  orderId          String?
+  order            Order?         @relation(fields: [orderId], references: [id])
+  orderItemId      String?
+  orderItem        OrderItem?     @relation(fields: [orderItemId], references: [id])
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@index([ledgerType, transactionDate])
+  @@index([customerId, transactionDate])
+  @@index([supplierId, transactionDate])
+  @@index([companyEntityId])
+  @@index([counterpartyName])
+  @@index([sourceFile])
+}
+
+model WarehouseStockSnapshot {
+  id              String         @id @default(cuid())
+  companyEntityId String
+  companyEntity   CompanyEntity  @relation(fields: [companyEntityId], references: [id])
+  productId       String?
+  product         Product?       @relation(fields: [productId], references: [id])
+  productCode     String?
+  productName     String
+  snapshotDate    DateTime
+  quantity        Float          @default(0)
+  unit            String         @default("TON")
+  memo            String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@unique([companyEntityId, productName, snapshotDate])
+  @@index([companyEntityId, snapshotDate])
+  @@index([productId])
+}
+
+model WarehouseStockMovement {
+  id              String         @id @default(cuid())
+  companyEntityId String
+  companyEntity   CompanyEntity  @relation(fields: [companyEntityId], references: [id])
+  orderItemId     String?
+  orderItem       OrderItem?     @relation(fields: [orderItemId], references: [id])
+  productId       String?
+  product         Product?       @relation(fields: [productId], references: [id])
+  productCode     String?
+  productName     String
+  movementDate    DateTime
+  movementType    String // IN | OUT | ADJUST
+  quantity        Float
+  unit            String         @default("TON")
+  sourceType      String         @default("ORDER")
+  memo            String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([companyEntityId, movementDate])
+  @@index([orderItemId])
+  @@index([productId])
+  @@index([movementType])
 }
 
 /// 모든 주문 ?�태 변경�? ?�력?�로 ?�긴??(?�수).
 model OrderStatusHistory {
-  id              String       @id @default(cuid())
+  id              String   @id @default(cuid())
   orderId         String
-  order           Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   previousStatus  String?
   newStatus       String
   changedByUserId String?
-  changedByUser   User?        @relation(fields: [changedByUserId], references: [id])
+  changedByUser   User?    @relation(fields: [changedByUserId], references: [id])
   changeReason    String?
-  internalMemo   String?
+  internalMemo    String?
   customerMessage String?
-  createdAt       DateTime     @default(now())
+  createdAt       DateTime @default(now())
 
   @@index([orderId])
   @@index([createdAt])
@@ -329,28 +492,28 @@ model HoldReminder {
 // ============================================================
 
 model Dispatch {
-  id                   String         @id @default(cuid())
-  orderId              String
-  order                Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  dispatchStatus       String @default("WAITING")
-  plannedDispatchDate  DateTime?
-  dispatchAttemptCount Int            @default(0)
-  carrierName          String?
-  vehicleNumber        String?
-  driverName           String?
-  driverPhone          String?
-  hanwhaDispatchRowId  String?
+  id                    String    @id @default(cuid())
+  orderId               String
+  order                 Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  dispatchStatus        String    @default("WAITING")
+  plannedDispatchDate   DateTime?
+  dispatchAttemptCount  Int       @default(0)
+  carrierName           String?
+  vehicleNumber         String?
+  driverName            String?
+  driverPhone           String?
+  hanwhaDispatchRowId   String?
   hanwhaMaterialNameRaw String?
-  hanwhaMaterialName   String?
-  hanwhaQuantityTon    Float?
-  hanwhaRawCells       String?
-  failureReason        String?
-  nextRetryDate        DateTime?
+  hanwhaMaterialName    String?
+  hanwhaQuantityTon     Float?
+  hanwhaRawCells        String?
+  failureReason         String?
+  nextRetryDate         DateTime?
   /// 차량/기사 ?�보�?거래처에게도 ?�내?��? ?��? (?�책??보통 false)
-  shareWithCustomer    Boolean        @default(false)
-  memo                 String?
-  createdAt            DateTime       @default(now())
-  updatedAt            DateTime       @updatedAt
+  shareWithCustomer     Boolean   @default(false)
+  memo                  String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   @@index([orderId])
   @@index([dispatchStatus])
@@ -359,20 +522,20 @@ model Dispatch {
 }
 
 model Shipment {
-  id                       String         @id @default(cuid())
+  id                       String    @id @default(cuid())
   orderId                  String
-  order                    Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  shipmentStatus           String @default("NOT_READY")
+  order                    Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  shipmentStatus           String    @default("NOT_READY")
   plannedShipDate          DateTime?
   actualShipDate           DateTime?
   plannedQuantity          Float?
   shippedQuantity          Float?
-  unit                     String   @default("KG")
-  hasQuantityDiscrepancy   Boolean        @default(false)
+  unit                     String    @default("KG")
+  hasQuantityDiscrepancy   Boolean   @default(false)
   quantityDifferenceReason String?
   shipmentMemo             String?
-  createdAt                DateTime       @default(now())
-  updatedAt                DateTime       @updatedAt
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
 
   @@index([orderId])
   @@index([shipmentStatus])
@@ -403,19 +566,19 @@ model DeliveryReceipt {
 // ============================================================
 
 model ErpInputBatch {
-  id               String         @id @default(cuid())
+  id               String    @id @default(cuid())
   /// 마감 ?�???�업??(?? 2026-04-29)
   batchDate        DateTime
-  batchStatus      String @default("GENERATED")
-  generatedAt      DateTime       @default(now())
+  batchStatus      String    @default("GENERATED")
+  generatedAt      DateTime  @default(now())
   approvedByUserId String?
-  approvedByUser   User?          @relation(fields: [approvedByUserId], references: [id])
+  approvedByUser   User?     @relation(fields: [approvedByUserId], references: [id])
   approvedAt       DateTime?
   ecountResult     String?
   click2002Result  String?
   memo             String?
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   items ErpInputItem[]
 
@@ -429,8 +592,8 @@ model ErpInputItem {
   batch                 ErpInputBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
   orderId               String
   order                 Order         @relation(fields: [orderId], references: [id])
-  ecountStatus          String @default("NOT_STARTED")
-  click2002Status       String @default("NOT_STARTED")
+  ecountStatus          String        @default("NOT_STARTED")
+  click2002Status       String        @default("NOT_STARTED")
   ecountErrorMessage    String?
   click2002ErrorMessage String?
   retryCount            Int           @default(0)
@@ -449,9 +612,9 @@ model ErpInputItem {
 // ============================================================
 
 model NotificationLog {
-  id               String                 @id @default(cuid())
+  id               String    @id @default(cuid())
   orderId          String?
-  order            Order?                 @relation(fields: [orderId], references: [id])
+  order            Order?    @relation(fields: [orderId], references: [id])
   recipientType    String
   recipientId      String?
   recipientLabel   String?
@@ -462,12 +625,12 @@ model NotificationLog {
   notificationType String
   title            String
   message          String
-  sendStatus       String @default("PENDING")
+  sendStatus       String    @default("PENDING")
   sentAt           DateTime?
   failedReason     String?
   metadata         String?
-  createdAt        DateTime               @default(now())
-  updatedAt        DateTime               @updatedAt
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   @@index([orderId])
   @@index([sendStatus])
@@ -475,38 +638,37 @@ model NotificationLog {
   @@index([createdAt])
 }
 
-
 // =====================================================================
 // ��ȭ����ý���(H-CRM) ����/��� ��ȸ ĳ��
 // =====================================================================
 /// Ư�� ���ڿ� ���� ��ȭ H-CRM���� �ܾ�� ����� ��Ÿ����. �� ��¥�� 1��.
 model HanwhaDispatchSnapshot {
-  id            String                @id @default(cuid())
+  id              String              @id @default(cuid())
   /// ��ȸ ��� ���� (YYYY-MM-DD ����)
-  dispatchDate  DateTime              @unique
+  dispatchDate    DateTime            @unique
   /// ���������� ��ȭ ����Ʈ���� �ܾ�� �ð�
-  fetchedAt     DateTime              @default(now())
+  fetchedAt       DateTime            @default(now())
   /// Ʈ������ ����
   fetchedByUserId String?
   /// 'OK' | 'PARTIAL' | 'FAILED'
-  status        String                @default("OK")
+  status          String              @default("OK")
   /// �ε�ó �� ����
-  rowCount      Int                   @default(0)
+  rowCount        Int                 @default(0)
   /// ���� �߻� �� �޽���
-  errorMessage  String?
-  rows          HanwhaDispatchRow[]
+  errorMessage    String?
+  rows            HanwhaDispatchRow[]
 
-  createdAt     DateTime              @default(now())
-  updatedAt     DateTime              @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([dispatchDate])
 }
 
 /// �ε�ó�� Line ��. �� �ε�ó�� ���� ���縦 ������ ���� ������ ����.
 model HanwhaDispatchRow {
-  id              String                  @id @default(cuid())
+  id              String                 @id @default(cuid())
   snapshotId      String
-  snapshot        HanwhaDispatchSnapshot  @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  snapshot        HanwhaDispatchSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
   /// �˻� ��� ���̺������� �ε�ó ���� (1����)
   indoChiIndex    Int
   /// �ε�ó�� (title �Ӽ����� ����)
@@ -518,12 +680,12 @@ model HanwhaDispatchRow {
   /// ��� ���� (kg) ? ���� ��
   quantityKg      Float?
   /// Line ���� ��� ��(td)�� �״�� ����. �÷� �߰�/���� ���濡�� �� ����.
-  rawCells        String   // JSON-stringified string[]
+  rawCells        String // JSON-stringified string[]
   /// 이 배차 라인과 매칭된 한양 주문
   matchedOrderId  String?
   matchedAt       DateTime?
   matchedByUserId String?
-  createdAt       DateTime @default(now())
+  createdAt       DateTime               @default(now())
 
   @@index([snapshotId])
   @@index([indoChiName])
@@ -543,27 +705,31 @@ model SystemSetting {
   createdAt   DateTime @default(now())
 }
 
-
 // =====================================================================
 // Credit (여신) 시스템
 // =====================================================================
 
-/// OUT: 출고 확정 자동 | IN: 입금 | ADJ: 수동 조정 (양희철 전용)
+/// OUT: 이카운트 청구 자동 | IN: 수금(입금) | ADJ: 수동 조정 | PAYMENT: 지급(출금, 매입처)
 model CreditTransaction {
-  id          String   @id @default(cuid())
-  customerId  String
-  customer    Customer @relation(fields: [customerId], references: [id])
+  id          String    @id @default(cuid())
+  customerId  String?
+  customer    Customer? @relation(fields: [customerId], references: [id])
+  supplierId  String?
+  supplier    Supplier? @relation(fields: [supplierId], references: [id])
   txDate      DateTime
-  txType      String   // OUT | IN | ADJ
+  txType      String // OUT | IN | ADJ | PAYMENT
   amount      Float
-  source      String   @default("MANUAL") // ORDER | UPLOAD | MANUAL
+  source      String   @default("MANUAL") // ORDER | UPLOAD | MANUAL | FINANCE_IMPORT
   orderId     String?
+  /// 재무일보 파일명+시트명+행번호 SHA-256 (중복 방지)
+  sourceRef   String?  @unique
   memo        String?
   createdById String?
   createdBy   User?    @relation("CreditTxCreatedBy", fields: [createdById], references: [id])
   createdAt   DateTime @default(now())
 
   @@index([customerId])
+  @@index([supplierId])
   @@index([txDate])
   @@index([txType])
   @@index([orderId])
@@ -571,21 +737,21 @@ model CreditTransaction {
 
 /// 여신 한도초과 주문 승인 요청 — 양희철(EXECUTIVE)만 승인
 model CreditOverrideRequest {
-  id                String   @id @default(cuid())
-  orderId           String   @unique
-  order             Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  id                String    @id @default(cuid())
+  orderId           String    @unique
+  order             Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
   currentReceivable Float
   creditLimit       Float
   overAmount        Float
-  status            String   @default("PENDING") // PENDING | APPROVED | REJECTED
+  status            String    @default("PENDING") // PENDING | APPROVED | REJECTED
   requestedById     String?
-  requestedBy       User?    @relation("OverrideRequested", fields: [requestedById], references: [id])
+  requestedBy       User?     @relation("OverrideRequested", fields: [requestedById], references: [id])
   reviewedById      String?
-  reviewedBy        User?    @relation("OverrideReviewed", fields: [reviewedById], references: [id])
+  reviewedBy        User?     @relation("OverrideReviewed", fields: [reviewedById], references: [id])
   reviewedAt        DateTime?
   rejectReason      String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   @@index([status])
   @@index([createdAt])
@@ -607,20 +773,54 @@ model ProductPrice {
   createdAt   DateTime @default(now())
 }
 
+/// 거래처별 직전/기준 단가. 주문 입력 시 동일 거래처·동일 품목의 매출/매입 단가를 제안하는 데 사용.
+model CustomerProductPrice {
+  id                String         @id @default(cuid())
+  customerId        String
+  customer          Customer       @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  productId         String
+  product           Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  companyEntityId   String?
+  companyEntity     CompanyEntity? @relation(fields: [companyEntityId], references: [id])
+  priceType         String // SALES | PURCHASE
+  unitPrice         Float
+  unit              String         @default("TON")
+  sourceOrderItemId String?
+  lastUsedAt        DateTime       @default(now())
+  memo              String?
+  createdById       String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@unique([customerId, productId, companyEntityId, priceType])
+  @@index([customerId, productId])
+  @@index([companyEntityId])
+  @@index([priceType])
+  @@index([lastUsedAt])
+}
+
 /// 월별 브랜드/제품군별 단가 조정값 (인상:+, 인하:-  원/TON).
 /// 예: 2026-05, 한화, LDPE → +50,000 원/TON
 model PriceAdjustment {
-  id             String   @id @default(cuid())
-  effectiveMonth String   // "2026-05"
-  brand          String   // 한화 | 롯데 | LG | 대한유화 | 기타
-  productGroup   String   // LDPE | LLDPE | EVA | HDPE | mLLDPE | 기타
-  delta          Float    @default(0)
-  memo           String?
-  createdById    String?
-  createdBy      User?    @relation("PriceAdjCreatedBy", fields: [createdById], references: [id])
-  createdAt      DateTime @default(now())
+  id              String         @id @default(cuid())
+  effectiveMonth  String // "2026-05"
+  companyEntityId String?
+  companyEntity   CompanyEntity? @relation(fields: [companyEntityId], references: [id])
+  priceType       String         @default("SALES") // SALES | PURCHASE
+  productId       String?
+  product         Product?       @relation(fields: [productId], references: [id])
+  brand           String // 한화 | 롯데 | LG | 대한유화 | 기타
+  productGroup    String // LDPE | LLDPE | EVA | HDPE | mLLDPE | 기타
+  delta           Float          @default(0)
+  memo            String?
+  createdById     String?
+  createdBy       User?          @relation("PriceAdjCreatedBy", fields: [createdById], references: [id])
+  createdAt       DateTime       @default(now())
 
   @@unique([effectiveMonth, brand, productGroup])
   @@index([effectiveMonth])
+  @@index([companyEntityId])
+  @@index([priceType])
+  @@index([productId])
   @@index([brand, productGroup])
 }

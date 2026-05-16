@@ -7,8 +7,18 @@ import { revalidatePath } from 'next/cache';
 import { OrderStatus } from '@/shared/enums';
 import { openHanwhaNewOrder } from '@/lib/hanwha-new-order';
 import { getHanwhaPassword, getHanwhaUsername } from '@/lib/hanwha-credentials';
+import { syncOrderWarehouseStockMovements } from '@/lib/warehouse-stock-sync';
 
-export type OrderItemInput = { productId: string; quantity: number };
+export type OrderItemInput = {
+    productId: string;
+    quantity: number;
+    fulfillmentType?: string;
+    salesEntityId?: string;
+    purchaseEntityId?: string;
+    purchaseSupplierId?: string;
+    salesUnitPrice?: number | null;
+    purchaseUnitPrice?: number | null;
+};
 export type CreateOrderInput = {
     customerId: string;          // 거래처 (customer 로그인 시 자동, staff는 폼에서)
     deliveryAddressId: string;
@@ -37,14 +47,93 @@ function buildOrderNoPrefix(orderDate: string) {
 
 async function getNextOrderNo(tx: Prisma.TransactionClient, orderDate: string) {
     const prefix = buildOrderNoPrefix(orderDate);
-    const lastOrder = await tx.order.findFirst({
-        where: { orderNo: { startsWith: prefix } },
-        select: { orderNo: true },
-        orderBy: { orderNo: 'desc' },
+    const date = new Date(orderDate + 'T00:00:00');
+    const existingSequence = await tx.orderSequence.findUnique({
+        where: { orderDate: date },
+        select: { lastSeq: true },
     });
-    const lastSeq = lastOrder?.orderNo.match(/-(\d{4})$/)?.[1];
-    const nextSeq = lastSeq ? Number(lastSeq) + 1 : 1;
+
+    let nextSeq: number;
+    if (existingSequence) {
+        const updated = await tx.orderSequence.update({
+            where: { orderDate: date },
+            data: { lastSeq: { increment: 1 } },
+            select: { lastSeq: true },
+        });
+        nextSeq = updated.lastSeq;
+    } else {
+        const lastOrder = await tx.order.findFirst({
+            where: { orderNo: { startsWith: prefix } },
+            select: { orderNo: true },
+            orderBy: { orderNo: 'desc' },
+        });
+        const lastSeq = lastOrder?.orderNo.match(/-(\d{4})$/)?.[1];
+        nextSeq = lastSeq ? Number(lastSeq) + 1 : 1;
+        await tx.orderSequence.create({
+            data: { orderDate: date, lastSeq: nextSeq },
+        });
+    }
     return `${prefix}${String(nextSeq).padStart(4, '0')}`;
+}
+
+function toOptionalPrice(value: number | null | undefined) {
+    if (value == null) return null;
+    return Number.isFinite(value) ? value : Number.NaN;
+}
+
+function compactJoin(values: Array<string | null | undefined>, separator = ' · ') {
+    return values.filter((value): value is string => Boolean(value)).join(separator);
+}
+
+function normalizeCompanyName(value: string | null | undefined) {
+    return (value ?? '')
+        .replace(/주식\s*회사/g, '')
+        .replace(/\(주\)|㈜|\s|[()]/g, '')
+        .trim();
+}
+
+function isHanyangCustomerName(value: string | null | undefined) {
+    return normalizeCompanyName(value) === '한양유화';
+}
+
+async function rememberCustomerProductPrice(
+    tx: Prisma.TransactionClient,
+    input: {
+        customerId: string;
+        productId: string;
+        companyEntityId: string;
+        priceType: 'SALES' | 'PURCHASE';
+        unitPrice: number | null;
+        sourceOrderItemId: string;
+        userId?: string;
+    },
+) {
+    if (input.unitPrice == null) return;
+    await tx.customerProductPrice.upsert({
+        where: {
+            customerId_productId_companyEntityId_priceType: {
+                customerId: input.customerId,
+                productId: input.productId,
+                companyEntityId: input.companyEntityId,
+                priceType: input.priceType,
+            },
+        },
+        update: {
+            unitPrice: input.unitPrice,
+            sourceOrderItemId: input.sourceOrderItemId,
+            lastUsedAt: new Date(),
+            createdById: input.userId,
+        },
+        create: {
+            customerId: input.customerId,
+            productId: input.productId,
+            companyEntityId: input.companyEntityId,
+            priceType: input.priceType,
+            unitPrice: input.unitPrice,
+            sourceOrderItemId: input.sourceOrderItemId,
+            createdById: input.userId,
+        },
+    });
 }
 
 /**
@@ -70,6 +159,17 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
         if (!it.productId) return { ok: false, error: '모든 제품을 선택해주세요.' };
         if (!Number.isFinite(it.quantity) || it.quantity <= 0)
             return { ok: false, error: '모든 제품의 수량을 입력해주세요.' };
+        if (!['WAREHOUSE', 'DIRECT'].includes(it.fulfillmentType ?? '')) {
+            return { ok: false, error: '모든 제품의 창고/직송을 선택해주세요.' };
+        }
+        const salesUnitPrice = toOptionalPrice(it.salesUnitPrice);
+        const purchaseUnitPrice = toOptionalPrice(it.purchaseUnitPrice);
+        if (Number.isNaN(salesUnitPrice) || Number.isNaN(purchaseUnitPrice)) {
+            return { ok: false, error: '단가는 숫자로 입력해주세요.' };
+        }
+        if ((salesUnitPrice != null && salesUnitPrice < 0) || (purchaseUnitPrice != null && purchaseUnitPrice < 0)) {
+            return { ok: false, error: '단가는 0 이상으로 입력해주세요.' };
+        }
     }
 
     // ── 권한 검증 ───────────────────────────────────────────────
@@ -77,6 +177,82 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
         if (session.user.customerId !== input.customerId) {
             return { ok: false, error: '본인 거래처의 주문만 생성할 수 있습니다.' };
         }
+    }
+
+    const isStaff = session.user.userKind === 'staff';
+    const productIdsForDefaults = Array.from(new Set(input.items.map((it) => it.productId)));
+    const [inputCustomer, productsForDefaults, activeCompanies] = await Promise.all([
+        prisma.customer.findUnique({ where: { id: input.customerId }, select: { companyName: true } }),
+        prisma.product.findMany({
+            where: { id: { in: productIdsForDefaults }, isActive: true },
+            select: {
+                id: true,
+                productName: true,
+                defaultSalesEntityId: true,
+                defaultPurchaseEntityId: true,
+                defaultSupplierId: true,
+            },
+        }),
+        prisma.companyEntity.findMany({
+            where: { isActive: true },
+            select: { id: true, isDefaultSales: true, isDefaultPurchase: true },
+        }),
+    ]);
+    if (!inputCustomer) return { ok: false, error: '거래처를 찾을 수 없습니다.' };
+    const isInternalPurchaseOnly = isHanyangCustomerName(inputCustomer.companyName);
+    const productMap = new Map(productsForDefaults.map((product) => [product.id, product]));
+    const companyIds = new Set(activeCompanies.map((company) => company.id));
+    const defaultSalesEntityId = activeCompanies.find((company) => company.isDefaultSales)?.id ?? activeCompanies[0]?.id;
+    const defaultPurchaseEntityId = activeCompanies.find((company) => company.isDefaultPurchase)?.id ?? defaultSalesEntityId;
+
+    const requestedSupplierIds = input.items.map((it) => it.purchaseSupplierId).filter((id): id is string => Boolean(id));
+    const activeSuppliers = requestedSupplierIds.length > 0
+        ? await prisma.supplier.findMany({
+            where: { id: { in: Array.from(new Set(requestedSupplierIds)) }, isActive: true },
+            select: { id: true },
+        })
+        : [];
+    const supplierIds = new Set(activeSuppliers.map((supplier) => supplier.id));
+
+    let resolvedItems: Array<{
+        productId: string;
+        quantity: number;
+        fulfillmentType: string;
+        salesEntityId: string;
+        purchaseEntityId: string;
+        purchaseSupplierId: string | null;
+        salesUnitPrice: number | null;
+        purchaseUnitPrice: number | null;
+    }>;
+    try {
+        resolvedItems = input.items.map((it, index) => {
+            const product = productMap.get(it.productId);
+            if (!product) throw new Error(`${index + 1}번째 제품을 찾을 수 없습니다.`);
+            const salesEntityId = isStaff
+                ? (it.salesEntityId || product.defaultSalesEntityId || defaultSalesEntityId)
+                : (product.defaultSalesEntityId || defaultSalesEntityId);
+            const purchaseEntityId = isStaff
+                ? (it.purchaseEntityId || product.defaultPurchaseEntityId || defaultPurchaseEntityId || salesEntityId)
+                : (product.defaultPurchaseEntityId || defaultPurchaseEntityId || salesEntityId);
+            const purchaseSupplierId = isStaff
+                ? (it.purchaseSupplierId || product.defaultSupplierId || null)
+                : (product.defaultSupplierId || null);
+            if (!isInternalPurchaseOnly && (!salesEntityId || !companyIds.has(salesEntityId))) throw new Error(`${index + 1}번째 품목의 매출주체가 올바르지 않습니다.`);
+            if (!purchaseEntityId || !companyIds.has(purchaseEntityId)) throw new Error(`${index + 1}번째 품목의 매입주체가 올바르지 않습니다.`);
+            if (it.purchaseSupplierId && !supplierIds.has(it.purchaseSupplierId)) throw new Error(`${index + 1}번째 품목의 매입처가 올바르지 않습니다.`);
+            return {
+                productId: it.productId,
+                quantity: it.quantity,
+                fulfillmentType: it.fulfillmentType!,
+                salesEntityId: isInternalPurchaseOnly ? purchaseEntityId : salesEntityId!,
+                purchaseEntityId,
+                purchaseSupplierId,
+                salesUnitPrice: isStaff && !isInternalPurchaseOnly ? toOptionalPrice(it.salesUnitPrice) : null,
+                purchaseUnitPrice: isStaff ? toOptionalPrice(it.purchaseUnitPrice) : null,
+            };
+        });
+    } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : '품목 기본값 확인 중 오류가 발생했습니다.' };
     }
 
     // ── 도착지 검증: ID가 있으면 기존 도착지 검증, 없으면 주문 생성 시 자동 생성 ──
@@ -97,7 +273,7 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
         const deliveryDate = new Date(input.deliveryDate + 'T00:00:00');
         const nextDeliveryDate = new Date(deliveryDate);
         nextDeliveryDate.setDate(nextDeliveryDate.getDate() + 1);
-        const productIds = Array.from(new Set(input.items.map((it) => it.productId)));
+        const productIds = Array.from(new Set(resolvedItems.map((it) => it.productId)));
         const existingOrders = await prisma.order.findMany({
             where: {
                 customerId: input.customerId,
@@ -119,7 +295,7 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
         });
 
         const duplicateOrderNos = existingOrders
-            .filter((order) => order.items.some((existingItem) => input.items.some(
+            .filter((order) => order.items.some((existingItem) => resolvedItems.some(
                 (newItem) => existingItem.productId === newItem.productId && Math.abs(existingItem.requestedQuantity - newItem.quantity) < 0.0001,
             )))
             .map((order) => order.orderNo);
@@ -167,9 +343,16 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
                     requestedDeliveryDate: new Date(input.deliveryDate + 'T00:00:00'),
                     memo: input.memo,
                     items: {
-                        create: input.items.map((it) => ({
+                        create: resolvedItems.map((it) => ({
                             productId: it.productId,
                             requestedQuantity: it.quantity,
+                            salesEntityId: it.salesEntityId,
+                            purchaseEntityId: it.purchaseEntityId,
+                            purchaseSupplierId: it.purchaseSupplierId,
+                            purchaseSupplierConfirmedAt: isStaff && it.purchaseSupplierId ? new Date() : null,
+                            fulfillmentType: it.fulfillmentType,
+                            salesUnitPrice: it.salesUnitPrice,
+                            purchaseUnitPrice: it.purchaseUnitPrice,
                             unit: 'TON',
                         })),
                     },
@@ -183,12 +366,35 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
                         },
                     },
                 },
+                include: { items: true },
             });
+            for (const item of created.items) {
+                if (!isInternalPurchaseOnly) {
+                    await rememberCustomerProductPrice(tx, {
+                        customerId: input.customerId,
+                        productId: item.productId,
+                        companyEntityId: item.salesEntityId!,
+                        priceType: 'SALES',
+                        unitPrice: item.salesUnitPrice,
+                        sourceOrderItemId: item.id,
+                        userId: isStaff ? session.user.id : undefined,
+                    });
+                }
+                await rememberCustomerProductPrice(tx, {
+                    customerId: input.customerId,
+                    productId: item.productId,
+                    companyEntityId: item.purchaseEntityId!,
+                    priceType: 'PURCHASE',
+                    unitPrice: item.purchaseUnitPrice,
+                    sourceOrderItemId: item.id,
+                    userId: isStaff ? session.user.id : undefined,
+                });
+            }
             return created;
         });
 
         // 화이트리스트 자동 추가 (거래처별 자주 주문하는 제품 학습)
-        for (const it of input.items) {
+        for (const it of resolvedItems) {
             await prisma.customerProductWhitelist.upsert({
                 where: {
                     customerId_productId: {
@@ -258,6 +464,28 @@ export async function changeOrderStatus(
         };
     }
 
+    if (nextStatus === 'APPROVED') {
+        const missingSupplierItems = await prisma.orderItem.findMany({
+            where: {
+                orderId,
+                OR: [
+                    { purchaseSupplierId: null },
+                    { purchaseSupplierConfirmedAt: null },
+                ],
+            },
+            select: {
+                product: { select: { productName: true } },
+            },
+            take: 5,
+        });
+        if (missingSupplierItems.length > 0) {
+            return {
+                ok: false,
+                error: `오더 수락 전 모든 품목의 매입처를 저장해야 합니다. 미확인: ${missingSupplierItems.map((item) => item.product.productName).join(', ')}`,
+            };
+        }
+    }
+
     try {
         await prisma.$transaction(async (tx) => {
             await tx.order.update({
@@ -273,6 +501,7 @@ export async function changeOrderStatus(
                     changeReason: reason ?? null,
                 },
             });
+            await syncOrderWarehouseStockMovements(tx, orderId);
         });
         revalidatePath('/admin');
         revalidatePath(`/admin/orders/${orderId}`);
@@ -320,6 +549,7 @@ export async function manualChangeOrderStatus(
                     changeReason: `[직원 수동변경] ${reason.trim()}`,
                 },
             });
+            await syncOrderWarehouseStockMovements(tx, orderId);
         });
         revalidatePath('/admin');
         revalidatePath(`/admin/orders/${orderId}`);
@@ -370,6 +600,7 @@ export async function updateOrderDeliveryDate(
                     changeReason: `[도착일 수정] ${currentDateValue} → ${nextDeliveryDate} / ${reason.trim()}`,
                 },
             });
+            await syncOrderWarehouseStockMovements(tx, orderId);
         });
         revalidatePath('/admin');
         revalidatePath(`/admin/orders/${orderId}`);
@@ -425,6 +656,7 @@ export async function updateOrderItemQuantity(
                     changeReason: `[수량 수정] ${item.product.productName}: ${previousQuantity}${item.unit} → ${nextQuantity}${item.unit} / ${reason.trim()}`,
                 },
             });
+            await syncOrderWarehouseStockMovements(tx, item.orderId);
         });
         revalidatePath('/admin');
         revalidatePath(`/admin/orders/${item.orderId}`);
@@ -520,6 +752,7 @@ export async function softDeleteOrder(
                     changeReason: `[삭제] ${reason.trim()}`,
                 },
             });
+            await syncOrderWarehouseStockMovements(tx, orderId);
         });
         revalidatePath('/admin');
         revalidatePath(`/admin/orders/${orderId}`);
@@ -539,6 +772,14 @@ export async function updateOrderItem(
     nextProductId: string,
     nextQuantity: number,
     reason: string,
+    options?: {
+        fulfillmentType?: string;
+        salesEntityId?: string;
+        purchaseEntityId?: string;
+        purchaseSupplierId?: string | null;
+        salesUnitPrice?: number | null;
+        purchaseUnitPrice?: number | null;
+    },
 ): Promise<ChangeStatusResult> {
     const session = await auth();
     if (!session?.user) return { ok: false, error: '로그인이 필요합니다.' };
@@ -549,21 +790,79 @@ export async function updateOrderItem(
     if (!Number.isFinite(nextQuantity) || nextQuantity <= 0) {
         return { ok: false, error: '수량은 0보다 커야 합니다.' };
     }
+    const nextSalesUnitPrice = toOptionalPrice(options?.salesUnitPrice);
+    const nextPurchaseUnitPrice = toOptionalPrice(options?.purchaseUnitPrice);
+    if (Number.isNaN(nextSalesUnitPrice) || Number.isNaN(nextPurchaseUnitPrice)) {
+        return { ok: false, error: '단가는 숫자로 입력해 주세요.' };
+    }
+    if ((nextSalesUnitPrice != null && nextSalesUnitPrice < 0) || (nextPurchaseUnitPrice != null && nextPurchaseUnitPrice < 0)) {
+        return { ok: false, error: '단가는 0 이상으로 입력해 주세요.' };
+    }
     if (!reason?.trim()) return { ok: false, error: '수정 사유를 입력해 주세요.' };
+    if (!['WAREHOUSE', 'DIRECT'].includes(options?.fulfillmentType ?? '')) {
+        return { ok: false, error: '창고/직송을 선택해 주세요.' };
+    }
 
     const item = await prisma.orderItem.findUnique({
         where: { id: itemId },
-        include: { order: true, product: { select: { productName: true } } },
+        include: {
+            product: { select: { productName: true } },
+            order: { include: { customer: { select: { companyName: true } } } },
+            salesEntity: { select: { displayName: true } },
+            purchaseEntity: { select: { displayName: true } },
+            purchaseSupplier: { select: { supplierName: true } },
+        },
     });
     if (!item || item.order.deletedAt) return { ok: false, error: '주문 항목을 찾을 수 없습니다.' };
+    const isInternalPurchaseOnly = isHanyangCustomerName(item.order.customer.companyName);
+    const currentFulfillmentType = (item as typeof item & { fulfillmentType?: string | null }).fulfillmentType ?? null;
 
     const nextProduct = await prisma.product.findUnique({
         where: { id: nextProductId },
-        select: { productName: true },
+        select: {
+            productName: true,
+            defaultSalesEntityId: true,
+            defaultPurchaseEntityId: true,
+            defaultSupplierId: true,
+        },
     });
     if (!nextProduct) return { ok: false, error: '선택한 품목을 찾을 수 없습니다.' };
 
-    const unchanged = item.productId === nextProductId && item.requestedQuantity === nextQuantity;
+    const activeCompanies = await prisma.companyEntity.findMany({
+        where: { isActive: true },
+        select: { id: true, displayName: true, isDefaultSales: true, isDefaultPurchase: true },
+    });
+    const companyMap = new Map(activeCompanies.map((company) => [company.id, company]));
+    const fallbackSalesEntityId = activeCompanies.find((company) => company.isDefaultSales)?.id ?? activeCompanies[0]?.id;
+    const fallbackPurchaseEntityId = activeCompanies.find((company) => company.isDefaultPurchase)?.id ?? fallbackSalesEntityId;
+    const nextSalesEntityId = isInternalPurchaseOnly ? (options?.purchaseEntityId || nextProduct.defaultPurchaseEntityId || fallbackPurchaseEntityId || fallbackSalesEntityId) : (options?.salesEntityId || nextProduct.defaultSalesEntityId || fallbackSalesEntityId);
+    const nextPurchaseEntityId = options?.purchaseEntityId || nextProduct.defaultPurchaseEntityId || fallbackPurchaseEntityId || nextSalesEntityId;
+    if (!isInternalPurchaseOnly && (!nextSalesEntityId || !companyMap.has(nextSalesEntityId))) return { ok: false, error: '매출주체를 선택해 주세요.' };
+    if (!nextPurchaseEntityId || !companyMap.has(nextPurchaseEntityId)) return { ok: false, error: '매입주체를 선택해 주세요.' };
+
+    const nextPurchaseSupplierId = options && 'purchaseSupplierId' in options
+        ? (options.purchaseSupplierId || null)
+        : (item.purchaseSupplierId || nextProduct.defaultSupplierId || null);
+    let nextPurchaseSupplierName: string | null = null;
+    if (nextPurchaseSupplierId) {
+        const supplier = await prisma.supplier.findFirst({
+            where: { id: nextPurchaseSupplierId, isActive: true },
+            select: { supplierName: true },
+        });
+        if (!supplier) return { ok: false, error: '매입처를 선택해 주세요.' };
+        nextPurchaseSupplierName = supplier.supplierName;
+    }
+    const supplierConfirmationMissing = Boolean(nextPurchaseSupplierId) && item.purchaseSupplierConfirmedAt == null;
+
+    const unchanged = item.productId === nextProductId
+        && item.requestedQuantity === nextQuantity
+        && item.salesEntityId === nextSalesEntityId
+        && item.purchaseEntityId === nextPurchaseEntityId
+        && (item.purchaseSupplierId ?? null) === nextPurchaseSupplierId
+        && currentFulfillmentType === options!.fulfillmentType
+        && (item.salesUnitPrice ?? null) === (isInternalPurchaseOnly ? null : nextSalesUnitPrice)
+        && (item.purchaseUnitPrice ?? null) === nextPurchaseUnitPrice
+        && !supplierConfirmationMissing;
     if (unchanged) return { ok: false, error: '변경된 내용이 없습니다.' };
 
     const previousQuantity = item.requestedQuantity;
@@ -573,19 +872,57 @@ export async function updateOrderItem(
 
     try {
         await prisma.$transaction(async (tx) => {
-            await tx.orderItem.update({
+            const updatedItem = await tx.orderItem.update({
                 where: { id: itemId },
                 data: {
                     productId: nextProductId,
                     requestedQuantity: nextQuantity,
                     approvedQuantity,
-                },
+                    salesEntityId: nextSalesEntityId,
+                    purchaseEntityId: nextPurchaseEntityId,
+                    purchaseSupplierId: nextPurchaseSupplierId,
+                    purchaseSupplierConfirmedAt: nextPurchaseSupplierId ? new Date() : null,
+                    fulfillmentType: options!.fulfillmentType,
+                    salesUnitPrice: isInternalPurchaseOnly ? null : nextSalesUnitPrice,
+                    purchaseUnitPrice: nextPurchaseUnitPrice,
+                } as Prisma.OrderItemUncheckedUpdateInput,
             });
+            if (!isInternalPurchaseOnly) {
+                await rememberCustomerProductPrice(tx, {
+                    customerId: item.order.customerId,
+                    productId: updatedItem.productId,
+                    companyEntityId: nextSalesEntityId,
+                    priceType: 'SALES',
+                    unitPrice: nextSalesUnitPrice,
+                    sourceOrderItemId: updatedItem.id,
+                    userId: session.user.id,
+                });
+            }
+            await rememberCustomerProductPrice(tx, {
+                customerId: item.order.customerId,
+                productId: updatedItem.productId,
+                companyEntityId: nextPurchaseEntityId,
+                priceType: 'PURCHASE',
+                unitPrice: nextPurchaseUnitPrice,
+                sourceOrderItemId: updatedItem.id,
+                userId: session.user.id,
+            });
+            await syncOrderWarehouseStockMovements(tx, item.orderId);
             const changeDesc: string[] = [];
             if (item.productId !== nextProductId)
                 changeDesc.push(`품목: ${item.product.productName} → ${nextProduct.productName}`);
             if (previousQuantity !== nextQuantity)
                 changeDesc.push(`수량: ${previousQuantity}${item.unit} → ${nextQuantity}${item.unit}`);
+            if (item.salesEntityId !== nextSalesEntityId)
+                changeDesc.push(`매출주체: ${item.salesEntity?.displayName ?? '-'} → ${companyMap.get(nextSalesEntityId)?.displayName ?? '-'}`);
+            if (currentFulfillmentType !== options!.fulfillmentType)
+                changeDesc.push(`창고/직송: ${currentFulfillmentType === 'WAREHOUSE' ? '창고' : currentFulfillmentType === 'DIRECT' ? '직송' : '-'} → ${options!.fulfillmentType === 'WAREHOUSE' ? '창고' : '직송'}`);
+            if ((item.purchaseSupplierId ?? null) !== nextPurchaseSupplierId || supplierConfirmationMissing)
+                changeDesc.push(`매입처: ${item.purchaseSupplier?.supplierName ?? '-'} → ${nextPurchaseSupplierName ?? '-'}`);
+            if (!isInternalPurchaseOnly && (item.salesUnitPrice ?? null) !== nextSalesUnitPrice)
+                changeDesc.push(`매출단가: ${item.salesUnitPrice?.toLocaleString('ko-KR') ?? '-'} → ${nextSalesUnitPrice?.toLocaleString('ko-KR') ?? '-'}`);
+            if ((item.purchaseUnitPrice ?? null) !== nextPurchaseUnitPrice)
+                changeDesc.push(`매입단가: ${item.purchaseUnitPrice?.toLocaleString('ko-KR') ?? '-'} → ${nextPurchaseUnitPrice?.toLocaleString('ko-KR') ?? '-'}`);
             await tx.orderStatusHistory.create({
                 data: {
                     orderId: item.orderId,
@@ -605,6 +942,115 @@ export async function updateOrderItem(
         console.error('updateOrderItem failed:', e);
         return { ok: false, error: '품목 수정 중 오류가 발생했습니다.' };
     }
+}
+
+export async function bulkConfirmOrderPurchaseSupplier(
+    orderId: string,
+    supplierId: string,
+): Promise<ChangeStatusResult> {
+    const session = await auth();
+    if (!session?.user) return { ok: false, error: '로그인이 필요합니다.' };
+    if (session.user.userKind !== 'staff') return { ok: false, error: '직원만 매입처를 저장할 수 있습니다.' };
+    if (!supplierId) return { ok: false, error: '매입처를 선택해 주세요.' };
+
+    const [order, supplier] = await Promise.all([
+        prisma.order.findUnique({ where: { id: orderId }, select: { id: true, status: true, deletedAt: true, items: { select: { id: true } } } }),
+        prisma.supplier.findFirst({ where: { id: supplierId, isActive: true }, select: { supplierName: true } }),
+    ]);
+    if (!order || order.deletedAt) return { ok: false, error: '주문을 찾을 수 없습니다.' };
+    if (!supplier) return { ok: false, error: '매입처를 찾을 수 없습니다.' };
+    if (order.items.length === 0) return { ok: false, error: '저장할 품목이 없습니다.' };
+
+    try {
+        await prisma.$transaction(async (tx) => {
+            await tx.orderItem.updateMany({
+                where: { orderId },
+                data: {
+                    purchaseSupplierId: supplierId,
+                    purchaseSupplierConfirmedAt: new Date(),
+                },
+            });
+            await tx.orderStatusHistory.create({
+                data: {
+                    orderId,
+                    previousStatus: order.status,
+                    newStatus: order.status,
+                    changedByUserId: session.user.id,
+                    changeReason: `[매입처 일괄 저장] 전체 품목 → ${supplier.supplierName}`,
+                },
+            });
+        });
+        revalidatePath('/admin');
+        revalidatePath(`/admin/orders/${orderId}`);
+        return { ok: true };
+    } catch (e) {
+        console.error('bulkConfirmOrderPurchaseSupplier failed:', e);
+        return { ok: false, error: '매입처 일괄 저장 중 오류가 발생했습니다.' };
+    }
+}
+
+export async function prepareSupplierKakaoNotice(
+    orderId: string,
+    supplierId: string,
+): Promise<{ ok: true; message: string } | { ok: false; error: string }> {
+    const session = await auth();
+    if (!session?.user) return { ok: false, error: '로그인이 필요합니다.' };
+    if (session.user.userKind !== 'staff') return { ok: false, error: '직원만 알림톡을 준비할 수 있습니다.' };
+
+    const order = await prisma.order.findUnique({
+        where: { id: orderId },
+        include: {
+            customer: { select: { companyName: true } },
+            deliveryAddress: { select: { label: true, addressLine1: true, addressLine2: true, contactName: true, contactPhone: true } },
+            items: {
+                where: { purchaseSupplierId: supplierId },
+                include: { product: { select: { productName: true, productCode: true } } },
+                orderBy: { createdAt: 'asc' },
+            },
+        },
+    });
+    if (!order || order.deletedAt) return { ok: false, error: '주문을 찾을 수 없습니다.' };
+    if (order.status !== 'APPROVED') return { ok: false, error: '알림톡 준비는 오더 수락 후 가능합니다.' };
+    if (order.items.length === 0) return { ok: false, error: '해당 매입처 품목이 없습니다.' };
+
+    const supplier = await prisma.supplier.findUnique({
+        where: { id: supplierId },
+        select: { supplierName: true, contactPerson: true, phone: true },
+    });
+    if (!supplier) return { ok: false, error: '매입처를 찾을 수 없습니다.' };
+    if (!supplier.phone) return { ok: false, error: `${supplier.supplierName} 담당자 전화번호가 없습니다.` };
+
+    const deliveryAddress = compactJoin([
+        order.deliveryAddress.label,
+        order.deliveryAddress.addressLine1,
+        order.deliveryAddress.addressLine2,
+    ]);
+    const itemLines = order.items.map((item) => (
+        `- ${item.product.productName} (${item.product.productCode}): ${item.requestedQuantity}${item.unit}`
+    ));
+    const message = [
+        `[한양유화 매입오더] ${order.orderNo}`,
+        `거래처: ${order.customer.companyName}`,
+        `도착일: ${order.requestedDeliveryDate?.toISOString().slice(0, 10) ?? '-'}`,
+        `도착지: ${deliveryAddress || '-'}`,
+        order.deliveryAddress.contactPhone ? `도착지 연락처: ${order.deliveryAddress.contactPhone}` : null,
+        '품목:',
+        ...itemLines,
+    ].filter((line): line is string => Boolean(line)).join('\n');
+
+    await prisma.orderStatusHistory.create({
+        data: {
+            orderId,
+            previousStatus: order.status,
+            newStatus: order.status,
+            changedByUserId: session.user.id,
+            changeReason: `[알림톡 준비] ${supplier.supplierName} (${supplier.contactPerson ?? '담당자'} ${supplier.phone}) 품목 ${order.items.length}건`,
+            internalMemo: message,
+        },
+    });
+    revalidatePath(`/admin/orders/${orderId}`);
+
+    return { ok: true, message };
 }
 
 export async function startHanwhaNewOrder(orderId: string) {

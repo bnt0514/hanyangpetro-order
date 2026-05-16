@@ -36,12 +36,16 @@ async function main() {
     await prisma.orderStatusHistory.deleteMany();
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();
+    await prisma.customerProductPrice.deleteMany();
     await prisma.customerProductWhitelist.deleteMany();
     await prisma.customerUser.deleteMany();
     await prisma.deliveryAddress.deleteMany();
+    await prisma.priceAdjustment.deleteMany();
+    await prisma.productPrice.deleteMany();
     await prisma.customer.deleteMany();
     await prisma.product.deleteMany();
     await prisma.supplier.deleteMany();
+    await prisma.companyEntity.deleteMany();
     await prisma.user.deleteMany();
 
     // ---- Staff users (loginId = 한글 이름, password = 한글 이름을 영문 키보드 그대로) ----
@@ -68,6 +72,26 @@ async function main() {
     // Backwards-compat references used later in the seed for sample orders
     const sales1 = staffUsers['김승철'];
     const sales2 = staffUsers['김종철'];
+
+    // ---- Managed company entities ----
+    const hanyangEntity = await prisma.companyEntity.create({
+        data: {
+            code: 'HANYANG_PETRO',
+            displayName: '한양유화',
+            legalName: '주식회사 한양유화',
+            isDefaultSales: true,
+            isDefaultPurchase: true,
+            memo: '한화 품목 기본 매입/매출 주체',
+        },
+    });
+    const bntEntity = await prisma.companyEntity.create({
+        data: {
+            code: 'BNT',
+            displayName: '비엔티',
+            legalName: '비엔티',
+            memo: '타사 품목 기본 매입/매출 주체',
+        },
+    });
 
     // ---- Suppliers ----
     const hanwha = await prisma.supplier.create({ data: { supplierName: '한화솔루션', supplierType: 'HANWHA' } });
@@ -102,11 +126,15 @@ async function main() {
                     productCode: p.code,
                     productName: p.name,
                     category: p.category,
+                    productGroup: p.category,
                     manufacturer: p.mfr,
+                    brand: p.mfr,
                     packagingType: '25kg PP bag',
                     ecountItemCode: p.ec,
                     click2002ItemCode: p.cl,
                     defaultSupplierId: p.supplierId,
+                    defaultSalesEntityId: p.mfr.includes('한화') ? hanyangEntity.id : bntEntity.id,
+                    defaultPurchaseEntityId: p.mfr.includes('한화') ? hanyangEntity.id : bntEntity.id,
                 },
             }),
         ),

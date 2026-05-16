@@ -6,12 +6,52 @@ import { Plus, Trash2, AlertCircle, CheckCircle2, Save } from 'lucide-react';
 import Combobox, { type ComboboxOption } from '@/components/Combobox';
 import { createOrder } from '@/app/orders/actions';
 
-type CustomerData = {
-    addresses: ComboboxOption[];
-    products: ComboboxOption[];
+type DeliveryAddressOption = ComboboxOption & {
+    addressLine1?: string | null;
+    addressLine2?: string | null;
+    contactPhone?: string | null;
 };
 
-type AddressComboboxOption = ComboboxOption & {
+type CompanyEntityOption = {
+    id: string;
+    code: string;
+    displayName: string;
+};
+
+type SupplierOption = {
+    id: string;
+    supplierName: string;
+    contactPerson?: string | null;
+    phone?: string | null;
+};
+
+type ProductOption = ComboboxOption & {
+    defaultSalesEntityId?: string | null;
+    defaultSalesEntityName?: string | null;
+    defaultPurchaseEntityId?: string | null;
+    defaultPurchaseEntityName?: string | null;
+    defaultSupplierId?: string | null;
+    defaultSupplierName?: string | null;
+    lastPurchaseSupplierId?: string | null;
+    lastPurchaseSupplierName?: string | null;
+    lastSalesUnitPrice?: number | null;
+    lastPurchaseUnitPrice?: number | null;
+};
+
+type CustomerData = {
+    customer: {
+        id: string;
+        companyName: string;
+        customerCode: string;
+        isInternalPurchaseOnly: boolean;
+    };
+    addresses: DeliveryAddressOption[];
+    products: ProductOption[];
+    companyEntities: CompanyEntityOption[];
+    suppliers: SupplierOption[];
+};
+
+type AddressComboboxOption = DeliveryAddressOption & {
     customerId: string;
     customerName: string;
     customerCode: string;
@@ -28,7 +68,16 @@ interface Props {
     allAddressOptions?: AddressComboboxOption[];
 }
 
-type LineItem = { key: number; productId: string; quantity: string };
+type LineItem = {
+    key: number;
+    productId: string;
+    quantity: string;
+    salesEntityId: string;
+    purchaseSupplierId: string;
+    fulfillmentType: string;
+    salesUnitPrice: string;
+    purchaseUnitPrice: string;
+};
 
 const AUTO_ADDRESS_PREFIX = '__auto_address__:';
 
@@ -55,6 +104,14 @@ function shiftDate(iso: string, days: number): string {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+function makeEmptyLine(): LineItem {
+    return { key: Date.now() + Math.random(), productId: '', quantity: '', salesEntityId: '', purchaseSupplierId: '', fulfillmentType: '', salesUnitPrice: '', purchaseUnitPrice: '' };
+}
+
+function priceToInput(value: number | null | undefined) {
+    return value == null ? '' : String(value);
+}
+
 export default function OrderForm({ mode, fixedCustomer, customerOptions = [], allAddressOptions = [] }: Props) {
     const router = useRouter();
     const [pending, start] = useTransition();
@@ -67,7 +124,7 @@ export default function OrderForm({ mode, fixedCustomer, customerOptions = [], a
     const [orderDate, setOrderDate] = useState(todayISO());
     const [deliveryDate, setDeliveryDate] = useState(tomorrowISO());
     const [addressId, setAddressId] = useState('');
-    const [items, setItems] = useState<LineItem[]>([{ key: 1, productId: '', quantity: '' }]);
+    const [items, setItems] = useState<LineItem[]>([makeEmptyLine()]);
     const [memo, setMemo] = useState('');
 
     const [error, setError] = useState<string | null>(null);
@@ -75,7 +132,7 @@ export default function OrderForm({ mode, fixedCustomer, customerOptions = [], a
     const [addressDefaultText, setAddressDefaultText] = useState('');
     const [addressFreeText, setAddressFreeText] = useState('');
     const selectedCustomerOption = customerOptions.find((customer) => customer.value === customerId);
-    const autoAddressOption = customerId && selectedCustomerOption
+    const autoAddressOption: DeliveryAddressOption | null = customerId && selectedCustomerOption
         ? {
             value: makeAutoAddressId(customerId),
             label: selectedCustomerOption.label,
@@ -85,6 +142,15 @@ export default function OrderForm({ mode, fixedCustomer, customerOptions = [], a
     const addressOptions = customerId
         ? (data?.addresses?.length ? data.addresses : autoAddressOption ? [autoAddressOption] : [])
         : allAddressOptions;
+    const selectedAddressDetail = addressId && !isAutoAddressId(addressId)
+        ? addressOptions.find((address) => address.value === addressId)
+        : null;
+    const isInternalPurchaseOnly = Boolean(data?.customer?.isInternalPurchaseOnly);
+    const supplierOptions: ComboboxOption[] = (data?.suppliers ?? []).map((supplier) => ({
+        value: supplier.id,
+        label: supplier.supplierName,
+        sublabel: [supplier.contactPerson, supplier.phone].filter(Boolean).join(' · ') || undefined,
+    }));
 
     // 거래처 변경 시 도착지/제품 다시 로드
     useEffect(() => {
@@ -132,13 +198,25 @@ export default function OrderForm({ mode, fixedCustomer, customerOptions = [], a
     }, [customerId]);
 
     function addLine() {
-        setItems((prev) => [...prev, { key: Date.now(), productId: '', quantity: '' }]);
+        setItems((prev) => [...prev, makeEmptyLine()]);
     }
     function removeLine(key: number) {
         setItems((prev) => (prev.length === 1 ? prev : prev.filter((i) => i.key !== key)));
     }
     function updateLine(key: number, patch: Partial<LineItem>) {
+        setError(null);
         setItems((prev) => prev.map((i) => (i.key === key ? { ...i, ...patch } : i)));
+    }
+
+    function handleProductChange(key: number, productId: string) {
+        const selectedProduct = data?.products.find((product) => product.value === productId);
+        updateLine(key, {
+            productId,
+            salesEntityId: selectedProduct?.defaultSalesEntityId ?? '',
+            purchaseSupplierId: selectedProduct?.lastPurchaseSupplierId ?? selectedProduct?.defaultSupplierId ?? '',
+            salesUnitPrice: priceToInput(selectedProduct?.lastSalesUnitPrice),
+            purchaseUnitPrice: priceToInput(selectedProduct?.lastPurchaseUnitPrice),
+        });
     }
 
     function handleCustomerChange(value: string) {
@@ -159,7 +237,7 @@ export default function OrderForm({ mode, fixedCustomer, customerOptions = [], a
             if (mode === 'staff' && selectedAddress && selectedAddress.customerId !== customerId) {
                 pendingAddressIdRef.current = value;
                 setCustomerId(selectedAddress.customerId);
-                setItems([{ key: Date.now(), productId: '', quantity: '' }]);
+                setItems([makeEmptyLine()]);
             }
             return;
         }
@@ -173,7 +251,7 @@ export default function OrderForm({ mode, fixedCustomer, customerOptions = [], a
         if (selectedAddress.customerId !== customerId) {
             pendingAddressIdRef.current = value;
             setCustomerId(selectedAddress.customerId);
-            setItems([{ key: Date.now(), productId: '', quantity: '' }]);
+            setItems([makeEmptyLine()]);
         }
     }
 
@@ -188,6 +266,13 @@ export default function OrderForm({ mode, fixedCustomer, customerOptions = [], a
             if (!it.productId) return `${idx + 1}번째 제품을 선택해주세요.`;
             if (!it.quantity || Number(it.quantity) <= 0)
                 return `${idx + 1}번째 제품의 수량을 입력해주세요.`;
+            if (!it.fulfillmentType) return `${idx + 1}번째 제품의 창고/직송을 선택해주세요.`;
+            if (mode === 'staff') {
+                if (!isInternalPurchaseOnly && !it.salesEntityId) return `${idx + 1}번째 제품의 매출주체를 선택해주세요.`;
+                if (!it.purchaseSupplierId) return `${idx + 1}번째 제품의 매입처를 선택해주세요.`;
+                if (it.salesUnitPrice && Number(it.salesUnitPrice) < 0) return `${idx + 1}번째 제품의 매출단가는 0 이상이어야 합니다.`;
+                if (it.purchaseUnitPrice && Number(it.purchaseUnitPrice) < 0) return `${idx + 1}번째 제품의 매입단가는 0 이상이어야 합니다.`;
+            }
         }
         return null;
     }
@@ -218,6 +303,11 @@ export default function OrderForm({ mode, fixedCustomer, customerOptions = [], a
                     items: items.map((i) => ({
                         productId: i.productId,
                         quantity: Number(i.quantity),
+                        fulfillmentType: i.fulfillmentType,
+                        salesEntityId: mode === 'staff' && !isInternalPurchaseOnly ? i.salesEntityId || undefined : undefined,
+                        purchaseSupplierId: mode === 'staff' ? i.purchaseSupplierId || undefined : undefined,
+                        salesUnitPrice: mode === 'staff' && !isInternalPurchaseOnly && i.salesUnitPrice !== '' ? Number(i.salesUnitPrice) : null,
+                        purchaseUnitPrice: mode === 'staff' && i.purchaseUnitPrice !== '' ? Number(i.purchaseUnitPrice) : null,
                     })),
                     memo: memo.trim() || undefined,
                 };
@@ -233,7 +323,7 @@ export default function OrderForm({ mode, fixedCustomer, customerOptions = [], a
                 if (res.ok) {
                     setSuccess(`주문 등록 완료 — 주문번호 ${res.orderNo}`);
                     // 폼 초기화 (거래처 모드면 거래처 유지)
-                    setItems([{ key: Date.now(), productId: '', quantity: '' }]);
+                    setItems([makeEmptyLine()]);
                     setAddressFreeText('');
                     setMemo('');
                     setOrderDate(todayISO());
@@ -373,6 +463,23 @@ export default function OrderForm({ mode, fixedCustomer, customerOptions = [], a
                 disabled={(mode !== 'staff' && !customerId) || loading}
                 emptyText="등록된 도착지가 없습니다"
             />
+            {selectedAddressDetail && (selectedAddressDetail.addressLine1 || selectedAddressDetail.contactPhone) && (
+                <div className="-mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                    {selectedAddressDetail.addressLine1 && (
+                        <p>
+                            <span className="font-medium text-slate-700">주소</span>{' '}
+                            {selectedAddressDetail.addressLine1}
+                            {selectedAddressDetail.addressLine2 ? ` ${selectedAddressDetail.addressLine2}` : ''}
+                        </p>
+                    )}
+                    {selectedAddressDetail.contactPhone && (
+                        <p className="mt-1">
+                            <span className="font-medium text-slate-700">전화번호</span>{' '}
+                            {selectedAddressDetail.contactPhone}
+                        </p>
+                    )}
+                </div>
+            )}
 
             {/* 제품 + 수량 라인들 */}
             <div>
@@ -389,56 +496,149 @@ export default function OrderForm({ mode, fixedCustomer, customerOptions = [], a
                         <Plus size={14} /> 제품 추가
                     </button>
                 </div>
-                <div className="space-y-2">
-                    {items.map((it) => (
-                        <div key={it.key} className="grid grid-cols-12 gap-2 items-start">
-                            <div className="col-span-7">
-                                <Combobox
-                                    options={data?.products ?? []}
-                                    value={it.productId}
-                                    onChange={(v: string) => updateLine(it.key, { productId: v })}
-                                    placeholder={
-                                        !customerId
-                                            ? '먼저 거래처 선택'
-                                            : '제품명 입력 (대소문자 무관, 포함 검색)'
-                                    }
-                                    disabled={!customerId || loading}
-                                    emptyText={
-                                        mode === 'customer'
-                                            ? '주문 이력 없는 제품입니다. 담당자에게 문의해주세요.'
-                                            : '제품이 없습니다'
-                                    }
-                                />
-                            </div>
-                            <div className="col-span-4">
-                                <div className="relative">
-                                    <input
-                                        type="number"
-                                        min={0}
-                                        step="any"
-                                        value={it.quantity}
-                                        onChange={(e) =>
-                                            updateLine(it.key, { quantity: e.target.value })
-                                        }
-                                        placeholder="수량"
-                                        className="w-full rounded-lg border border-slate-300 bg-white pl-3.5 pr-12 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                                    />
-                                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">
-                                        톤
-                                    </span>
-                                </div>
-                            </div>
-                            <div className="col-span-1">
+                {isInternalPurchaseOnly && (
+                    <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                        한양유화 창고 입고 오더입니다. 매출로 집계하지 않으며 매입처/매입단가만 입력합니다.
+                    </div>
+                )}
+                <div className="space-y-3">
+                    {items.map((it, idx) => (
+                        <div key={it.key} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                            <div className="mb-3 flex items-center justify-between gap-3">
+                                <span className="text-sm font-semibold text-slate-700">품목 {idx + 1}</span>
                                 <button
                                     type="button"
                                     onClick={() => removeLine(it.key)}
                                     disabled={items.length === 1}
-                                    className="inline-flex h-[42px] w-full items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 hover:text-red-600 hover:border-red-200 disabled:opacity-30 disabled:hover:text-slate-400"
+                                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 hover:text-red-600 hover:border-red-200 disabled:opacity-30 disabled:hover:text-slate-400"
                                     title="삭제"
                                 >
-                                    <Trash2 size={16} />
+                                    <Trash2 size={15} />
                                 </button>
                             </div>
+                            <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
+                                <div className={mode === 'staff' ? 'lg:col-span-3' : 'lg:col-span-6'}>
+                                    <label className="mb-1 block text-xs font-medium text-slate-500">제품명</label>
+                                    <Combobox
+                                        options={data?.products ?? []}
+                                        value={it.productId}
+                                        onChange={(v: string) => handleProductChange(it.key, v)}
+                                        placeholder={
+                                            !customerId
+                                                ? '먼저 거래처 선택'
+                                                : '제품명 입력 (대소문자 무관, 포함 검색)'
+                                        }
+                                        disabled={!customerId || loading}
+                                        emptyText={
+                                            mode === 'customer'
+                                                ? '주문 이력 없는 제품입니다. 담당자에게 문의해주세요.'
+                                                : '제품이 없습니다'
+                                        }
+                                    />
+                                </div>
+                                <div className={mode === 'staff' ? 'lg:col-span-2' : 'lg:col-span-3'}>
+                                    <label className="mb-1 block text-xs font-medium text-slate-500">수량</label>
+                                    <div className="relative">
+                                        <input
+                                            type="number"
+                                            min={0}
+                                            step="any"
+                                            value={it.quantity}
+                                            onChange={(e) =>
+                                                updateLine(it.key, { quantity: e.target.value })
+                                            }
+                                            placeholder="수량"
+                                            className="w-full rounded-lg border border-slate-300 bg-white pl-3.5 pr-12 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                                        />
+                                        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">
+                                            톤
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className={mode === 'staff' ? 'lg:col-span-2' : 'lg:col-span-3'}>
+                                    <label className="mb-1 block text-xs font-medium text-slate-500">창고/직송</label>
+                                    <select
+                                        value={it.fulfillmentType}
+                                        onChange={(e) => updateLine(it.key, { fulfillmentType: e.target.value })}
+                                        disabled={!customerId || loading}
+                                        className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
+                                    >
+                                        <option value="">선택 필수</option>
+                                        <option value="WAREHOUSE">창고</option>
+                                        <option value="DIRECT">직송</option>
+                                    </select>
+                                </div>
+                                {mode === 'staff' && (
+                                    <>
+                                        {!isInternalPurchaseOnly && (
+                                            <div className="lg:col-span-2">
+                                                <label className="mb-1 block text-xs font-medium text-slate-500">매출주체</label>
+                                                <select
+                                                    value={it.salesEntityId}
+                                                    onChange={(e) => updateLine(it.key, { salesEntityId: e.target.value })}
+                                                    disabled={!customerId || loading}
+                                                    className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
+                                                >
+                                                    <option value="">매출주체</option>
+                                                    {(data?.companyEntities ?? []).map((company) => (
+                                                        <option key={company.id} value={company.id}>{company.displayName}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        )}
+                                        <div className="lg:col-span-2">
+                                            <label className="mb-1 block text-xs font-medium text-slate-500">매입처</label>
+                                            <Combobox
+                                                options={supplierOptions}
+                                                value={it.purchaseSupplierId}
+                                                onChange={(value: string) => updateLine(it.key, { purchaseSupplierId: value })}
+                                                disabled={!customerId || loading}
+                                                placeholder="매입처명 입력"
+                                                emptyText="일치하는 매입처가 없습니다"
+                                            />
+                                        </div>
+                                        {!isInternalPurchaseOnly && (
+                                            <div className="lg:col-span-2">
+                                                <label className="mb-1 block text-xs font-medium text-slate-500">매출단가</label>
+                                                <input
+                                                    type="text"
+                                                    inputMode="decimal"
+                                                    value={it.salesUnitPrice}
+                                                    onChange={(e) => updateLine(it.key, { salesUnitPrice: e.target.value })}
+                                                    placeholder="매출단가"
+                                                    className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2.5 text-right text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                                                />
+                                            </div>
+                                        )}
+                                        <div className="lg:col-span-1">
+                                            <label className="mb-1 block text-xs font-medium text-slate-500">매입단가</label>
+                                            <input
+                                                type="text"
+                                                inputMode="decimal"
+                                                value={it.purchaseUnitPrice}
+                                                onChange={(e) => updateLine(it.key, { purchaseUnitPrice: e.target.value })}
+                                                placeholder="매입단가"
+                                                className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2.5 text-right text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                                            />
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                            {mode === 'staff' && it.productId && (
+                                <div className="mt-3 text-[11px] text-slate-500">
+                                    {!isInternalPurchaseOnly && data?.products.find((product) => product.value === it.productId)?.defaultSalesEntityName && (
+                                        <span>기본 매출주체 {data.products.find((product) => product.value === it.productId)?.defaultSalesEntityName}</span>
+                                    )}
+                                    {data?.products.find((product) => product.value === it.productId)?.lastPurchaseSupplierName && (
+                                        <span className="ml-2">직전 매입처 {data.products.find((product) => product.value === it.productId)?.lastPurchaseSupplierName}</span>
+                                    )}
+                                    {!data?.products.find((product) => product.value === it.productId)?.lastPurchaseSupplierName && data?.products.find((product) => product.value === it.productId)?.defaultSupplierName && (
+                                        <span className="ml-2">기본 매입처 {data.products.find((product) => product.value === it.productId)?.defaultSupplierName}</span>
+                                    )}
+                                    {!isInternalPurchaseOnly && it.salesUnitPrice && <span className="ml-2">직전 매출단가 {Number(it.salesUnitPrice).toLocaleString('ko-KR')}</span>}
+                                    {it.purchaseUnitPrice && <span className="ml-2">직전 매입단가 {Number(it.purchaseUnitPrice).toLocaleString('ko-KR')}</span>}
+                                </div>
+                            )}
                         </div>
                     ))}
                 </div>

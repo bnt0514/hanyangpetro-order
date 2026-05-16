@@ -24,6 +24,8 @@ export default async function StaffNewOrderPage() {
             id: true,
             label: true,
             addressLine1: true,
+            addressLine2: true,
+            contactPhone: true,
             customerId: true,
             customer: { select: { companyName: true, customerCode: true } },
         },
@@ -43,6 +45,9 @@ export default async function StaffNewOrderPage() {
         customerId: address.customerId,
         customerName: address.customer.companyName,
         customerCode: address.customer.customerCode,
+        addressLine1: address.addressLine1,
+        addressLine2: address.addressLine2,
+        contactPhone: address.contactPhone,
     }));
 
     const customersWithAddress = new Set(deliveryAddresses.map((address) => address.customerId));

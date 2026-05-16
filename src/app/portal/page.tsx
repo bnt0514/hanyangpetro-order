@@ -4,7 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { prisma } from '@/lib/db';
 import { statusLabel, statusColor, fmtDate, fmtDateTime, fmtNumber } from '@/lib/orders';
-import { Plus, Package } from 'lucide-react';
+import { Plus, Package, BookOpen } from 'lucide-react';
 import BackButton from '@/components/BackButton';
 
 export const dynamic = 'force-dynamic';
@@ -32,7 +32,7 @@ export default async function PortalHome() {
             },
         }),
         prisma.order.count({
-            where: { customerId, createdAt: { gte: today, lt: tomorrow } },
+            where: { customerId, deletedAt: null, createdAt: { gte: today, lt: tomorrow } },
         }),
         prisma.order.count({
             where: {
@@ -83,12 +83,20 @@ export default async function PortalHome() {
                         </h1>
                         <p className="text-sm text-slate-500 mt-1">주문 현황</p>
                     </div>
-                    <Link
-                        href="/portal/orders/new"
-                        className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
-                    >
-                        <Plus size={16} /> 신규 주문 등록
-                    </Link>
+                    <div className="flex items-center gap-2">
+                        <Link
+                            href="/portal/ledger"
+                            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                        >
+                            <BookOpen size={16} /> 거래처원장
+                        </Link>
+                        <Link
+                            href="/portal/orders/new"
+                            className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
+                        >
+                            <Plus size={16} /> 신규 주문 등록
+                        </Link>
+                    </div>
                 </div>
 
                 {/* 통계 */}

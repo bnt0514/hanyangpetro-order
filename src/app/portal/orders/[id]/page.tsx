@@ -33,7 +33,7 @@ export default async function PortalOrderDetail({
         },
     });
 
-    if (!order || order.customerId !== session.user.customerId) notFound();
+    if (!order || order.customerId !== session.user.customerId || order.deletedAt) notFound();
 
     const dispatchRows = await prisma.hanwhaDispatchRow.findMany({
         where: { matchedOrderId: order.id },
@@ -113,7 +113,13 @@ export default async function PortalOrderDetail({
                             <span className="font-medium">{order.deliveryAddress.label}</span>
                             <span className="block text-xs text-slate-500">
                                 {order.deliveryAddress.addressLine1}
+                                {order.deliveryAddress.addressLine2 ? ` ${order.deliveryAddress.addressLine2}` : ''}
                             </span>
+                            {order.deliveryAddress.contactPhone && (
+                                <span className="block text-xs text-slate-500">
+                                    전화번호 {order.deliveryAddress.contactPhone}
+                                </span>
+                            )}
                         </Info>
                         <Info icon={<Calendar size={14} />} label="요청 도착일">
                             {fmtDate(order.requestedDeliveryDate)}
