@@ -1,9 +1,10 @@
 'use client';
 
-import { useMemo, useState, useTransition } from 'react';
+import { useMemo, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { AlertCircle, CheckCircle2, Loader2, MessageCircle, Save } from 'lucide-react';
 import { bulkConfirmOrderPurchaseSupplier, prepareSupplierKakaoNotice } from '@/app/orders/actions';
+import { useF8SaveShortcut } from '@/hooks/useF8SaveShortcut';
 
 type SupplierOption = {
     id: string;
@@ -36,6 +37,7 @@ export default function SupplierOrderPanel({
     suppliers: SupplierOption[];
 }) {
     const router = useRouter();
+    const bulkSaveRef = useRef<HTMLDivElement | null>(null);
     const [bulkSupplierId, setBulkSupplierId] = useState('');
     const [message, setMessage] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -90,6 +92,8 @@ export default function SupplierOrderPanel({
         });
     }
 
+    useF8SaveShortcut(saveBulk, { disabled: pending || !bulkSupplierId, scopeRef: bulkSaveRef });
+
     return (
         <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
             <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -111,7 +115,7 @@ export default function SupplierOrderPanel({
                 </div>
             )}
 
-            <div className="flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 p-3">
+            <div ref={bulkSaveRef} className="flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 p-3">
                 <select
                     value={bulkSupplierId}
                     onChange={(event) => setBulkSupplierId(event.target.value)}
@@ -127,6 +131,7 @@ export default function SupplierOrderPanel({
                     type="button"
                     onClick={saveBulk}
                     disabled={pending || !bulkSupplierId}
+                    title="이 영역에서 F8로도 저장할 수 있습니다"
                     className="inline-flex items-center gap-1.5 rounded-lg bg-slate-800 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-900 disabled:opacity-60"
                 >
                     {pending ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
@@ -160,7 +165,7 @@ export default function SupplierOrderPanel({
                         <ul className="mt-3 space-y-1 text-sm text-slate-600">
                             {group.items.map((item) => (
                                 <li key={item.id} className="flex justify-between gap-3">
-                                    <span>{item.productName} <span className="text-xs text-slate-400">{item.productCode}</span></span>
+                                    <span>{item.productName}</span>
                                     <span className="shrink-0 font-medium">{item.requestedQuantity.toLocaleString('ko-KR')} {item.unit}</span>
                                 </li>
                             ))}

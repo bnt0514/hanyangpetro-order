@@ -4,7 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { prisma } from '@/lib/db';
 import { statusLabel, statusColor, fmtDate, fmtDateTime, fmtNumber } from '@/lib/orders';
-import { Plus, Package, BookOpen } from 'lucide-react';
+import { Plus, Package, BookOpen, Truck, ClipboardList } from 'lucide-react';
 import BackButton from '@/components/BackButton';
 
 export const dynamic = 'force-dynamic';
@@ -56,13 +56,14 @@ export default async function PortalHome() {
                 <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
                     <Link href="/portal" className="flex items-center gap-2">
                         <Image src="/hanyanglogo.png" alt="logo" width={32} height={32} className="h-8 w-auto" />
-                        <span className="font-bold text-slate-800">한양유화 거래처 포털</span>
+                        <span className="text-sm font-bold text-slate-800 sm:text-base">한양유화&BNT 거래처 포털</span>
                     </Link>
                     <div className="flex items-center gap-4 text-sm">
                         <span className="text-slate-600">
                             {session.user.customerName}{' '}
                             <span className="text-xs text-slate-400">({session.user.name})</span>
                         </span>
+                        <Link href="/settings" className="text-slate-500 hover:text-blue-600 transition text-sm">비밀번호 변경</Link>
                         <form
                             action={async () => {
                                 'use server';
@@ -75,15 +76,15 @@ export default async function PortalHome() {
                 </div>
             </header>
 
-            <main className="max-w-5xl mx-auto p-6">
-                <div className="flex items-center justify-between mb-6">
+            <main className="max-w-5xl mx-auto p-4 md:p-6">
+                <div className="mb-6 flex items-center justify-between">
                     <div>
                         <h1 className="text-2xl font-bold text-slate-800">
                             {session.user.customerName}
                         </h1>
                         <p className="text-sm text-slate-500 mt-1">주문 현황</p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="hidden items-center gap-2 md:flex">
                         <Link
                             href="/portal/ledger"
                             className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
@@ -99,8 +100,15 @@ export default async function PortalHome() {
                     </div>
                 </div>
 
+                <section className="mb-6 grid grid-cols-2 gap-3 md:hidden">
+                    <MobileCard href="/portal/orders/new" icon={<Plus size={26} />} label="신규오더" tone="blue" />
+                    <MobileCard href="/portal/dispatch" icon={<Truck size={26} />} label="배차조회" tone="emerald" />
+                    <MobileCard href="/portal/ledger" icon={<BookOpen size={26} />} label="거래처원장" tone="violet" />
+                    <MobileCard href="/portal/orders" icon={<ClipboardList size={26} />} label="주문내역" tone="slate" />
+                </section>
+
                 {/* 통계 */}
-                <div className="grid grid-cols-2 gap-4 mb-8">
+                <div className="mb-8 hidden grid-cols-2 gap-4 md:grid">
                     <div className="rounded-xl border border-blue-100 bg-blue-50 p-5">
                         <p className="text-sm font-medium text-blue-700/80">오늘 등록한 주문</p>
                         <p className="mt-2 text-3xl font-bold text-blue-700">
@@ -115,8 +123,16 @@ export default async function PortalHome() {
                     </div>
                 </div>
 
+                {/* 큰 신규 주문 버튼 */}
+                <Link
+                    href="/portal/orders/new"
+                    className="mb-6 hidden w-full items-center justify-center gap-3 rounded-2xl bg-blue-600 py-6 text-lg font-bold text-white shadow-md transition-colors hover:bg-blue-700 md:flex"
+                >
+                    <Plus size={26} /> 신규 주문 등록
+                </Link>
+
                 {/* 최근 주문 */}
-                <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <section className="hidden overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm md:block">
                     <div className="flex items-center gap-2 px-6 py-4 border-b border-slate-100">
                         <Package size={18} className="text-slate-500" />
                         <h2 className="font-semibold text-slate-800">최근 주문</h2>
@@ -192,11 +208,23 @@ export default async function PortalHome() {
                     )}
                 </section>
 
-                <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-                    🔒 비밀번호는 사업자번호 숫자입니다. 추후 설정에서 변경할 수 있습니다.
-                </div>
+
             </main>
-            <BackButton />
         </div>
+    );
+}
+
+function MobileCard({ href, icon, label, tone }: { href: string; icon: React.ReactNode; label: string; tone: 'blue' | 'emerald' | 'violet' | 'slate' }) {
+    const toneClass = {
+        blue: 'border-blue-100 bg-blue-600 text-white shadow-blue-100',
+        emerald: 'border-emerald-100 bg-emerald-600 text-white shadow-emerald-100',
+        violet: 'border-violet-100 bg-violet-600 text-white shadow-violet-100',
+        slate: 'border-slate-200 bg-slate-900 text-white shadow-slate-100',
+    }[tone];
+    return (
+        <Link href={href} className={`flex min-h-32 flex-col items-center justify-center gap-3 rounded-3xl border p-5 text-lg font-bold shadow-lg ${toneClass}`}>
+            {icon}
+            {label}
+        </Link>
     );
 }

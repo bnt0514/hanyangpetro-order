@@ -97,8 +97,7 @@ export default async function DeletedOrdersPage() {
                         </table>
                     </div>
                 )}
-            </main>
-            <BackButton />
+            </main>
         </div>
     );
 }

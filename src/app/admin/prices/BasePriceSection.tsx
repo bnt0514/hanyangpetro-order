@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useRef, useState, useTransition } from 'react';
 import { Save, Loader2 } from 'lucide-react';
 import { upsertProductBasePrice } from '@/app/admin/credit/actions';
+import { useF8SaveShortcut } from '@/hooks/useF8SaveShortcut';
 
 type Product = {
     id: string;
@@ -14,6 +15,8 @@ type Product = {
 };
 
 export default function BasePriceSection({ products }: { products: Product[] }) {
+    const sectionRef = useRef<HTMLDivElement | null>(null);
+    const activeProductIdRef = useRef<string | null>(null);
     const [search, setSearch] = useState('');
     const [editing, setEditing] = useState<Record<string, string>>({});
     const [pending, startTransition] = useTransition();
@@ -36,8 +39,13 @@ export default function BasePriceSection({ products }: { products: Product[] }) 
         });
     }
 
+    useF8SaveShortcut(() => {
+        const productId = activeProductIdRef.current;
+        if (productId) saveOne(productId);
+    }, { disabled: pending, scopeRef: sectionRef });
+
     return (
-        <div className="space-y-3">
+        <div ref={sectionRef} className="space-y-3">
             <input
                 type="text"
                 placeholder="제품명 / 코드 / 브랜드 / 제품군 검색"
@@ -85,6 +93,7 @@ export default function BasePriceSection({ products }: { products: Product[] }) 
                                                 setEditing((s) => ({ ...s, [p.id]: e.target.value }));
                                                 setSaved((s) => ({ ...s, [p.id]: false }));
                                             }}
+                                            onFocus={() => { activeProductIdRef.current = p.id; }}
                                             className="w-32 text-right px-2 py-1 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
                                         />
                                     </td>
@@ -95,10 +104,11 @@ export default function BasePriceSection({ products }: { products: Product[] }) 
                                             <button
                                                 onClick={() => saveOne(p.id)}
                                                 disabled={pending || !editing[p.id]}
+                                                title="해당 기준가 입력칸에서 F8로도 저장할 수 있습니다"
                                                 className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-lg disabled:opacity-40 flex items-center gap-1"
                                             >
                                                 {pending ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
-                                                저장
+                                                저장 (F8)
                                             </button>
                                         )}
                                     </td>

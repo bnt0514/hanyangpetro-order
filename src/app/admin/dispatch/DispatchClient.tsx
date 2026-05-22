@@ -3,7 +3,6 @@
 import { useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import BackButton from '@/components/BackButton';
 import {
     Calendar,
     Search,
@@ -70,6 +69,15 @@ type AutoMatchHit = {
     score: number;
     reason: string;
 };
+
+function normalizeCompanyMatchText(value: string) {
+    return value
+        .toLowerCase()
+        .replace(/주식회사|\(주\)|㈜|\s/g, '')
+        .replace(/[()\[\]{}.,/\\_-]/g, '')
+        .replace(/앤/g, '엔')
+        .trim();
+}
 
 export default function DispatchClient({
     defaultDate,
@@ -365,7 +373,6 @@ export default function DispatchClient({
                     )}
                 </>
             )}
-            <BackButton />
         </div>
     );
 }
@@ -377,8 +384,11 @@ function scoreAutoMatch(
     dispatchDate: string,
 ): AutoMatchHit | null {
     const hay = [order.customerName, order.addressLabel, order.addressLine1].join(' ').toLowerCase();
+    const normalizedHay = normalizeCompanyMatchText(hay);
+    const normalizedIndoChiName = normalizeCompanyMatchText(line.indoChiName);
     const addressHits = keywords.filter((kw) => hay.includes(kw));
-    if (addressHits.length === 0) return null;
+    const normalizedAddressHit = Boolean(normalizedIndoChiName) && normalizedHay.includes(normalizedIndoChiName);
+    if (addressHits.length === 0 && !normalizedAddressHit) return null;
 
     const materialExists = Boolean(line.materialName || line.materialNameRaw);
     const itemHits = order.items
@@ -414,7 +424,8 @@ function scoreAutoMatch(
     const deliveryDate = order.requestedDeliveryDate?.slice(0, 10) ?? null;
     const dateExact = deliveryDate === dispatchDate;
     const bestItem = itemHits[0];
-    const score = (addressHits.length * 15) + (dateExact ? 35 : -30) + bestItem.score;
+    const addressScore = Math.max(addressHits.length * 15, normalizedAddressHit ? 30 : 0);
+    const score = addressScore + (dateExact ? 35 : -30) + bestItem.score;
 
     if (score < 70) return null;
 

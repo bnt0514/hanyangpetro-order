@@ -1,19 +1,23 @@
 'use client';
 
-import { useMemo, useState, useTransition } from 'react';
+import { useMemo, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { saveDeliveryAddress, updateCustomer } from '../actions';
+import { useF8SaveShortcut } from '@/hooks/useF8SaveShortcut';
 
 type CustomerVM = {
     id: string;
     customerCode: string;
     companyName: string;
     businessNumber: string | null;
+    defaultSalesRepId: string | null;
     creditLimit: number;
     paymentTerms: string | null;
     memo: string | null;
     isActive: boolean;
 };
+
+type StaffUserVM = { id: string; name: string };
 
 type AddressVM = {
     id: string;
@@ -40,8 +44,10 @@ const emptyAddress = {
     memo: '',
 };
 
-export default function CustomerEditor({ customer, addresses }: { customer: CustomerVM; addresses: AddressVM[] }) {
+export default function CustomerEditor({ customer, addresses, staffUsers }: { customer: CustomerVM; addresses: AddressVM[]; staffUsers: StaffUserVM[] }) {
     const router = useRouter();
+    const customerSectionRef = useRef<HTMLElement | null>(null);
+    const addressSectionRef = useRef<HTMLDivElement | null>(null);
     const [pending, startTransition] = useTransition();
     const [message, setMessage] = useState<string | null>(null);
     const [selectedAddressId, setSelectedAddressId] = useState(addresses[0]?.id ?? 'new');
@@ -49,6 +55,7 @@ export default function CustomerEditor({ customer, addresses }: { customer: Cust
         customerCode: customer.customerCode,
         companyName: customer.companyName,
         businessNumber: customer.businessNumber ?? '',
+        defaultSalesRepId: customer.defaultSalesRepId ?? '',
         creditLimit: String(customer.creditLimit ?? 0),
         paymentTerms: customer.paymentTerms ?? '',
         memo: customer.memo ?? '',
@@ -101,6 +108,9 @@ export default function CustomerEditor({ customer, addresses }: { customer: Cust
         });
     }
 
+    useF8SaveShortcut(saveCustomer, { disabled: pending, scopeRef: customerSectionRef });
+    useF8SaveShortcut(saveAddress, { disabled: pending, scopeRef: addressSectionRef });
+
     return (
         <div className="space-y-6">
             <div>
@@ -113,7 +123,7 @@ export default function CustomerEditor({ customer, addresses }: { customer: Cust
                 <p className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-2 text-sm text-blue-700">{message}</p>
             )}
 
-            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+            <section ref={customerSectionRef} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
                 <h2 className="font-semibold text-slate-800">업체 정보</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <Field label="거래처코드 *">
@@ -124,6 +134,12 @@ export default function CustomerEditor({ customer, addresses }: { customer: Cust
                     </Field>
                     <Field label="사업자등록번호">
                         <input className="inp" value={customerForm.businessNumber} onChange={(e) => setCustomerForm({ ...customerForm, businessNumber: e.target.value })} />
+                    </Field>
+                    <Field label="담당자">
+                        <select className="inp" value={customerForm.defaultSalesRepId} onChange={(e) => setCustomerForm({ ...customerForm, defaultSalesRepId: e.target.value })}>
+                            <option value="">담당자 미지정</option>
+                            {staffUsers.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
+                        </select>
                     </Field>
                     <Field label="여신한도">
                         <input className="inp" type="number" min="0" value={customerForm.creditLimit} onChange={(e) => setCustomerForm({ ...customerForm, creditLimit: e.target.value })} />
@@ -140,8 +156,8 @@ export default function CustomerEditor({ customer, addresses }: { customer: Cust
                     <textarea className="inp resize-none" rows={2} value={customerForm.memo} onChange={(e) => setCustomerForm({ ...customerForm, memo: e.target.value })} />
                 </Field>
                 <div className="flex justify-end">
-                    <button type="button" disabled={pending} onClick={saveCustomer} className="rounded-xl bg-slate-800 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-900 disabled:opacity-60">
-                        업체 정보 저장
+                    <button type="button" disabled={pending} onClick={saveCustomer} title="이 영역에서 F8로도 저장할 수 있습니다" className="rounded-xl bg-slate-800 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-900 disabled:opacity-60">
+                        업체 정보 저장 (F8)
                     </button>
                 </div>
             </section>
@@ -171,7 +187,7 @@ export default function CustomerEditor({ customer, addresses }: { customer: Cust
                     </div>
                 </div>
 
-                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+                <div ref={addressSectionRef} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
                     <h2 className="font-semibold text-slate-800">{selectedAddressId === 'new' ? '도착지 추가' : '도착지 수정'}</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <Field label="도착지명 *">
@@ -209,8 +225,8 @@ export default function CustomerEditor({ customer, addresses }: { customer: Cust
                                 사용중
                             </label>
                         </div>
-                        <button type="button" disabled={pending} onClick={saveAddress} className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
-                            도착지 저장
+                        <button type="button" disabled={pending} onClick={saveAddress} title="이 영역에서 F8로도 저장할 수 있습니다" className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
+                            도착지 저장 (F8)
                         </button>
                     </div>
                 </div>

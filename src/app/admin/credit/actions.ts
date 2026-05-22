@@ -301,6 +301,68 @@ export async function upsertPriceAdjustment(
     return { ok: true };
 }
 
+export async function bulkUpsertCustomerProductPrices(input: {
+    priceType: 'SALES' | 'PURCHASE';
+    updates: { customerId: string; productId: string; unitPrice: number }[];
+}): Promise<{ ok: true; count: number } | { ok: false; error: string }> {
+    const session = await auth();
+    if (!session?.user || !['EXECUTIVE', 'ADMIN'].includes(session.user.role ?? '')) {
+        return { ok: false, error: '관리자만 단가를 수정할 수 있습니다.' };
+    }
+    if (!['SALES', 'PURCHASE'].includes(input.priceType)) {
+        return { ok: false, error: '단가 구분을 확인해 주세요.' };
+    }
+
+    const normalized = input.updates
+        .filter((item) => item.customerId && item.productId && Number.isFinite(item.unitPrice) && item.unitPrice >= 0)
+        .slice(0, 500);
+    if (normalized.length === 0) return { ok: false, error: '저장할 단가가 없습니다.' };
+
+    await prisma.$transaction(async (tx) => {
+        for (const item of normalized) {
+            const existing = await tx.customerProductPrice.findFirst({
+                where: {
+                    customerId: item.customerId,
+                    productId: item.productId,
+                    companyEntityId: null,
+                    priceType: input.priceType,
+                },
+                select: { id: true },
+            });
+            if (existing) {
+                await tx.customerProductPrice.update({
+                    where: { id: existing.id },
+                    data: {
+                        unitPrice: item.unitPrice,
+                        unit: 'TON',
+                        lastUsedAt: new Date(),
+                        createdById: session.user.id,
+                        memo: '[단가 수정] 단가 관리 페이지 일괄 수정',
+                    },
+                });
+            } else {
+                await tx.customerProductPrice.create({
+                    data: {
+                        customerId: item.customerId,
+                        productId: item.productId,
+                        companyEntityId: null,
+                        priceType: input.priceType,
+                        unitPrice: item.unitPrice,
+                        unit: 'TON',
+                        createdById: session.user.id,
+                        memo: '[단가 수정] 단가 관리 페이지 일괄 등록',
+                    },
+                });
+            }
+        }
+    });
+
+    revalidatePath('/admin/prices');
+    revalidatePath('/admin/orders/new');
+    revalidatePath('/portal/orders/new');
+    return { ok: true, count: normalized.length };
+}
+
 export async function getPriceAdjustmentsForMonth(month: string) {
     return prisma.priceAdjustment.findMany({
         where: { effectiveMonth: month },

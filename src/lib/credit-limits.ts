@@ -191,7 +191,7 @@ export async function getCreditLimitReport(options: {
             difference: currentLimit - calculatedLimit,
             monthlyAmounts: monthKeys.map((key) => ({ month: key, amount: bucket?.months.get(key) || 0 })),
         };
-    });
+    }).filter((row) => row.totalSales > 0);
 
     const sort = options.sort || 'calculatedLimit';
     const dir = options.dir === 'asc' ? 'asc' : 'desc';
@@ -228,3 +228,5 @@ export async function getCreditLimitReport(options: {
 
     return { asOf, months, startDate, endDate, monthKeys, rows, summary };
 }
+
+

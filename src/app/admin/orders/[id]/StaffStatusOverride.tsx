@@ -7,32 +7,13 @@ import { manualChangeOrderStatus } from '@/app/orders/actions';
 import { confirmOrderReceipt } from '@/app/dispatch/actions';
 import { statusLabel } from '@/lib/orders';
 
-const ORDER_STATUSES = [
-    'REQUESTED',
-    'PENDING_SALES_REVIEW',
-    'SALES_REVIEWING',
-    'APPROVED',
-    'REJECTED',
-    'ON_HOLD',
-    'SUPPLIER_ORDER_REQUIRED',
-    'SUPPLIER_ORDER_COMPLETED',
-    'DISPATCH_WAITING',
-    'DISPATCHING',
-    'DISPATCH_COMPLETED',
-    'DISPATCH_FAILED',
-    'DISPATCH_RETRY_SCHEDULED',
-    'READY_TO_SHIP',
-    'SHIPPING',
-    'SHIPPED',
-    'DELIVERY_CONFIRM_PENDING',
-    'DELIVERY_CONFIRMED',
-    'DELIVERY_DISPUTED',
-    'ERP_INPUT_WAITING',
-    'ERP_INPUT_COMPLETED',
-    'INVOICE_WAITING',
-    'INVOICE_COMPLETED',
-    'COMPLETED',
-    'CANCELLED',
+const STATUS_GROUPS: { label: string; statuses: string[] }[] = [
+    { label: '신규 / 검토', statuses: ['REQUESTED', 'PENDING_SALES_REVIEW', 'SALES_REVIEWING'] },
+    { label: '승인 / 보류 / 반려', statuses: ['APPROVED', 'ON_HOLD', 'REJECTED'] },
+    { label: '배차', statuses: ['DISPATCH_WAITING', 'DISPATCH_COMPLETED', 'DISPATCH_FAILED'] },
+    { label: '출고 / 수령', statuses: ['READY_TO_SHIP', 'SHIPPING', 'SHIPPED', 'DELIVERY_CONFIRM_PENDING', 'DELIVERY_CONFIRMED', 'DELIVERY_DISPUTED'] },
+    { label: 'ERP / 계산서 / 완료', statuses: ['ERP_INPUT_WAITING', 'ERP_INPUT_COMPLETED', 'INVOICE_WAITING', 'INVOICE_COMPLETED', 'COMPLETED'] },
+    { label: '취소', statuses: ['CANCELLED'] },
 ];
 
 export default function StaffStatusOverride({
@@ -89,10 +70,14 @@ export default function StaffStatusOverride({
                     className="rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs outline-none focus:border-blue-500 disabled:opacity-60"
                     title="직원 전용 상태 수동 변경"
                 >
-                    {ORDER_STATUSES.map((status) => (
-                        <option key={status} value={status}>
-                            {statusLabel(status)}
-                        </option>
+                    {STATUS_GROUPS.map((group) => (
+                        <optgroup key={group.label} label={group.label}>
+                            {group.statuses.map((status) => (
+                                <option key={status} value={status}>
+                                    {statusLabel(status)}
+                                </option>
+                            ))}
+                        </optgroup>
                     ))}
                 </select>
                 <button

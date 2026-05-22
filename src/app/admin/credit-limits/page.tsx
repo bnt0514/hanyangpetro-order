@@ -4,6 +4,8 @@ import { ArrowLeft, ShieldCheck } from 'lucide-react';
 import { auth } from '@/lib/auth';
 import { canManageCreditLimits, defaultAsOf, getCreditLimitReport, type CreditLimitSortDir, type CreditLimitSortKey } from '@/lib/credit-limits';
 import { applyCalculatedCreditLimits, updateCustomerCreditLimit } from './actions';
+import BulkSaveButton from './BulkSaveButton';
+import F8FormShortcut from '@/components/F8FormShortcut';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,19 +16,13 @@ const sortOptions: { value: CreditLimitSortKey; label: string }[] = [
     { value: 'difference', label: '차액순' },
     { value: 'creditInsuranceAmount', label: '매출채권보험순' },
     { value: 'mortgageAmount', label: '근저당설정순' },
-    { value: 'creditGrade', label: '신용등급순' },
+    { value: 'creditGrade', label: '내부등급순' },
     { value: 'rep', label: '담당자순' },
     { value: 'customer', label: '거래처명순' },
 ];
 
 function money(value: number) {
     return Math.round(value).toLocaleString('ko-KR');
-}
-
-function gradeBadge(grade: string) {
-    if (grade === 'A') return <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-bold text-blue-700 ring-1 ring-blue-300">A 우량</span>;
-    if (grade === 'C') return <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700 ring-1 ring-red-300">C 선입금</span>;
-    return <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600 ring-1 ring-slate-300">B 정상</span>;
 }
 
 function dateText(date: Date) {
@@ -76,6 +72,7 @@ export default async function CreditLimitsPage({
             </header>
 
             <main className="max-w-7xl mx-auto p-6 space-y-5">
+                <F8FormShortcut formIdPrefix="credit-" />
                 <div className="flex items-end justify-between gap-3 flex-wrap">
                     <div>
                         <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
@@ -154,11 +151,12 @@ export default async function CreditLimitsPage({
                             <option value="asc">오름차순</option>
                         </select>
                     </label>
-                    <label className="text-xs font-semibold text-slate-600 flex-1 min-w-56">
+                    <label className="text-xs font-semibold text-slate-600 min-w-40">
                         검색
                         <input name="q" defaultValue={q} placeholder="거래처명/코드/담당자" className="mt-1 block w-full rounded-xl border border-slate-300 px-3 py-2 text-sm" />
                     </label>
                     <button className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">조회</button>
+                    <BulkSaveButton />
                 </form>
 
                 <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -172,11 +170,10 @@ export default async function CreditLimitsPage({
                                     <th className="px-4 py-3 text-right min-w-32">평균매출</th>
                                     <th className="px-4 py-3 text-right min-w-32">산정한도<br /><span className="font-normal">평균×2</span></th>
                                     <th className="px-4 py-3 text-right min-w-40">최종 여신한도</th>
+                                    <th className="px-4 py-3 text-right min-w-32">내부등급</th>
                                     <th className="px-4 py-3 text-right min-w-36">차액<br /><span className="font-normal">최종-산정</span></th>
                                     <th className="px-4 py-3 text-right min-w-40">매출채권보험</th>
                                     <th className="px-4 py-3 text-right min-w-40">근저당설정</th>
-                                    <th className="px-4 py-3 text-right min-w-24">신용등급</th>
-                                    <th className="px-4 py-3 text-right min-w-20">저장</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
@@ -197,25 +194,22 @@ export default async function CreditLimitsPage({
                                                 <input name="creditLimit" defaultValue={row.currentLimit} className="w-36 rounded-lg border border-slate-300 px-2 py-1.5 text-right text-sm font-semibold" />
                                             </form>
                                         </td>
+                                        <td className="px-4 py-3 text-right">
+                                            <div className="flex justify-end gap-1.5">
+                                                <select form={`credit-${row.customerId}`} name="creditGrade" defaultValue={row.creditGrade} className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm font-semibold uppercase">
+                                                    <option value="A">A</option>
+                                                    <option value="B">B</option>
+                                                    <option value="C">C</option>
+                                                </select>
+                                                <button form={`credit-${row.customerId}`} title="이 행에서 F8로도 저장할 수 있습니다" className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">저장 (F8)</button>
+                                            </div>
+                                        </td>
                                         <td className={`px-4 py-3 text-right font-semibold ${row.difference >= 0 ? 'text-blue-700' : 'text-red-600'}`}>{money(row.difference)}</td>
                                         <td className="px-4 py-3 text-right">
                                             <input form={`credit-${row.customerId}`} name="creditInsuranceAmount" defaultValue={row.creditInsuranceAmount} className="w-36 rounded-lg border border-slate-300 px-2 py-1.5 text-right text-sm" />
                                         </td>
                                         <td className="px-4 py-3 text-right">
                                             <input form={`credit-${row.customerId}`} name="mortgageAmount" defaultValue={row.mortgageAmount} className="w-36 rounded-lg border border-slate-300 px-2 py-1.5 text-right text-sm" />
-                                        </td>
-                                        <td className="px-4 py-3 text-right">
-                                            <select form={`credit-${row.customerId}`} name="creditGrade" defaultValue={row.creditGrade} className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm">
-                                                <option value="A">A 우량</option>
-                                                <option value="B">B 정상</option>
-                                                <option value="C">C 선입금</option>
-                                            </select>
-                                        </td>
-                                        <td className="px-4 py-3 text-right">
-                                            {gradeBadge(row.creditGrade)}
-                                        </td>
-                                        <td className="px-4 py-3 text-right">
-                                            <button form={`credit-${row.customerId}`} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">저장</button>
                                         </td>
                                     </tr>
                                 ))}
@@ -232,3 +226,4 @@ export default async function CreditLimitsPage({
         </div>
     );
 }
+

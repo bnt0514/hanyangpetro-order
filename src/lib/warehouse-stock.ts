@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db';
+import { productIdentityKey } from '@/lib/product-identity';
 
 export type WarehouseStockRow = {
     productKey: string;
@@ -52,6 +53,21 @@ export async function getWarehouseStock(companyEntityId: string) {
         });
     }
 
-    rows.sort((a, b) => a.productName.localeCompare(b.productName, 'ko'));
-    return rows;
+    const aggregatedRows = new Map<string, WarehouseStockRow>();
+    for (const row of rows) {
+        const key = productIdentityKey(row.productName, row.productCode);
+        const current = aggregatedRows.get(key);
+        if (!current) {
+            aggregatedRows.set(key, { ...row, productKey: key });
+            continue;
+        }
+        current.snapshotQuantity += row.snapshotQuantity;
+        current.inboundQuantity += row.inboundQuantity;
+        current.outboundQuantity += row.outboundQuantity;
+        current.currentQuantity += row.currentQuantity;
+    }
+
+    return Array.from(aggregatedRows.values())
+        .sort((a, b) => a.productName.localeCompare(b.productName, 'ko'))
+        .filter((row) => row.currentQuantity > 0);
 }

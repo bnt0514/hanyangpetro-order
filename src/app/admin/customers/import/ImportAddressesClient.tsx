@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useRef, useState, useTransition } from 'react';
 import { bulkImportDeliveryAddresses, type AddressImportRow } from '../actions';
+import { useF8SaveShortcut } from '@/hooks/useF8SaveShortcut';
 
 const SAMPLE = `customerCode\tcompanyName\tlabel\taddressLine1\taddressLine2\tpostalCode\tcontactName\tcontactPhone\tmemo
 HY-001\t주식회사 예시\t본사창고\t서울시 강남구 테헤란로 1\t101호\t06100\t홍길동\t010-0000-0000\t납품 전 연락`;
 
 export default function ImportAddressesClient() {
+    const sectionRef = useRef<HTMLDivElement | null>(null);
     const [text, setText] = useState(SAMPLE);
     const [pending, startTransition] = useTransition();
     const [result, setResult] = useState<Awaited<ReturnType<typeof bulkImportDeliveryAddresses>> | null>(null);
@@ -19,8 +21,10 @@ export default function ImportAddressesClient() {
         });
     }
 
+    useF8SaveShortcut(runImport, { disabled: pending, scopeRef: sectionRef });
+
     return (
-        <div className="space-y-5">
+        <div ref={sectionRef} className="space-y-5">
             <div>
                 <h1 className="text-2xl font-bold text-slate-800">도착지 자료 가져오기</h1>
                 <p className="mt-1 text-sm text-slate-500">
@@ -45,9 +49,10 @@ export default function ImportAddressesClient() {
                         type="button"
                         onClick={runImport}
                         disabled={pending}
+                        title="F8로도 저장할 수 있습니다"
                         className="rounded-xl bg-blue-600 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
                     >
-                        {pending ? '가져오는 중...' : '매칭 후 저장'}
+                        {pending ? '가져오는 중...' : '매칭 후 저장 (F8)'}
                     </button>
                 </div>
             </section>

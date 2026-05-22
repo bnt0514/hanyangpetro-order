@@ -46,6 +46,7 @@ model User {
   holdRemindersCreated  HoldReminder[]       @relation("HoldReminderCreator")
   approvedBatches       ErpInputBatch[]
   receiptsConfirmed     DeliveryReceipt[]    @relation("ReceiptConfirmedByEmployee")
+  deliveryDateReviews   DeliveryDateChangeRequest[] @relation("DeliveryDateReviewedBy")
 }
 
 // ============================================================
@@ -155,6 +156,8 @@ model Product {
   category                String?
   brand                   String?
   productGroup            String?
+  /// 한화 H-CRM 주문 입력용 기본 자재명. 예: MF_LD_955_FFS_LD2
+  hanwhaMaterialName      String?
   ecountItemCode          String?
   click2002ItemCode       String?
   defaultSupplierId       String?
@@ -248,6 +251,7 @@ model CustomerUser {
 
   ordersRequested      Order[]           @relation("OrderCustomerUserRequester")
   receiptConfirmations DeliveryReceipt[] @relation("ReceiptConfirmedByCustomer")
+  deliveryDateRequests DeliveryDateChangeRequest[] @relation("DeliveryDateRequestedByCustomer")
 
   @@index([customerId])
 }
@@ -289,6 +293,8 @@ model Order {
   deleteReason              String?
   /// 오더 수락 전 여신 시뮬레이션 결과 (단가 × 수량 합계)
   estimatedAmount           Float?
+  /// 한화솔루션 H-CRM 주문요청까지 완료된 시각 (null=미완료)
+  hanwhaOrderedAt           DateTime?
   createdAt                 DateTime        @default(now())
   updatedAt                 DateTime        @updatedAt
 
@@ -302,12 +308,35 @@ model Order {
   notifications    NotificationLog[]
   creditOverride   CreditOverrideRequest?
   ledgerEntries    LedgerEntry[]
+  deliveryDateChangeRequests DeliveryDateChangeRequest[]
 
   @@index([customerId])
   @@index([status])
   @@index([salesRepId])
   @@index([createdAt])
   @@index([requestedDeliveryDate])
+}
+
+model DeliveryDateChangeRequest {
+  id                        String        @id @default(cuid())
+  orderId                   String
+  order                     Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  requestedDate             DateTime
+  requestedWeekdayText      String?
+  reason                    String?
+  status                    String        @default("PENDING") // PENDING | APPROVED | REJECTED
+  requestedByCustomerUserId String?
+  requestedByCustomerUser   CustomerUser? @relation("DeliveryDateRequestedByCustomer", fields: [requestedByCustomerUserId], references: [id])
+  reviewedByUserId          String?
+  reviewedByUser            User?         @relation("DeliveryDateReviewedBy", fields: [reviewedByUserId], references: [id])
+  reviewMemo                String?
+  reviewedAt                DateTime?
+  createdAt                 DateTime      @default(now())
+  updatedAt                 DateTime      @updatedAt
+
+  @@index([orderId])
+  @@index([status])
+  @@index([createdAt])
 }
 
 model OrderItem {
@@ -325,6 +354,8 @@ model OrderItem {
   purchaseSupplierConfirmedAt DateTime?
   /// WAREHOUSE=창고 입출고, DIRECT=직송. 기존 데이터 호환을 위해 nullable, 신규 입력은 필수 검증.
   fulfillmentType   String?
+  /// 한화 H-CRM 주문 입력용 포장백. 미선택/null이면 FFS로 자동 처리.
+  hanwhaBagType      String?
   requestedQuantity  Float
   approvedQuantity   Float?
   shippedQuantity    Float?
@@ -332,6 +363,10 @@ model OrderItem {
   unit               String         @default("KG")
   salesUnitPrice     Float?
   purchaseUnitPrice  Float?
+  /// 원장 반영용 매출일자 override. null이면 Order.requestedDeliveryDate 사용.
+  salesLedgerDate    DateTime?
+  /// 원장 반영용 매입일자 override. null이면 최종 DISPATCH_COMPLETED 일자 사용.
+  purchaseLedgerDate DateTime?
   expectedPrice      Float?
   confirmedPrice     Float?
   /// 여신 시뮬레이션 시 적용된 단가 (원/TON)
@@ -350,6 +385,8 @@ model OrderItem {
   @@index([purchaseSupplierId])
   @@index([productId])
   @@index([fulfillmentType])
+  @@index([salesLedgerDate])
+  @@index([purchaseLedgerDate])
 }
 
 model OrderSequence {

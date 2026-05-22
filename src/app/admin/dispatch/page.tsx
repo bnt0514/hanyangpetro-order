@@ -126,7 +126,7 @@ export default async function AdminDispatchPage({
                 </div>
             </header>
 
-            <main className="max-w-7xl mx-auto p-6">
+            <main className="max-w-7xl mx-auto p-6 pb-28">
                 <Link href="/admin" className="text-sm text-slate-500 hover:text-slate-800">
                     ← 대시보드로
                 </Link>

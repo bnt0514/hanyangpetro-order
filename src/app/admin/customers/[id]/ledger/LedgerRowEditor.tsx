@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { updateLedgerOrderItem } from './actions';
+import { useF8SaveShortcut } from '@/hooks/useF8SaveShortcut';
 
 type ProductOption = { id: string; productName: string; productCode: string };
 
@@ -22,6 +23,7 @@ function priceToInput(value: number | null) {
 
 export default function LedgerRowEditor({ itemId, salesDate, productId, quantity, unitPrice, memo, products }: Props) {
     const router = useRouter();
+    const rowRef = useRef<HTMLDivElement | null>(null);
     const [dateValue, setDateValue] = useState(salesDate);
     const [productValue, setProductValue] = useState(productId);
     const [quantityValue, setQuantityValue] = useState(String(quantity));
@@ -53,8 +55,10 @@ export default function LedgerRowEditor({ itemId, salesDate, productId, quantity
         });
     }
 
+    useF8SaveShortcut(submit, { disabled: pending, scopeRef: rowRef });
+
     return (
-        <div className="min-w-[620px] space-y-1">
+        <div ref={rowRef} className="min-w-[620px] space-y-1">
             <div className="grid grid-cols-12 gap-1.5">
                 <input
                     type="date"
@@ -112,9 +116,10 @@ export default function LedgerRowEditor({ itemId, salesDate, productId, quantity
                     type="button"
                     onClick={submit}
                     disabled={pending}
+                    title="이 행에서 F8로도 저장할 수 있습니다"
                     className="col-span-1 rounded-lg bg-slate-800 px-2 py-1 text-xs font-semibold text-white hover:bg-slate-900 disabled:opacity-60"
                 >
-                    저장
+                    저장 (F8)
                 </button>
             </div>
             {message && <p className="text-[11px] text-slate-500">{message}</p>}

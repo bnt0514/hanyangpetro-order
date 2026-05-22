@@ -9,6 +9,7 @@ import { statusLabel, statusColor, fmtDate, fmtDateTime, fmtNumber } from '@/lib
 import { ArrowLeft, MapPin, Calendar, FileText, Clock } from 'lucide-react';
 import CancelButton from './CancelButton';
 import BackButton from '@/components/BackButton';
+import DeliveryDateChangeRequestButton from './DeliveryDateChangeRequestButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,6 +31,7 @@ export default async function PortalOrderDetail({
             deliveryAddress: true,
             items: { include: { product: true } },
             statusHistory: { orderBy: { createdAt: 'asc' } },
+            deliveryDateChangeRequests: { orderBy: { createdAt: 'desc' }, take: 3 },
         },
     });
 
@@ -68,7 +70,7 @@ export default async function PortalOrderDetail({
                 <div className="max-w-3xl mx-auto px-6 h-16 flex items-center justify-between">
                     <Link href="/portal" className="flex items-center gap-2">
                         <Image src="/hanyanglogo.png" alt="logo" width={32} height={32} className="h-8 w-auto" />
-                        <span className="font-bold text-slate-800">한양유화 거래처 포털</span>
+                        <span className="text-sm font-bold text-slate-800 sm:text-base">한양유화&BNT 거래처 포털</span>
                     </Link>
                     <div className="flex items-center gap-4 text-sm">
                         <span className="text-slate-600">{session.user.customerName}</span>
@@ -123,6 +125,12 @@ export default async function PortalOrderDetail({
                         </Info>
                         <Info icon={<Calendar size={14} />} label="요청 도착일">
                             {fmtDate(order.requestedDeliveryDate)}
+                            {order.deliveryDateChangeRequests[0] && (
+                                <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${order.deliveryDateChangeRequests[0].status === 'PENDING' ? 'bg-amber-100 text-amber-800' : order.deliveryDateChangeRequests[0].status === 'APPROVED' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                                    변경 요청 {order.deliveryDateChangeRequests[0].status === 'PENDING' ? '요청중' : order.deliveryDateChangeRequests[0].status === 'APPROVED' ? '승인됨' : '반려됨'}
+                                </span>
+                            )}
+                            <DeliveryDateChangeRequestButton orderId={order.id} />
                         </Info>
                         {order.memo && (
                             <Info icon={<FileText size={14} />} label="메모">
@@ -152,9 +160,6 @@ export default async function PortalOrderDetail({
                                     <tr key={it.id}>
                                         <td className="px-6 py-3 font-medium text-slate-800">
                                             {it.product.productName}
-                                            <span className="ml-2 text-xs text-slate-400 font-mono">
-                                                {it.product.productCode}
-                                            </span>
                                         </td>
                                         <td className="px-6 py-3 text-right text-slate-700">
                                             {fmtNumber(it.requestedQuantity)} {it.unit}
@@ -198,7 +203,7 @@ export default async function PortalOrderDetail({
                     </ul>
                 </section>
             </main>
-            <BackButton />
+
         </div>
     );
 }

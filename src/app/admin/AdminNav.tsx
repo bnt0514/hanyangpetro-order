@@ -71,20 +71,23 @@ export default function AdminNav({
             ],
         },
         {
-            title: '거래처 / 원장',
+            title: '거래처 / 패턴 / 창고 / 품목',
             icon: '🏢',
             items: [
-                { href: '/admin/customers/new', label: '신규업체 등록', icon: '➕', color: 'border-emerald-200 bg-emerald-50 text-emerald-700' },
-                { href: '/admin/customers', label: '거래처 수정', icon: '✏️', color: 'border-emerald-200 bg-emerald-50 text-emerald-600' },
+                { href: '/admin/customers', label: '거래처등록 및 수정', icon: '✏️', color: 'border-emerald-200 bg-emerald-50 text-emerald-700' },
                 { href: '/admin/ledger', label: '거래처원장 조회', icon: '📒', color: 'border-teal-200 bg-teal-50 text-teal-700' },
+                { href: '/admin/reports/customer-patterns', label: '거래처주문패턴', icon: '🔁', color: 'border-emerald-200 bg-emerald-50 text-emerald-700' },
                 { href: '/admin/warehouse', label: '창고 재고', icon: '🏭', color: 'border-blue-200 bg-blue-50 text-blue-700' },
+                { href: '/admin/products', label: '품목 추가 및 수정', icon: '🧾', color: 'border-indigo-200 bg-indigo-50 text-indigo-700' },
             ],
         },
         {
-            title: '수익 / 단가',
+            title: '수익 / 매입매출 / 단가',
             icon: '📈',
             items: [
                 { href: '/admin/reports/profit', label: '월별 수익/담당자', icon: '📊', color: 'border-purple-200 bg-purple-50 text-purple-700' },
+                { href: '/admin/reports/sales-daily', label: '매입매출조회', icon: '📅', color: 'border-orange-200 bg-orange-50 text-orange-700' },
+                { href: '/admin/reports/performance', label: '매입매출기간조회', icon: '📈', color: 'border-blue-200 bg-blue-50 text-blue-700' },
                 ...(isHanwhaManager
                     ? [{ href: '/admin/prices', label: '단가 관리', icon: '💲', color: 'border-indigo-200 bg-indigo-50 text-indigo-700' }]
                     : []),

@@ -1,9 +1,10 @@
 ﻿'use client';
 
-import { useState, useTransition } from 'react';
+import { useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { updateOrderItem } from '@/app/orders/actions';
 import Combobox from '@/components/Combobox';
+import { useF8SaveShortcut } from '@/hooks/useF8SaveShortcut';
 
 export type ProductOption = {
     id: string;
@@ -29,10 +30,14 @@ export default function ItemQuantityEditor({
     currentPurchaseEntityId,
     currentPurchaseSupplierId,
     currentFulfillmentType,
+    currentHanwhaBagType,
     isInternalPurchaseOnly,
     currentSalesUnitPrice,
     currentPurchaseUnitPrice,
+    autoSalesUnitPrice,
+    autoPurchaseUnitPrice,
     unit,
+    orderStatus,
     products,
     companyEntities,
     suppliers,
@@ -44,26 +49,43 @@ export default function ItemQuantityEditor({
     currentPurchaseEntityId: string;
     currentPurchaseSupplierId: string;
     currentFulfillmentType: string;
+    currentHanwhaBagType?: string | null;
     isInternalPurchaseOnly: boolean;
     currentSalesUnitPrice: number | null;
     currentPurchaseUnitPrice: number | null;
+    /** 이 거래처+품목의 최근 매출단가 (주문에 단가 없을 때 자동 채움용) */
+    autoSalesUnitPrice: number | null;
+    /** 이 거래처+품목의 최근 매입단가 (주문에 단가 없을 때 자동 채움용) */
+    autoPurchaseUnitPrice: number | null;
     unit: string;
+    orderStatus: string;
     products: ProductOption[];
     companyEntities: CompanyEntityOption[];
     suppliers: SupplierOption[];
 }) {
     const router = useRouter();
+    const editorRef = useRef<HTMLDivElement | null>(null);
     const [productId, setProductId] = useState(currentProductId);
     const [quantity, setQuantity] = useState(String(currentQuantity));
     const [salesEntityId, setSalesEntityId] = useState(currentSalesEntityId);
     const [purchaseEntityId, setPurchaseEntityId] = useState(currentPurchaseEntityId);
     const [purchaseSupplierId, setPurchaseSupplierId] = useState(currentPurchaseSupplierId);
     const [fulfillmentType, setFulfillmentType] = useState(currentFulfillmentType);
-    const [salesUnitPrice, setSalesUnitPrice] = useState(priceToInput(currentSalesUnitPrice));
-    const [purchaseUnitPrice, setPurchaseUnitPrice] = useState(priceToInput(currentPurchaseUnitPrice));
+    const [hanwhaBagType, setHanwhaBagType] = useState(currentHanwhaBagType ?? '');
+    // 단가가 없으면 자동 조회값으로 초기화
+    const [salesUnitPrice, setSalesUnitPrice] = useState(
+        priceToInput(currentSalesUnitPrice ?? autoSalesUnitPrice)
+    );
+    const [purchaseUnitPrice, setPurchaseUnitPrice] = useState(
+        priceToInput(currentPurchaseUnitPrice ?? autoPurchaseUnitPrice)
+    );
     const [reason, setReason] = useState('');
     const [message, setMessage] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
+
+    // 단가가 자동 채움된 경우 UI로 표시
+    const salesAutoFilled = currentSalesUnitPrice == null && autoSalesUnitPrice != null;
+    const purchaseAutoFilled = currentPurchaseUnitPrice == null && autoPurchaseUnitPrice != null;
 
     const productOptions = products.map((product) => ({
         value: product.id,
@@ -93,6 +115,7 @@ export default function ItemQuantityEditor({
                 salesEntityId: isInternalPurchaseOnly ? undefined : salesEntityId,
                 purchaseEntityId,
                 purchaseSupplierId: purchaseSupplierId || null,
+                hanwhaBagType: hanwhaBagType || null,
                 salesUnitPrice: isInternalPurchaseOnly || salesUnitPrice === '' ? null : Number(salesUnitPrice),
                 purchaseUnitPrice: purchaseUnitPrice === '' ? null : Number(purchaseUnitPrice),
             });
@@ -106,23 +129,24 @@ export default function ItemQuantityEditor({
         });
     }
 
+    useF8SaveShortcut(submit, { disabled: pending, scopeRef: editorRef });
+
     return (
-        <div className="ml-auto flex max-w-sm flex-col items-end gap-1.5">
+        <div ref={editorRef} className="ml-auto flex max-w-sm flex-col items-end gap-1.5">
             <div className="w-full text-left">
                 <Combobox
                     options={productOptions}
                     value={productId}
                     onChange={(value: string) => handleProductChange(value)}
-                    placeholder="제품명/코드 입력"
+                    placeholder="제품명 입력"
                     emptyText="일치하는 제품이 없습니다"
                     disabled={pending}
                 />
             </div>
             <div className="flex items-center justify-end gap-1.5">
                 <input
-                    type="number"
-                    min="0.001"
-                    step="0.001"
+                    type="text"
+                    inputMode="decimal"
                     value={quantity}
                     onChange={(event) => setQuantity(event.target.value)}
                     disabled={pending}
@@ -141,6 +165,19 @@ export default function ItemQuantityEditor({
                     <option value="">창고/직송</option>
                     <option value="WAREHOUSE">창고</option>
                     <option value="DIRECT">직송</option>
+                </select>
+                <select
+                    value={hanwhaBagType}
+                    onChange={(event) => setHanwhaBagType(event.target.value)}
+                    disabled={pending}
+                    className="rounded-lg border border-slate-300 px-2 py-1 text-xs outline-none focus:border-blue-500 disabled:opacity-60"
+                    title="한화 포장백"
+                >
+                    <option value="">한화백 자동(FFS)</option>
+                    <option value="FFS">FFS</option>
+                    <option value="FB500">500백</option>
+                    <option value="FB700">700백</option>
+                    <option value="FB750">750백</option>
                 </select>
                 {!isInternalPurchaseOnly && (
                     <select
@@ -179,27 +216,35 @@ export default function ItemQuantityEditor({
                     />
                 </div>
                 {!isInternalPurchaseOnly && (
-                    <input
-                        type="number"
-                        min="0"
-                        step="any"
-                        value={salesUnitPrice}
-                        onChange={(event) => setSalesUnitPrice(event.target.value)}
-                        placeholder="매출단가"
-                        disabled={pending}
-                        className="rounded-lg border border-slate-300 px-2 py-1 text-right text-xs outline-none focus:border-blue-500 disabled:opacity-60"
-                    />
+                    <div className="relative">
+                        <input
+                            type="text"
+                            inputMode="decimal"
+                            value={salesUnitPrice}
+                            onChange={(event) => setSalesUnitPrice(event.target.value)}
+                            placeholder="매출단가"
+                            disabled={pending}
+                            className={`w-full rounded-lg border px-2 py-1 text-right text-xs outline-none focus:border-blue-500 disabled:opacity-60 ${salesAutoFilled ? 'border-blue-300 bg-blue-50' : 'border-slate-300'}`}
+                        />
+                        {salesAutoFilled && (
+                            <span className="absolute -top-3 left-0 text-[10px] text-blue-500">직전단가 자동채움</span>
+                        )}
+                    </div>
                 )}
-                <input
-                    type="number"
-                    min="0"
-                    step="any"
-                    value={purchaseUnitPrice}
-                    onChange={(event) => setPurchaseUnitPrice(event.target.value)}
-                    placeholder="매입단가"
-                    disabled={pending}
-                    className="rounded-lg border border-slate-300 px-2 py-1 text-right text-xs outline-none focus:border-blue-500 disabled:opacity-60"
-                />
+                <div className="relative">
+                    <input
+                        type="text"
+                        inputMode="decimal"
+                        value={purchaseUnitPrice}
+                        onChange={(event) => setPurchaseUnitPrice(event.target.value)}
+                        placeholder="매입단가"
+                        disabled={pending}
+                        className={`w-full rounded-lg border px-2 py-1 text-right text-xs outline-none focus:border-blue-500 disabled:opacity-60 ${purchaseAutoFilled ? 'border-blue-300 bg-blue-50' : 'border-slate-300'}`}
+                    />
+                    {purchaseAutoFilled && (
+                        <span className="absolute -top-3 left-0 text-[10px] text-blue-500">직전단가 자동채움</span>
+                    )}
+                </div>
             </div>
             <div className="flex items-center justify-end gap-1.5">
                 <input
@@ -214,6 +259,7 @@ export default function ItemQuantityEditor({
                     type="button"
                     onClick={submit}
                     disabled={pending}
+                    title="이 영역에서 F8로도 저장할 수 있습니다"
                     className="rounded-lg bg-slate-800 px-2.5 py-1 text-xs font-semibold text-white hover:bg-slate-900 disabled:opacity-60"
                 >
                     저장

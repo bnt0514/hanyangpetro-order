@@ -21,6 +21,8 @@ interface Props {
     defaultText?: string;
     /** 옵션 매칭 없이 자유 텍스트가 입력된 채로 확정될 때 호출 */
     onFreeText?: (text: string) => void;
+    /** 값이 입력되어 있어도 포커스 시 전체 옵션을 보여줌 */
+    showAllOnFocus?: boolean;
 }
 
 /* ── 매칭 정규화 ────────────────────────────────────────────
@@ -51,11 +53,13 @@ export default function Combobox({
     emptyText = '결과 없음',
     defaultText,
     onFreeText,
+    showAllOnFocus = false,
 }: Props) {
     const id = useId();
     const wrapRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const isTypingRef = useRef(false);
+    const skipNextBlurCommitRef = useRef(false);
 
     const valueLabel = useMemo(
         () => options.find((o) => o.value === value)?.label ?? '',
@@ -65,6 +69,7 @@ export default function Combobox({
     const [text, setText] = useState(valueLabel || defaultText || '');
     const [open, setOpen] = useState(false);
     const [hi, setHi] = useState(0);
+    const [showAll, setShowAll] = useState(false);
 
     // 외부에서 value 바뀐 경우에만 input sync (사용자 타이핑 중에는 차단)
     // value가 비어 있으면 defaultText를 표시
@@ -86,6 +91,7 @@ export default function Combobox({
     // ── 필터 + 정렬 (대소문자 무관 + 부분 포함) ───────────────
     // 점수: 0=완전일치, 1=startsWith, 2=contains
     const filtered = useMemo(() => {
+        if (showAllOnFocus && showAll && !isTypingRef.current) return options.slice(0, 100);
         const q = normalize(text);
         const scored: { opt: ComboboxOption; score: number }[] = [];
 
@@ -104,15 +110,19 @@ export default function Combobox({
         return scored
             .sort((a, b) => {
                 if (a.score !== b.score) return a.score - b.score;
+                // 동점이면 normalized label 길이가 짧을수록 우선 (3120 > 3120MF)
+                const lenDiff = normalize(a.opt.label).length - normalize(b.opt.label).length;
+                if (lenDiff !== 0) return lenDiff;
                 return a.opt.label.localeCompare(b.opt.label, 'ko');
             })
             .map((s) => s.opt)
             .slice(0, 100);
-    }, [options, text]);
+    }, [options, showAll, showAllOnFocus, text]);
 
     const select = useCallback(
         (opt: ComboboxOption) => {
             isTypingRef.current = false;
+            skipNextBlurCommitRef.current = true;
             onChange(opt.value, opt.label);
             setText(opt.label);
             setOpen(false);
@@ -125,7 +135,11 @@ export default function Combobox({
     function commit() {
         const q = normalize(text);
         if (q === '') {
-            if (value) onChange('', '');
+            if (value) {
+                // 선택된 값이 있는데 text가 비었으면 text만 복원 (blur 타이밍 이슈 방지)
+                setText(valueLabel || defaultText || '');
+                return;
+            }
             onFreeText?.('');
             return;
         }
@@ -161,6 +175,7 @@ export default function Combobox({
             isTypingRef.current = false;
             setText(valueLabel);
         } else if (e.key === 'Tab') {
+            skipNextBlurCommitRef.current = true;
             commit();
         }
     }
@@ -184,15 +199,25 @@ export default function Combobox({
                     autoComplete="off"
                     onChange={(e) => {
                         isTypingRef.current = true;
+                        setShowAll(false);
                         setText(e.target.value);
                         setOpen(true);
                         setHi(0);
                     }}
-                    onFocus={() => setOpen(true)}
+                    onFocus={() => {
+                        setShowAll(true);
+                        setOpen(true);
+                    }}
                     onBlur={() => {
                         // 옵션 클릭과 충돌 방지를 위해 약간 지연
                         setTimeout(() => {
+                            if (skipNextBlurCommitRef.current) {
+                                skipNextBlurCommitRef.current = false;
+                                setOpen(false);
+                                return;
+                            }
                             isTypingRef.current = false;
+                            setShowAll(false);
                             commit();
                         }, 150);
                     }}

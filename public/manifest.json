@@ -1,0 +1,25 @@
+{
+    "name": "한양유화 e-Business OS",
+    "short_name": "한양유화",
+    "description": "주식회사 한양유화 주문 관제 시스템",
+    "start_url": "/",
+    "scope": "/",
+    "display": "standalone",
+    "orientation": "portrait",
+    "background_color": "#f8fafc",
+    "theme_color": "#0f172a",
+    "icons": [
+        {
+            "src": "/hanyanglogo.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "/hanyanglogo.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ]
+}

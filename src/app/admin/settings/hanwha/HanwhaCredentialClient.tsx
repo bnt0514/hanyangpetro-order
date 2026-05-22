@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, KeyRound, Loader2, AlertCircle, CheckCircle2, Save } from 'lucide-react';
 import { updateHanwhaPassword } from '@/app/dispatch/actions';
 import { fmtDateTime } from '@/lib/orders';
+import { useF8SaveShortcut } from '@/hooks/useF8SaveShortcut';
 
 interface Props {
     username: string | null;
@@ -22,6 +23,7 @@ export default function HanwhaCredentialClient({
     updatedByName,
 }: Props) {
     const router = useRouter();
+    const formRef = useRef<HTMLFormElement | null>(null);
     const [pw, setPw] = useState('');
     const [pw2, setPw2] = useState('');
     const [show, setShow] = useState(false);
@@ -49,6 +51,8 @@ export default function HanwhaCredentialClient({
             router.refresh();
         });
     }
+
+    useF8SaveShortcut(() => formRef.current?.requestSubmit(), { disabled: pending || !pw || !pw2, scopeRef: formRef });
 
     return (
         <div className="mt-6 space-y-6">
@@ -87,7 +91,7 @@ export default function HanwhaCredentialClient({
             {/* 변경 폼 */}
             <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
                 <h2 className="text-sm font-semibold text-slate-700 mb-4">새 비밀번호 등록</h2>
-                <form onSubmit={submit} className="space-y-4">
+                <form ref={formRef} onSubmit={submit} className="space-y-4">
                     <div>
                         <label className="block text-xs font-medium text-slate-500 mb-1.5">
                             새 비밀번호
@@ -143,6 +147,7 @@ export default function HanwhaCredentialClient({
                         <button
                             type="submit"
                             disabled={pending || !pw || !pw2}
+                            title="F8로도 저장할 수 있습니다"
                             className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 text-sm font-semibold shadow-sm disabled:opacity-60"
                         >
                             {pending ? (
@@ -150,7 +155,7 @@ export default function HanwhaCredentialClient({
                             ) : (
                                 <Save size={16} />
                             )}
-                            비밀번호 저장
+                            비밀번호 저장 (F8)
                         </button>
                         <p className="text-xs text-slate-400">
                             저장 즉시 다음 배차 조회부터 새 비밀번호가 적용됩니다.

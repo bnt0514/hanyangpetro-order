@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useRef, useState, useTransition } from 'react';
 import { Save, Loader2, Info } from 'lucide-react';
 import {
     upsertPriceAdjustment,
 } from '@/app/admin/credit/actions';
 import { BRANDS, PRODUCT_GROUPS, type Brand, type ProductGroup } from '@/lib/price-constants';
+import { useF8SaveShortcut } from '@/hooks/useF8SaveShortcut';
 
 type AdjMap = Record<string, Record<string, number>>; // brand → productGroup → delta
 
@@ -16,6 +17,7 @@ export default function PriceAdjustmentClient({
     month: string;
     initial: { brand: string; productGroup: string; delta: number }[];
 }) {
+    const sectionRef = useRef<HTMLDivElement | null>(null);
     const [memo, setMemo] = useState('');
     const [pending, startTransition] = useTransition();
     const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -54,8 +56,10 @@ export default function PriceAdjustmentClient({
         });
     }
 
+    useF8SaveShortcut(save, { disabled: pending, scopeRef: sectionRef });
+
     return (
-        <div className="space-y-4">
+        <div ref={sectionRef} className="space-y-4">
             <div className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-xl p-3 text-sm text-blue-700">
                 <Info size={16} className="mt-0.5 flex-shrink-0" />
                 <p>
@@ -119,10 +123,11 @@ export default function PriceAdjustmentClient({
                 <button
                     onClick={save}
                     disabled={pending}
+                    title="F8로도 저장할 수 있습니다"
                     className="flex items-center gap-2 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl disabled:opacity-60"
                 >
                     {pending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                    저장
+                    저장 (F8)
                 </button>
             </div>
 

@@ -1,8 +1,10 @@
-'use client';
+﻿'use client';
 
-import { useState, useTransition } from 'react';
+import { useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { updateOrderDeliveryDate } from '@/app/orders/actions';
+import { useF8SaveShortcut } from '@/hooks/useF8SaveShortcut';
+import { getDateInfo } from '@/lib/korean-holidays';
 
 export default function DeliveryDateEditor({
     orderId,
@@ -12,6 +14,7 @@ export default function DeliveryDateEditor({
     currentDate: string;
 }) {
     const router = useRouter();
+    const editorRef = useRef<HTMLDivElement | null>(null);
     const [date, setDate] = useState(currentDate);
     const [reason, setReason] = useState('');
     const [message, setMessage] = useState<string | null>(null);
@@ -31,8 +34,12 @@ export default function DeliveryDateEditor({
         });
     }
 
+    useF8SaveShortcut(submit, { disabled: pending, scopeRef: editorRef });
+
+    const dateInfo = getDateInfo(date);
+
     return (
-        <div className="space-y-1.5">
+        <div ref={editorRef} className="space-y-1.5">
             <div className="flex flex-wrap items-center gap-1.5">
                 <input
                     type="date"
@@ -53,11 +60,15 @@ export default function DeliveryDateEditor({
                     type="button"
                     onClick={submit}
                     disabled={pending}
+                    title="이 입력 영역에서 F8로도 저장할 수 있습니다"
                     className="rounded-lg bg-slate-800 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-slate-900 disabled:opacity-60"
                 >
                     저장
                 </button>
             </div>
+            {dateInfo && (
+                <p className={`text-xs font-medium ${dateInfo.isWarning ? 'text-amber-600' : 'text-blue-600'}`}>{dateInfo.message}</p>
+            )}
             {message && <p className="text-[11px] text-slate-500">{message}</p>}
         </div>
     );

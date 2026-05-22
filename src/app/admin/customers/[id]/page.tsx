@@ -17,14 +17,21 @@ export default async function CustomerEditPage({
     if (session.user.userKind !== 'staff') redirect('/portal');
 
     const { id } = await params;
-    const customer = await prisma.customer.findUnique({
-        where: { id },
-        include: {
-            addresses: {
-                orderBy: [{ isDefault: 'desc' }, { isActive: 'desc' }, { label: 'asc' }],
+    const [customer, staffUsers] = await Promise.all([
+        prisma.customer.findUnique({
+            where: { id },
+            include: {
+                addresses: {
+                    orderBy: [{ isDefault: 'desc' }, { isActive: 'desc' }, { label: 'asc' }],
+                },
             },
-        },
-    });
+        }),
+        prisma.user.findMany({
+            where: { isActive: true },
+            select: { id: true, name: true },
+            orderBy: { name: 'asc' },
+        }),
+    ]);
 
     if (!customer) notFound();
 
@@ -38,7 +45,7 @@ export default async function CustomerEditPage({
                 </div>
             </header>
             <main className="max-w-5xl mx-auto p-6">
-                <CustomerEditor customer={customer} addresses={customer.addresses} />
+                <CustomerEditor customer={customer} addresses={customer.addresses} staffUsers={staffUsers} />
             </main>
         </div>
     );

@@ -1,6 +1,7 @@
 ﻿import { Truck } from 'lucide-react';
 import { fmtNumber } from '@/lib/orders';
 import DeleteHanwhaDispatchMatchButton from '@/components/DeleteHanwhaDispatchMatchButton';
+import DispatchKakaoNoticeButton from '@/components/DispatchKakaoNoticeButton';
 
 export type HanwhaDispatchDetailRow = {
     id: string;
@@ -10,14 +11,25 @@ export type HanwhaDispatchDetailRow = {
     driverInfo: string;
 };
 
+export type DispatchNoticeContext = {
+    orderNo: string;
+    customerName: string;
+    deliveryDate: string;
+    deliveryAddress: string;
+};
+
 export default function HanwhaDispatchDetails({
     rows,
     orderQuantityTon,
     showDeleteAction = false,
+    title = '배차내역',
+    noticeContext,
 }: {
     rows: HanwhaDispatchDetailRow[];
     orderQuantityTon?: number;
     showDeleteAction?: boolean;
+    title?: string;
+    noticeContext?: DispatchNoticeContext;
 }) {
     if (rows.length === 0) return null;
 
@@ -31,9 +43,12 @@ export default function HanwhaDispatchDetails({
             <div className="px-6 py-4 border-b border-cyan-100 bg-cyan-50/60 flex items-center justify-between gap-3 flex-wrap">
                 <div className="flex items-center gap-2">
                     <Truck size={16} className="text-cyan-700" />
-                    <h2 className="font-semibold text-slate-800">배차내역</h2>
+                    <h2 className="font-semibold text-slate-800">{title}</h2>
                 </div>
-                <span className="text-xs text-cyan-700">라인 {rows.length}건</span>
+                <div className="flex items-center gap-3">
+                    <span className="text-xs text-cyan-700">라인 {rows.length}건</span>
+                    <DispatchKakaoNoticeButton rows={rows} title={title} context={noticeContext} />
+                </div>
             </div>
             {orderQuantityTon != null && (
                 <div className={`px-6 py-3 text-xs border-b ${hasMismatch ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-cyan-100 bg-white text-slate-500'}`}>

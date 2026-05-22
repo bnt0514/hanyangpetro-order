@@ -91,8 +91,7 @@ export default async function CreditOverridesPage() {
                         </div>
                     </section>
                 )}
-            </main>
-            <BackButton />
+            </main>
         </div>
     );
 }

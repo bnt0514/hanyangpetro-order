@@ -1,10 +1,11 @@
 ﻿'use client';
 
-import { useState, useTransition } from 'react';
+import { useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { createCustomer, addDeliveryAddress } from '../actions';
+import { useF8SaveShortcut } from '@/hooks/useF8SaveShortcut';
 
 type Mode = 'customer+address' | 'customer' | 'address';
 
@@ -16,6 +17,7 @@ const MODE_OPTIONS: { value: Mode; label: string; desc: string }[] = [
 
 export default function NewCustomerPage() {
     const router = useRouter();
+    const formRef = useRef<HTMLFormElement | null>(null);
     const [pending, startTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
     const [mode, setMode] = useState<Mode>('customer+address');
@@ -25,6 +27,7 @@ export default function NewCustomerPage() {
         customerCode: '',
         companyName: '',
         businessNumber: '',
+        defaultSalesRepId: '',
         creditLimit: '',
         paymentTerms: '',
         custMemo: '',
@@ -46,6 +49,15 @@ export default function NewCustomerPage() {
     const [existingCustomerSearch, setExistingCustomerSearch] = useState('');
     const [customers, setCustomers] = useState<{ id: string; companyName: string; customerCode: string }[]>([]);
     const [customersLoaded, setCustomersLoaded] = useState(false);
+    const [staffUsers, setStaffUsers] = useState<{ id: string; name: string }[]>([]);
+    const [staffLoaded, setStaffLoaded] = useState(false);
+
+    async function loadStaffUsers() {
+        if (staffLoaded) return;
+        const res = await fetch('/api/staff/users');
+        if (res.ok) setStaffUsers(await res.json());
+        setStaffLoaded(true);
+    }
 
     async function loadCustomers() {
         if (customersLoaded) return;
@@ -87,6 +99,7 @@ export default function NewCustomerPage() {
                     customerCode: cust.customerCode,
                     companyName: cust.companyName,
                     businessNumber: cust.businessNumber || undefined,
+                    defaultSalesRepId: cust.defaultSalesRepId || undefined,
                     creditLimit: cust.creditLimit ? Number(cust.creditLimit) : undefined,
                     paymentTerms: cust.paymentTerms || undefined,
                     memo: cust.custMemo || undefined,
@@ -109,6 +122,8 @@ export default function NewCustomerPage() {
         });
     }
 
+    useF8SaveShortcut(() => formRef.current?.requestSubmit(), { disabled: pending, scopeRef: formRef });
+
     const filteredCustomers = customers.filter(
         (c) =>
             c.companyName.includes(existingCustomerSearch) ||
@@ -122,14 +137,18 @@ export default function NewCustomerPage() {
         <div className="min-h-screen bg-slate-50">
             <header className="bg-white border-b border-slate-200">
                 <div className="max-w-2xl mx-auto px-6 h-16 flex items-center">
-                    <Link href="/admin" className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800">
-                        <ArrowLeft size={14} /> 홈으로
+                    <Link href="/admin/customers" className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800">
+                        <ArrowLeft size={14} /> 거래처등록 및 수정
                     </Link>
                 </div>
             </header>
 
             <main className="max-w-2xl mx-auto p-6 space-y-4">
-                <h1 className="text-2xl font-bold text-slate-800">신규 등록</h1>
+                <h1 className="text-2xl font-bold text-slate-800">거래처등록 및 수정</h1>
+                <div className="flex rounded-xl border border-slate-200 bg-white p-1 text-sm font-semibold">
+                    <Link href="/admin/customers" className="rounded-lg px-4 py-2 text-slate-600 hover:bg-slate-50">전체 거래처/수정</Link>
+                    <Link href="/admin/customers/new" className="rounded-lg bg-slate-900 px-4 py-2 text-white">신규거래처 등록</Link>
+                </div>
 
                 {/* 등록 방식 선택 */}
                 <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-3">
@@ -139,8 +158,8 @@ export default function NewCustomerPage() {
                             <label
                                 key={opt.value}
                                 className={`flex items-start gap-3 rounded-xl border px-4 py-3 cursor-pointer transition ${mode === opt.value
-                                        ? 'border-blue-500 bg-blue-50'
-                                        : 'border-slate-200 hover:bg-slate-50'
+                                    ? 'border-blue-500 bg-blue-50'
+                                    : 'border-slate-200 hover:bg-slate-50'
                                     }`}
                             >
                                 <input
@@ -163,7 +182,7 @@ export default function NewCustomerPage() {
                     </div>
                 </div>
 
-                <form onSubmit={submit} className="space-y-4">
+                <form ref={formRef} onSubmit={submit} className="space-y-4">
                     {/* 업체 정보 섹션 */}
                     {showCustomer && (
                         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
@@ -181,6 +200,12 @@ export default function NewCustomerPage() {
                             <Field label="사업자등록번호">
                                 <input name="businessNumber" value={cust.businessNumber} onChange={handleCust}
                                     placeholder="000-00-00000" className="inp" />
+                            </Field>
+                            <Field label="담당자">
+                                <select name="defaultSalesRepId" value={cust.defaultSalesRepId} onFocus={loadStaffUsers} onChange={(e) => setCust((prev) => ({ ...prev, defaultSalesRepId: e.target.value }))} className="inp">
+                                    <option value="">담당자 미지정</option>
+                                    {staffUsers.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
+                                </select>
                             </Field>
                             <div className="grid grid-cols-2 gap-3">
                                 <Field label="여신한도 (원)">
@@ -222,8 +247,8 @@ export default function NewCustomerPage() {
                                         type="button"
                                         onClick={() => setExistingCustomerId(c.id)}
                                         className={`w-full text-left px-3 py-2.5 text-sm transition ${existingCustomerId === c.id
-                                                ? 'bg-blue-50 text-blue-700 font-semibold'
-                                                : 'hover:bg-slate-50'
+                                            ? 'bg-blue-50 text-blue-700 font-semibold'
+                                            : 'hover:bg-slate-50'
                                             }`}
                                     >
                                         {c.companyName}
@@ -284,9 +309,9 @@ export default function NewCustomerPage() {
                             className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
                             취소
                         </Link>
-                        <button type="submit" disabled={pending}
+                        <button type="submit" disabled={pending} title="F8로도 저장할 수 있습니다"
                             className="rounded-xl bg-blue-600 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
-                            {pending ? '등록 중...' : '저장'}
+                            {pending ? '등록 중...' : '저장 (F8)'}
                         </button>
                     </div>
                 </form>

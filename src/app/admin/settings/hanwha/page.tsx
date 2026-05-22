@@ -71,8 +71,7 @@ export default async function HanwhaSettingsPage() {
                     updatedAt={meta.updatedAt?.toISOString() ?? null}
                     updatedByName={lastUpdaterName}
                 />
-            </main>
-            <BackButton />
+            </main>
         </div>
     );
 }

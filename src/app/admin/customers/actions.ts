@@ -24,6 +24,7 @@ export type CustomerInput = {
     customerCode: string;
     companyName: string;
     businessNumber?: string;
+    defaultSalesRepId?: string;
     creditLimit?: number;
     paymentTerms?: string;
     memo?: string;
@@ -80,6 +81,7 @@ export async function createCustomer(input: {
     customerCode?: string;
     companyName: string;
     businessNumber?: string;
+    defaultSalesRepId?: string;
     creditLimit?: number;
     paymentTerms?: string;
     memo?: string;
@@ -113,6 +115,7 @@ export async function createCustomer(input: {
                     customerCode: code,
                     companyName: name,
                     businessNumber: input.businessNumber?.trim() || null,
+                    defaultSalesRepId: input.defaultSalesRepId?.trim() || null,
                     creditLimit: Number.isFinite(input.creditLimit) ? input.creditLimit! : 0,
                     paymentTerms: input.paymentTerms?.trim() || null,
                     memo: input.memo?.trim() || null,
@@ -214,6 +217,7 @@ export async function updateCustomer(
                 customerCode: code,
                 companyName: name,
                 businessNumber: input.businessNumber?.trim() || null,
+                defaultSalesRepId: input.defaultSalesRepId?.trim() || null,
                 creditLimit: Number.isFinite(input.creditLimit) ? input.creditLimit! : 0,
                 paymentTerms: input.paymentTerms?.trim() || null,
                 memo: input.memo?.trim() || null,
@@ -228,6 +232,22 @@ export async function updateCustomer(
         console.error('updateCustomer failed:', e);
         return { ok: false, error: '업체 수정 중 오류가 발생했습니다.' };
     }
+}
+
+export async function deactivateCustomer(formData: FormData): Promise<void> {
+    const session = await auth();
+    if (!session?.user || session.user.userKind !== 'staff') return;
+
+    const customerId = String(formData.get('customerId') ?? '').trim();
+    if (!customerId) return;
+
+    await prisma.$transaction(async (tx) => {
+        await tx.customer.update({ where: { id: customerId }, data: { isActive: false } });
+        await tx.deliveryAddress.updateMany({ where: { customerId }, data: { isActive: false } });
+    });
+
+    revalidatePath('/admin');
+    revalidatePath('/admin/customers');
 }
 
 export async function saveDeliveryAddress(input: {

@@ -6,12 +6,18 @@ import { ArrowLeft, BookOpen } from 'lucide-react';
 import { defaultLedgerRange, getCustomerLedger, type CompanyLedger } from '@/lib/ledger';
 import { fmtDate, fmtNumber } from '@/lib/orders';
 import BackButton from '@/components/BackButton';
+import LedgerRangeForm from './LedgerRangeForm';
 
 export const dynamic = 'force-dynamic';
 
 function fmtMoney(value: number | null | undefined) {
     if (value == null) return '-';
     return `${value.toLocaleString('ko-KR')}원`;
+}
+
+function fmtAmount(value: number | null | undefined) {
+    if (value == null) return '-';
+    return value.toLocaleString('ko-KR');
 }
 
 function deltaClass(value: number | null) {
@@ -30,32 +36,58 @@ function LedgerTable({ ledger }: { ledger: CompanyLedger }) {
         <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
             <div className="border-b border-slate-100 px-6 py-4">
                 <h2 className="text-lg font-semibold text-slate-800">{ledger.companyName} 거래처원장</h2>
-                <p className="mt-1 text-xs text-slate-500">총 수량 {fmtNumber(ledger.totalQuantity)}TON · 총 금액 {fmtMoney(ledger.totalAmount)}</p>
+                <p className="mt-1 text-xs text-slate-500">매출일자=오더 도착일 기준 · 오더번호를 클릭하면 상세내역으로 이동합니다.</p>
             </div>
             <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                     <thead>
                         <tr className="bg-slate-50 text-left text-xs font-medium text-slate-500 uppercase">
                             <th className="px-5 py-3">매출일자</th>
+                            <th className="px-5 py-3">오더번호</th>
                             <th className="px-5 py-3">품목</th>
-                            <th className="px-5 py-3 text-right">수량</th>
-                            <th className="px-5 py-3 text-right">단가</th>
-                            <th className="px-5 py-3 text-right">금액</th>
-                            <th className="px-5 py-3">비고</th>
+                            <th className="px-5 py-3 text-right">수량(TON)</th>
+                            <th className="px-5 py-3 text-right">단가(원)</th>
+                            <th className="px-5 py-3 text-right">공급가액(원)</th>
+                            <th className="px-5 py-3 text-right">부가세(원)</th>
+                            <th className="px-5 py-3 text-right">합계(원)</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                        {ledger.rows.map((row) => (
-                            <tr key={row.itemId}>
-                                <td className="px-5 py-3 text-slate-600">{fmtDate(row.salesDate)}</td>
-                                <td className="px-5 py-3 text-slate-700"><span className="font-medium">{row.productName}</span><span className="ml-2 text-xs text-slate-400 font-mono">{row.productCode}</span></td>
-                                <td className="px-5 py-3 text-right text-slate-700">{fmtNumber(row.quantity)} {row.unit}</td>
-                                <td className="px-5 py-3 text-right text-slate-700">{fmtMoney(row.unitPrice)}</td>
-                                <td className="px-5 py-3 text-right font-medium text-slate-800">{fmtMoney(row.amount)}</td>
-                                <td className="px-5 py-3 text-slate-500">{row.memo ?? '-'}</td>
-                            </tr>
-                        ))}
+                        {ledger.rows.map((row, index) => {
+                            const previous = ledger.rows[index - 1];
+                            const sameOrderAsPrevious = previous?.orderId && previous.orderId === row.orderId;
+                            return (
+                                <tr key={row.itemId} className="hover:bg-slate-50/70">
+                                    <td className="px-5 py-3 text-slate-600">{sameOrderAsPrevious ? '' : fmtDate(row.salesDate)}</td>
+                                    <td className="px-5 py-3 font-mono text-xs">
+                                        {row.orderId ? (
+                                            <Link href={`/portal/orders/${row.orderId}`} className="inline-flex rounded-full bg-blue-50 px-2.5 py-1 font-semibold text-blue-700 hover:bg-blue-100 hover:text-blue-900">
+                                                {row.orderNo}
+                                            </Link>
+                                        ) : (
+                                            <span className="text-slate-300">-</span>
+                                        )}
+                                    </td>
+                                    <td className="px-5 py-3 text-slate-700"><span className="font-medium">{row.productName}</span></td>
+                                    <td className="px-5 py-3 text-right text-slate-700">{fmtNumber(row.quantity)}</td>
+                                    <td className="px-5 py-3 text-right text-slate-700">{fmtAmount(row.unitPrice)}</td>
+                                    <td className="px-5 py-3 text-right font-medium text-slate-800">{fmtAmount(row.amount)}</td>
+                                    <td className="px-5 py-3 text-right text-slate-700">{fmtAmount(row.vatAmount)}</td>
+                                    <td className="px-5 py-3 text-right font-semibold text-slate-900">{fmtAmount(row.totalAmount)}</td>
+                                </tr>
+                            );
+                        })}
                     </tbody>
+                    <tfoot>
+                        <tr className="border-t border-slate-200 bg-slate-50 text-sm font-semibold text-slate-800">
+                            <td className="px-5 py-3" colSpan={3}>합계</td>
+                            <td className="px-5 py-3 text-right">{fmtNumber(ledger.totalQuantity)}</td>
+                            <td className="px-5 py-3 text-right text-slate-400">-</td>
+                            <td className="px-5 py-3 text-right">{fmtAmount(ledger.totalAmount)}</td>
+                            <td className="px-5 py-3 text-right">{fmtAmount(ledger.totalVatAmount)}</td>
+                            <td className="px-5 py-3 text-right">{fmtAmount(ledger.totalWithVat)}</td>
+                        </tr>
+                    </tfoot>
                 </table>
             </div>
             {ledger.comparisons.length > 0 && (
@@ -93,7 +125,7 @@ export default async function PortalLedgerPage({ searchParams }: { searchParams:
                 <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
                     <Link href="/portal" className="flex items-center gap-2">
                         <Image src="/hanyanglogo.png" alt="logo" width={32} height={32} className="h-8 w-auto" />
-                        <span className="font-bold text-slate-800">한양유화 거래처 포털</span>
+                        <span className="text-sm font-bold text-slate-800 sm:text-base">한양유화&BNT 거래처 포털</span>
                     </Link>
                     <form action={async () => { 'use server'; await signOut({ redirectTo: '/login' }); }}>
                         <button className="text-sm text-slate-500 hover:text-red-600 transition">로그아웃</button>
@@ -107,18 +139,13 @@ export default async function PortalLedgerPage({ searchParams }: { searchParams:
                         <div className="flex items-center gap-2"><BookOpen className="text-blue-600" size={24} /><h1 className="text-2xl font-bold text-slate-800">{ledger.customerName} 거래처원장</h1></div>
                         <p className="mt-1 text-sm text-slate-500">매출일자=도착일자 기준입니다.</p>
                     </div>
-                    <form className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white p-2 text-sm">
-                        <input type="date" name="from" defaultValue={ledger.from} className="rounded-lg border border-slate-200 px-2 py-1" />
-                        <span className="text-slate-400">~</span>
-                        <input type="date" name="to" defaultValue={ledger.to} className="rounded-lg border border-slate-200 px-2 py-1" />
-                        <button className="rounded-lg bg-slate-800 px-3 py-1.5 font-semibold text-white">조회</button>
-                    </form>
+                    <LedgerRangeForm from={ledger.from} to={ledger.to} />
                 </div>
                 {ledger.ledgers.length === 0 ? (
                     <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-400">조회 기간 내 매출 원장 항목이 없습니다.</div>
                 ) : ledger.ledgers.map((companyLedger) => <LedgerTable key={companyLedger.companyEntityId} ledger={companyLedger} />)}
             </main>
-            <BackButton />
+
         </div>
     );
 }

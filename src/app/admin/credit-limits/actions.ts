@@ -58,6 +58,47 @@ export async function updateCustomerCreditLimit(formData: FormData) {
     redirect(`/admin/credit-limits?${queryFromForm(formData)}`);
 }
 
+export async function bulkUpdateCreditLimits(
+    updates: { customerId: string; creditLimit: string; creditGrade: string; creditInsuranceAmount: string; mortgageAmount: string }[],
+): Promise<{ ok: true; count: number } | { ok: false; error: string }> {
+    const session = await auth();
+    requireCreditLimitManager(session?.user);
+
+    if (!updates.length) return { ok: true, count: 0 };
+
+    try {
+        const parsed = updates.map((u) => {
+            const rawGrade = (u.creditGrade || 'B').toUpperCase();
+            return {
+                customerId: u.customerId,
+                creditLimit: amountFromForm(u.creditLimit, '여신한도'),
+                creditGrade: ['A', 'B', 'C'].includes(rawGrade) ? rawGrade : 'B',
+                creditInsuranceAmount: amountFromForm(u.creditInsuranceAmount, '매출채권보험'),
+                mortgageAmount: amountFromForm(u.mortgageAmount, '근저당설정'),
+            };
+        });
+
+        await prisma.$transaction(
+            parsed.map((u) =>
+                prisma.customer.update({
+                    where: { id: u.customerId },
+                    data: {
+                        creditLimit: u.creditLimit,
+                        creditGrade: u.creditGrade,
+                        creditInsuranceAmount: u.creditInsuranceAmount,
+                        mortgageAmount: u.mortgageAmount,
+                    },
+                }),
+            ),
+        );
+
+        revalidatePath('/admin/credit-limits');
+        return { ok: true, count: parsed.length };
+    } catch (e) {
+        return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    }
+}
+
 export async function applyCalculatedCreditLimits(formData: FormData) {
     const session = await auth();
     requireCreditLimitManager(session?.user);

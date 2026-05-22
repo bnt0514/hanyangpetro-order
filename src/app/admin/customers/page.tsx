@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Building2, Plus, BookOpen } from 'lucide-react';
+import { deactivateCustomer } from './actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,7 +44,7 @@ export default async function CustomersPage({
                         href="/admin/customers/new"
                         className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
                     >
-                        <Plus size={16} /> 신규 등록
+                        <Plus size={16} /> 신규거래처 등록
                     </Link>
                     <Link
                         href="/admin/customers/import"
@@ -58,9 +59,13 @@ export default async function CustomersPage({
                 <div className="flex items-end justify-between gap-3 flex-wrap">
                     <div>
                         <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                            <Building2 size={24} /> 업체 관리
+                            <Building2 size={24} /> 거래처등록 및 수정
                         </h1>
-                        <p className="mt-1 text-sm text-slate-500">업체 정보와 등록된 도착지를 수정합니다.</p>
+                        <p className="mt-1 text-sm text-slate-500">전체 거래처를 확인·수정·삭제하고 신규 거래처를 등록합니다.</p>
+                    </div>
+                    <div className="flex rounded-xl border border-slate-200 bg-white p-1 text-sm font-semibold">
+                        <Link href="/admin/customers" className="rounded-lg bg-slate-900 px-4 py-2 text-white">전체 거래처/수정</Link>
+                        <Link href="/admin/customers/new" className="rounded-lg px-4 py-2 text-slate-600 hover:bg-slate-50">신규거래처 등록</Link>
                     </div>
                     <form className="flex items-center gap-2">
                         <input
@@ -114,6 +119,10 @@ export default async function CustomersPage({
                                         >
                                             수정
                                         </Link>
+                                        <form action={deactivateCustomer} className="inline">
+                                            <input type="hidden" name="customerId" value={customer.id} />
+                                            <button className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50">삭제</button>
+                                        </form>
                                     </td>
                                 </tr>
                             ))}

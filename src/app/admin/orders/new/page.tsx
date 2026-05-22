@@ -26,10 +26,11 @@ export default async function StaffNewOrderPage() {
             addressLine1: true,
             addressLine2: true,
             contactPhone: true,
+            isDefault: true,
             customerId: true,
             customer: { select: { companyName: true, customerCode: true } },
         },
-        orderBy: [{ label: 'asc' }, { customer: { companyName: 'asc' } }],
+        orderBy: [{ customer: { companyName: 'asc' } }, { isDefault: 'desc' }, { label: 'asc' }],
     });
 
     const customerOptions = customers.map((c) => ({
@@ -48,6 +49,7 @@ export default async function StaffNewOrderPage() {
         addressLine1: address.addressLine1,
         addressLine2: address.addressLine2,
         contactPhone: address.contactPhone,
+        isDefault: address.isDefault,
     }));
 
     const customersWithAddress = new Set(deliveryAddresses.map((address) => address.customerId));
@@ -63,6 +65,20 @@ export default async function StaffNewOrderPage() {
         }));
 
     const allAddressOptions = [...addressOptions, ...autoAddressOptions];
+
+    const isYangHuiCheol = session.user.name === '양희철';
+    const hanyangEntity = await prisma.companyEntity.findFirst({
+        where: {
+            isActive: true,
+            OR: [
+                { code: 'HANYANG_PETRO' },
+                { displayName: '한양유화' },
+                { legalName: { contains: '한양유화' } },
+            ],
+        },
+        select: { id: true },
+    });
+    const defaultEntityId = hanyangEntity?.id ?? null;
 
     return (
         <div className="min-h-screen">
@@ -88,10 +104,10 @@ export default async function StaffNewOrderPage() {
                 </p>
 
                 <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <OrderForm mode="staff" customerOptions={customerOptions} allAddressOptions={allAddressOptions} />
+                    <OrderForm mode="staff" customerOptions={customerOptions} allAddressOptions={allAddressOptions} isYangHuiCheol={isYangHuiCheol} defaultSalesEntityId={defaultEntityId} defaultPurchaseEntityId={defaultEntityId} />
                 </div>
             </main>
-            <BackButton />
+
         </div>
     );
 }

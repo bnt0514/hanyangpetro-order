@@ -68,6 +68,33 @@ function isHanyangCustomerName(value: string | null | undefined) {
     return normalizeCompanyName(value) === '한양유화';
 }
 
+function normalizeProductKey(value: string | null | undefined) {
+    return (value ?? '')
+        .replace(/\s+/g, '')
+        .replace(/[()]/g, '')
+        .replace(/[<>]/g, '')
+        .trim()
+        .toUpperCase();
+}
+
+function uniqueKeys(keys: (string | null | undefined)[]) {
+    return Array.from(new Set(keys.filter((key): key is string => Boolean(key))));
+}
+
+function productLookupKeys(
+    product: { id?: string | null; productName?: string | null; productCode?: string | null } | null | undefined,
+    fallbackName?: string | null,
+) {
+    const productName = product?.productName || fallbackName || '';
+    const normalizedName = normalizeProductKey(productName);
+    const normalizedCode = normalizeProductKey(product?.productCode);
+    return uniqueKeys([
+        product?.id ? `id:${product.id}` : null,
+        normalizedName ? `name:${normalizedName}` : null,
+        normalizedCode ? `code:${normalizedCode}` : null,
+    ]);
+}
+
 function emptyRow(key: string, label: string): ProfitReportRow {
     return {
         key,
@@ -142,7 +169,16 @@ export async function getProfitReport(options: {
         // also fetch ALL purchase entries independently for the unit rate map
         prisma.ledgerEntry.findMany({
             where: { transactionDate: { gte: from, lt: toExclusive }, ledgerType: 'PURCHASE' },
-            select: { transactionDate: true, productId: true, productName: true, quantity: true, supplyAmount: true, vatAmount: true, totalAmount: true },
+            select: {
+                transactionDate: true,
+                productId: true,
+                productName: true,
+                quantity: true,
+                supplyAmount: true,
+                vatAmount: true,
+                totalAmount: true,
+                product: { select: { id: true, productName: true, productCode: true } },
+            },
         }), prisma.orderItem.findMany({
             where: {
                 order: {
@@ -174,28 +210,39 @@ export async function getProfitReport(options: {
     const byRep = new Map<string, ProfitReportRow>();
     const repCustomers = new Map<string, ProfitReportRow>();
 
-    // Build monthly product purchase unit rate for proportional attribution
-    // key: "YYYY-MM:productKey" → { supply, vat, total, qty }
+    // Build monthly product purchase unit rate for rep/customer attribution.
+    // Purchases may be linked by productId or only by productName, so every entry is indexed by all stable keys.
     type RateEntry = { supply: number; vat: number; total: number; qty: number };
     const monthProductRate = new Map<string, RateEntry>();
     for (const e of purchaseLedgerEntries) {
-        const productKey = e.productId || `import:${e.productName}`;
-        const rateKey = `${monthKey(e.transactionDate)}:${productKey}`;
-        const r = monthProductRate.get(rateKey) ?? { supply: 0, vat: 0, total: 0, qty: 0 };
-        r.supply += e.supplyAmount ?? 0;
-        r.vat += e.vatAmount ?? 0;
-        r.total += amountTotal(e.supplyAmount, e.vatAmount, e.totalAmount);
-        r.qty += e.quantity ?? 0;
-        monthProductRate.set(rateKey, r);
+        const keys = productLookupKeys(e.product, e.productName);
+        for (const key of keys) {
+            const rateKey = `${monthKey(e.transactionDate)}:${key}`;
+            const r = monthProductRate.get(rateKey) ?? { supply: 0, vat: 0, total: 0, qty: 0 };
+            r.supply += e.supplyAmount ?? 0;
+            r.vat += e.vatAmount ?? 0;
+            r.total += amountTotal(e.supplyAmount, e.vatAmount, e.totalAmount);
+            r.qty += e.quantity ?? 0;
+            monthProductRate.set(rateKey, r);
+        }
     }
-    function getUnitPurchaseCost(date: Date, productKey: string, salesQty: number) {
-        const r = monthProductRate.get(`${monthKey(date)}:${productKey}`);
-        if (!r || r.qty === 0) return null;
+    function getUnitPurchaseCost(date: Date, keys: string[], salesQty: number) {
+        const candidates = keys
+            .map((key) => monthProductRate.get(`${monthKey(date)}:${key}`))
+            .filter((rate): rate is RateEntry => Boolean(rate && rate.qty > 0));
+        const r = candidates.sort((a, b) => b.qty - a.qty)[0];
+        if (!r) return null;
         const ratio = salesQty / r.qty;
         return { supply: r.supply * ratio, vat: r.vat * ratio, total: r.total * ratio };
     }
 
-    function addSales(date: Date, productKey: string, productLabel: string, customerId: string | null, customerLabel: string, repId: string | null, repName: string, quantity: number, supply: number, vat: number, total: number, explicitPurchaseCost?: { supply: number; vat: number; total: number } | null) {
+    function addPurchase(row: ProfitReportRow, supply: number, vat: number, total: number) {
+        row.purchaseSupply += supply;
+        row.purchaseVat += vat;
+        row.purchaseTotal += total;
+    }
+
+    function addSales(date: Date, productKey: string, productLabel: string, productKeys: string[], customerId: string | null, customerLabel: string, repId: string | null, repName: string, quantity: number, supply: number, vat: number, total: number, explicitPurchaseCost?: { supply: number; vat: number; total: number } | null) {
         const month = addToMap(monthly, monthKey(date), monthKey(date));
         const product = addToMap(byProduct, productKey, productLabel);
         const customer = addToMap(byCustomer, customerId || `customer:${customerLabel}`, customerLabel);
@@ -213,19 +260,19 @@ export async function getProfitReport(options: {
             row.salesTotal += total;
         }
 
-        const pc = explicitPurchaseCost ?? getUnitPurchaseCost(date, productKey, quantity);
+        const pc = explicitPurchaseCost ?? getUnitPurchaseCost(date, productKeys, quantity);
         if (pc) {
-            for (const row of [summary, month, product, customer, rep, repCustomer]) {
-                row.purchaseSupply += pc.supply;
-                row.purchaseVat += pc.vat;
-                row.purchaseTotal += pc.total;
-            }
+            const attributedRows = selectedRepId === 'all'
+                ? [customer, rep, repCustomer]
+                : [summary, month, product, customer, rep, repCustomer];
+            for (const row of attributedRows) addPurchase(row, pc.supply, pc.vat, pc.total);
         }
     }
 
     for (const entry of ledgerEntries) {
-        const productKey = entry.productId || `import:${entry.productName}`;
+        const productKey = entry.productId || `name:${normalizeProductKey(entry.productName)}`;
         const productLabel = entry.product?.productName || entry.productName || '미지정 품목';
+        const productKeys = productLookupKeys(entry.product, entry.productName);
         const quantity = entry.quantity || 0;
         const supply = entry.supplyAmount ?? 0;
         const vat = entry.vatAmount ?? 0;
@@ -239,6 +286,7 @@ export async function getProfitReport(options: {
                 entry.transactionDate,
                 productKey,
                 productLabel,
+                productKeys,
                 customer?.id ?? null,
                 customerLabel,
                 customer?.defaultSalesRepId ?? null,
@@ -258,10 +306,24 @@ export async function getProfitReport(options: {
         const purchaseSupply = item.purchaseUnitPrice == null ? 0 : quantity * item.purchaseUnitPrice;
         const productKey = item.productId;
         const productLabel = item.product.productName;
+        const productKeys = productLookupKeys(item.product, item.product.productName);
         const customer = item.order.customer;
         if (isHanyangCustomerName(customer.companyName)) continue;
         const explicitCost = purchaseSupply > 0 ? { supply: purchaseSupply, vat: 0, total: purchaseSupply } : null;
-        addSales(date, productKey, productLabel, customer.id, customer.companyName, customer.defaultSalesRepId, customer.defaultSalesRep?.name || '미지정', quantity, salesSupply, 0, salesSupply, explicitCost);
+        addSales(date, productKey, productLabel, productKeys, customer.id, customer.companyName, customer.defaultSalesRepId, customer.defaultSalesRep?.name || '미지정', quantity, salesSupply, 0, salesSupply, explicitCost);
+    }
+
+    if (selectedRepId === 'all') {
+        for (const entry of purchaseLedgerEntries) {
+            const productKey = entry.productId || `name:${normalizeProductKey(entry.productName)}`;
+            const productLabel = entry.product?.productName || entry.productName || '미지정 품목';
+            const month = addToMap(monthly, monthKey(entry.transactionDate), monthKey(entry.transactionDate));
+            const product = addToMap(byProduct, productKey, productLabel);
+            const supply = entry.supplyAmount ?? 0;
+            const vat = entry.vatAmount ?? 0;
+            const total = amountTotal(entry.supplyAmount, entry.vatAmount, entry.totalAmount);
+            for (const row of [summary, month, product]) addPurchase(row, supply, vat, total);
+        }
     }
 
     for (const receipt of receipts) {

@@ -50,10 +50,12 @@ export default function StatusActions({
     orderId,
     currentStatus,
     canStartHanwhaOrder = false,
+    hanwhaOrderedAt,
 }: {
     orderId: string;
     currentStatus: string;
     canStartHanwhaOrder?: boolean;
+    hanwhaOrderedAt?: Date | string | null;
 }) {
     const router = useRouter();
     const [pending, startTransition] = useTransition();
@@ -63,6 +65,10 @@ export default function StatusActions({
 
     const transitions = ALLOWED[currentStatus] ?? [];
     const showHanwhaOrderButton = canStartHanwhaOrder && currentStatus === 'APPROVED';
+    const hanwhaOrdered = !!hanwhaOrderedAt;
+    const hanwhaOrderedDateStr = hanwhaOrderedAt
+        ? new Date(hanwhaOrderedAt).toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+        : null;
 
     if (transitions.length === 0 && !showHanwhaOrderButton) {
         return (
@@ -73,6 +79,9 @@ export default function StatusActions({
     }
 
     function act(next: string) {
+        if (next === 'DISPATCH_WAITING' && !hanwhaOrdered) {
+            if (!window.confirm('한화오더가 완료되지 않았습니다.\n\n타사 오더인 경우, 혹은 이미 한화 오더가 완료된 경우라면 계속 진행하세요.')) return;
+        }
         const meta = META[next];
         let reason: string | null = null;
         if (meta?.needsReason) {
@@ -91,7 +100,13 @@ export default function StatusActions({
     }
 
     function startHanwhaOrder() {
-        if (!window.confirm('한화 H-CRM 브라우저를 열고 새 주문 화면까지 자동 진행할까요?')) return;
+        if (hanwhaOrdered) {
+            if (!window.confirm(
+                `이미 한화오더가 완료된 건입니다 (${hanwhaOrderedDateStr}).\n계속 진행 시 중복 오더가 될 수 있습니다.\n한화 오더 내역을 확인하신 후 진행하세요.\n\n계속 진행하시겠습니까?`
+            )) return;
+        } else {
+            if (!window.confirm('한화 H-CRM 브라우저를 열고 새 주문 화면까지 자동 진행할까요?')) return;
+        }
         setError(null);
         setMessage(null);
         startHanwhaTransition(async () => {
@@ -120,18 +135,20 @@ export default function StatusActions({
                     <span>{message}</span>
                 </div>
             )}
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 items-center">
                 {transitions.map((next) => {
                     const m = META[next];
                     if (!m) return null;
                     const Icon = m.icon;
+                    const isDispatchWaiting = next === 'DISPATCH_WAITING';
                     return (
                         <button
                             key={next}
                             type="button"
                             disabled={pending}
                             onClick={() => act(next)}
-                            className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-semibold shadow-sm transition disabled:opacity-60 disabled:cursor-not-allowed ${m.cls}`}
+                            title={isDispatchWaiting && !hanwhaOrdered ? '한화오더 미완료 — 확인 후 이동 가능' : undefined}
+                            className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-semibold shadow-sm transition disabled:opacity-60 disabled:cursor-not-allowed ${m.cls} ${isDispatchWaiting && !hanwhaOrdered ? 'opacity-60' : ''}`}
                         >
                             {pending ? <Loader2 size={16} className="animate-spin" /> : <Icon size={16} />}
                             {m.label}
@@ -139,17 +156,26 @@ export default function StatusActions({
                     );
                 })}
                 {showHanwhaOrderButton && (
-                    <button
-                        type="button"
-                        disabled={hanwhaPending}
-                        onClick={startHanwhaOrder}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-700 disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                        {hanwhaPending ? <Loader2 size={16} className="animate-spin" /> : <ExternalLink size={16} />}
-                        한화오더
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            disabled={hanwhaPending}
+                            onClick={startHanwhaOrder}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                            {hanwhaPending ? <Loader2 size={16} className="animate-spin" /> : <ExternalLink size={16} />}
+                            한화오더
+                        </button>
+                        {hanwhaOrdered && hanwhaOrderedDateStr && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+                                <CheckCircle2 size={12} />
+                                오더완료 {hanwhaOrderedDateStr}
+                            </span>
+                        )}
+                    </div>
                 )}
             </div>
         </section>
     );
 }
+

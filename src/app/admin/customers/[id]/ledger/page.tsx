@@ -2,16 +2,25 @@ import { auth } from '@/lib/auth';
 import { redirect, notFound } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, BookOpen } from 'lucide-react';
-import { prisma } from '@/lib/db';
 import { defaultLedgerRange, getCustomerLedger, type CompanyLedger, type ReceiptRow } from '@/lib/ledger';
 import { fmtDate, fmtNumber } from '@/lib/orders';
-import LedgerRowEditor from './LedgerRowEditor';
+import LedgerRangeForm from './LedgerRangeForm';
+import SalesLedgerDateEditor from './SalesLedgerDateEditor';
 
 export const dynamic = 'force-dynamic';
 
 function fmtMoney(value: number | null | undefined) {
     if (value == null) return '-';
     return `${value.toLocaleString('ko-KR')}원`;
+}
+
+function fmtAmount(value: number | null | undefined) {
+    if (value == null) return '-';
+    return value.toLocaleString('ko-KR');
+}
+
+function dateToInput(value: Date | null | undefined) {
+    return value ? value.toISOString().slice(0, 10) : '';
 }
 
 function deltaClass(value: number | null) {
@@ -25,13 +34,13 @@ function deltaText(value: number | null, suffix = '') {
     return `${value > 0 ? '▲' : '▼'} ${Math.abs(value).toLocaleString('ko-KR')}${suffix}`;
 }
 
-function LedgerTable({ ledger, canEdit, products }: { ledger: CompanyLedger; canEdit: boolean; products: { id: string; productName: string; productCode: string }[] }) {
+function LedgerTable({ ledger }: { ledger: CompanyLedger }) {
     return (
         <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
             <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-6 py-4">
                 <div>
                     <h2 className="text-lg font-semibold text-slate-800">{ledger.companyName} 거래처원장</h2>
-                    <p className="mt-1 text-xs text-slate-500">매출일자 기준 · 총 수량 {fmtNumber(ledger.totalQuantity)}TON · 총 금액 {fmtMoney(ledger.totalAmount)}</p>
+                    <p className="mt-1 text-xs text-slate-500">매출일자=원장 반영일 기준 · 변경 시 오더 도착일은 유지되고 이력에 기록됩니다.</p>
                 </div>
             </div>
             <div className="overflow-x-auto">
@@ -39,50 +48,55 @@ function LedgerTable({ ledger, canEdit, products }: { ledger: CompanyLedger; can
                     <thead>
                         <tr className="bg-slate-50 text-left text-xs font-medium text-slate-500 uppercase">
                             <th className="px-5 py-3">매출일자</th>
-                            <th className="px-5 py-3">오더</th>
+                            <th className="px-5 py-3">오더번호</th>
                             <th className="px-5 py-3">품목</th>
-                            <th className="px-5 py-3 text-right">수량</th>
-                            <th className="px-5 py-3 text-right">단가</th>
-                            <th className="px-5 py-3 text-right">금액</th>
-                            <th className="px-5 py-3">비고</th>
-                            {canEdit && <th className="px-5 py-3">양희철 수정</th>}
+                            <th className="px-5 py-3 text-right">수량(TON)</th>
+                            <th className="px-5 py-3 text-right">단가(원)</th>
+                            <th className="px-5 py-3 text-right">공급가액(원)</th>
+                            <th className="px-5 py-3 text-right">부가세(원)</th>
+                            <th className="px-5 py-3 text-right">합계(원)</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                        {ledger.rows.map((row) => (
-                            <tr key={row.itemId}>
-                                <td className="px-5 py-3 text-slate-600">{fmtDate(row.salesDate)}</td>
-                                <td className="px-5 py-3 font-mono text-xs">
-                                    {row.orderId ? (
-                                        <Link href={`/admin/orders/${row.orderId}`} className="text-blue-700">{row.orderNo}</Link>
-                                    ) : (
-                                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-500">{row.orderNo}</span>
-                                    )}
-                                </td>
-                                <td className="px-5 py-3 text-slate-700"><span className="font-medium">{row.productName}</span><span className="ml-2 text-xs text-slate-400 font-mono">{row.productCode}</span></td>
-                                <td className="px-5 py-3 text-right text-slate-700">{fmtNumber(row.quantity)} {row.unit}</td>
-                                <td className="px-5 py-3 text-right text-slate-700">{fmtMoney(row.unitPrice)}</td>
-                                <td className="px-5 py-3 text-right font-medium text-slate-800">{fmtMoney(row.amount)}</td>
-                                <td className="px-5 py-3 text-slate-500">{row.memo ?? '-'}</td>
-                                {canEdit && row.rowSource === 'ORDER' && (
-                                    <td className="px-5 py-3">
-                                        <LedgerRowEditor
-                                            itemId={row.itemId}
-                                            salesDate={row.salesDate ? fmtDate(row.salesDate) : ''}
-                                            productId={row.productId}
-                                            quantity={row.quantity}
-                                            unitPrice={row.unitPrice}
-                                            memo={row.memo}
-                                            products={products}
-                                        />
+                        {ledger.rows.map((row, index) => {
+                            const previous = ledger.rows[index - 1];
+                            const sameOrderAsPrevious = previous?.orderId && previous.orderId === row.orderId;
+                            return (
+                                <tr key={row.itemId} className="hover:bg-slate-50/70">
+                                    <td className="px-5 py-3 text-slate-600">
+                                        {sameOrderAsPrevious ? '' : (
+                                            <SalesLedgerDateEditor itemId={row.itemId} salesDate={dateToInput(row.salesDate)} />
+                                        )}
                                     </td>
-                                )}
-                                {canEdit && row.rowSource === 'IMPORT' && (
-                                    <td className="px-5 py-3 text-xs text-slate-400">이관자료</td>
-                                )}
-                            </tr>
-                        ))}
+                                    <td className="px-5 py-3 font-mono text-xs">
+                                        {row.orderId ? (
+                                            <Link href={`/admin/orders/${row.orderId}`} className="inline-flex rounded-full bg-blue-50 px-2.5 py-1 font-semibold text-blue-700 hover:bg-blue-100 hover:text-blue-900">
+                                                {row.orderNo}
+                                            </Link>
+                                        ) : (
+                                            <span className="text-slate-300">-</span>
+                                        )}
+                                    </td>
+                                    <td className="px-5 py-3 text-slate-700"><span className="font-medium">{row.productName}</span></td>
+                                    <td className="px-5 py-3 text-right text-slate-700">{fmtNumber(row.quantity)}</td>
+                                    <td className="px-5 py-3 text-right text-slate-700">{fmtAmount(row.unitPrice)}</td>
+                                    <td className="px-5 py-3 text-right font-medium text-slate-800">{fmtAmount(row.amount)}</td>
+                                    <td className="px-5 py-3 text-right text-slate-700">{fmtAmount(row.vatAmount)}</td>
+                                    <td className="px-5 py-3 text-right font-semibold text-slate-900">{fmtAmount(row.totalAmount)}</td>
+                                </tr>
+                            );
+                        })}
                     </tbody>
+                    <tfoot>
+                        <tr className="border-t border-slate-200 bg-slate-50 text-sm font-semibold text-slate-800">
+                            <td className="px-5 py-3" colSpan={3}>합계</td>
+                            <td className="px-5 py-3 text-right">{fmtNumber(ledger.totalQuantity)}</td>
+                            <td className="px-5 py-3 text-right text-slate-400">-</td>
+                            <td className="px-5 py-3 text-right">{fmtAmount(ledger.totalAmount)}</td>
+                            <td className="px-5 py-3 text-right">{fmtAmount(ledger.totalVatAmount)}</td>
+                            <td className="px-5 py-3 text-right">{fmtAmount(ledger.totalWithVat)}</td>
+                        </tr>
+                    </tfoot>
                 </table>
             </div>
             {ledger.comparisons.length > 0 && (
@@ -113,18 +127,11 @@ export default async function AdminCustomerLedgerPage({ params, searchParams }: 
     const ledger = await getCustomerLedger(id, sp.from || range.from, sp.to || range.to);
     if (!ledger) notFound();
 
-    const products = await prisma.product.findMany({
-        where: { isActive: true },
-        select: { id: true, productName: true, productCode: true },
-        orderBy: { productName: 'asc' },
-    });
-    const canEdit = session.user.name === '양희철';
-
     return (
         <div className="min-h-screen bg-slate-50">
             <header className="border-b border-slate-200 bg-white">
                 <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
-                    <Link href={`/admin/customers/${ledger.customerId}`} className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800"><ArrowLeft size={14} /> 거래처 상세</Link>
+                    <Link href="/admin/ledger?tab=customer" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800"><ArrowLeft size={14} /> 거래처원장 조회</Link>
                     <span className="text-sm text-slate-500">{session.user.name}</span>
                 </div>
             </header>
@@ -132,19 +139,26 @@ export default async function AdminCustomerLedgerPage({ params, searchParams }: 
                 <div className="flex items-start justify-between gap-4 flex-wrap">
                     <div>
                         <div className="flex items-center gap-2"><BookOpen className="text-blue-600" size={24} /><h1 className="text-2xl font-bold text-slate-800">{ledger.customerName} 거래처원장</h1></div>
-                        <p className="mt-1 text-sm text-slate-500">매출일자=도착일자 기준. 도착일 수정 시 원장도 즉시 바뀝니다.</p>
+                        <p className="mt-1 text-sm text-slate-500">매출일자는 기본적으로 도착일자를 따르며, 필요 시 원장에서 오더 단위로 별도 변경합니다.</p>
                     </div>
-                    <form className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white p-2 text-sm">
-                        <input type="date" name="from" defaultValue={ledger.from} className="rounded-lg border border-slate-200 px-2 py-1" />
-                        <span className="text-slate-400">~</span>
-                        <input type="date" name="to" defaultValue={ledger.to} className="rounded-lg border border-slate-200 px-2 py-1" />
-                        <button className="rounded-lg bg-slate-800 px-3 py-1.5 font-semibold text-white">조회</button>
-                    </form>
+                    <LedgerRangeForm from={ledger.from} to={ledger.to} />
                 </div>
+                <form action="/admin/ledger" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm flex flex-col gap-3 sm:flex-row sm:items-end">
+                    <input type="hidden" name="tab" value="customer" />
+                    <div className="flex-1">
+                        <label className="mb-1.5 block text-sm font-medium text-slate-700">다른 거래처 원장 조회</label>
+                        <input
+                            name="q"
+                            placeholder="매출처/거래처명을 입력하세요"
+                            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                        />
+                    </div>
+                    <button className="rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-800">조회</button>
+                </form>
                 {ledger.ledgers.length === 0 ? (
                     <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-400">조회 기간 내 매출 원장 항목이 없습니다.</div>
                 ) : ledger.ledgers.map((companyLedger) => (
-                    <LedgerTable key={companyLedger.companyEntityId} ledger={companyLedger} canEdit={canEdit} products={products} />
+                    <LedgerTable key={companyLedger.companyEntityId} ledger={companyLedger} />
                 ))}
 
                 {/* 수금 내역 */}
@@ -184,6 +198,7 @@ export default async function AdminCustomerLedgerPage({ params, searchParams }: 
                 {/* 미수금 잔액 */}
                 <section className="rounded-2xl border border-slate-200 bg-white shadow-sm px-6 py-5">
                     <h2 className="text-base font-semibold text-slate-700 mb-4">미수금 잔액 현황</h2>
+
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                         <div className="rounded-xl bg-slate-50 p-4">
                             <p className="text-xs text-slate-500">기초 미수금</p>
@@ -205,6 +220,11 @@ export default async function AdminCustomerLedgerPage({ params, searchParams }: 
                         </div>
                     </div>
                 </section>
+                <div className="flex justify-end">
+                    <Link href="/admin/ledger?tab=customer" className="inline-flex items-center gap-1.5 rounded-xl bg-slate-800 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-700">
+                        <ArrowLeft size={14} /> 거래처원장 조회로 돌아가기
+                    </Link>
+                </div>
             </main>
         </div>
     );

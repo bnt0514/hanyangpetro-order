@@ -257,6 +257,12 @@ export async function matchHanwhaDispatchRow(rowId: string, orderId: string) {
             error: `배차 수량이 오더 수량을 초과합니다. 오더 ${orderQuantityTon}TON / 기매칭 ${matchedQuantityTon}TON / 추가 ${nextDispatchQuantityTon}TON`,
         };
     }
+    const nextMatchedQuantityTon = matchedQuantityTon + Number(nextDispatchQuantityTon);
+    const nextStatus = nextMatchedQuantityTon + 0.0001 >= orderQuantityTon
+        ? OrderStatus.DISPATCH_COMPLETED
+        : order.status === OrderStatus.APPROVED
+            ? OrderStatus.DISPATCH_WAITING
+            : order.status;
 
     const now = new Date();
     await prisma.$transaction(async (tx) => {
@@ -287,22 +293,24 @@ export async function matchHanwhaDispatchRow(rowId: string, orderId: string) {
                 memo: `한화 배차 라인 매칭: ${row.indoChiName} / ${row.materialName ?? row.materialNameRaw ?? '-'}`,
             },
         });
-        if (!alreadyDispatched) {
+        if (!alreadyDispatched && nextStatus !== order.status) {
             await tx.order.update({
                 where: { id: orderId },
-                data: { status: OrderStatus.DISPATCH_COMPLETED },
+                data: { status: nextStatus },
             });
             await tx.orderStatusHistory.create({
                 data: {
                     orderId,
                     previousStatus: order.status,
-                    newStatus: OrderStatus.DISPATCH_COMPLETED,
+                    newStatus: nextStatus,
                     changedByUserId: session.user.id,
-                    changeReason: `한화 배차 조회 라인 매칭 (${row.indoChiName})`,
+                    changeReason: nextStatus === OrderStatus.DISPATCH_COMPLETED
+                        ? `한화 배차 조회 라인 매칭 완료 (${row.indoChiName})`
+                        : `한화 배차 조회 라인 부분 매칭 (${row.indoChiName})`,
                 },
             });
         } else {
-            // 추가 배차 라인 매칭 이력만 남김
+            // 상태 변경 없이 배차 라인 매칭 이력만 남김
             await tx.orderStatusHistory.create({
                 data: {
                     orderId,
@@ -340,6 +348,7 @@ export async function deleteHanwhaDispatchMatch(matchId: string) {
 
     const order = await prisma.order.findUnique({ where: { id: orderId }, select: { status: true, deletedAt: true } });
     if (!order || order.deletedAt) return { ok: false as const, error: '주문을 찾을 수 없습니다.' };
+    const deleteLabel = dispatch?.carrierName === '수기 배차' ? '수기 배차내역' : '한화 배차 매칭';
 
     await prisma.$transaction(async (tx) => {
         if (dispatch) {
@@ -365,7 +374,7 @@ export async function deleteHanwhaDispatchMatch(matchId: string) {
                 previousStatus: order.status,
                 newStatus: nextStatus,
                 changedByUserId: session.user.id,
-                changeReason: '[배차 매칭 삭제] 오매칭 정정으로 한화 배차 매칭을 삭제했습니다.',
+                changeReason: `[배차 삭제] ${deleteLabel}을 삭제했습니다.`,
             },
         });
         await syncOrderWarehouseStockMovements(tx, orderId);
@@ -373,6 +382,85 @@ export async function deleteHanwhaDispatchMatch(matchId: string) {
 
     revalidatePath('/admin');
     revalidatePath('/admin/dispatch');
+    revalidatePath(`/admin/orders/${orderId}`);
+    revalidatePath(`/portal/orders/${orderId}`);
+    return { ok: true as const };
+}
+
+export async function createManualDispatch(formData: FormData) {
+    const session = await auth();
+    if (!session?.user || session.user.userKind !== 'staff') {
+        return { ok: false as const, error: '직원만 수기 배차를 입력할 수 있습니다.' };
+    }
+
+    const orderId = String(formData.get('orderId') ?? '');
+    const materialName = String(formData.get('materialName') ?? '').trim();
+    const driverInfo = String(formData.get('driverInfo') ?? '').trim();
+    const quantityTon = Number(formData.get('quantityTon'));
+
+    if (!orderId) return { ok: false as const, error: '주문 정보가 없습니다.' };
+    if (!materialName) return { ok: false as const, error: '품목을 입력해주세요.' };
+    if (!Number.isFinite(quantityTon) || quantityTon <= 0) return { ok: false as const, error: '수량을 올바르게 입력해주세요.' };
+    if (!driverInfo) return { ok: false as const, error: '기사정보를 입력해주세요.' };
+
+    const order = await prisma.order.findUnique({
+        where: { id: orderId },
+        include: {
+            items: { select: { requestedQuantity: true } },
+            dispatches: { select: { hanwhaQuantityTon: true } },
+        },
+    });
+    if (!order || order.deletedAt) return { ok: false as const, error: '주문을 찾을 수 없습니다.' };
+
+    const dispatchableStatuses: string[] = [OrderStatus.APPROVED, OrderStatus.DISPATCH_WAITING, OrderStatus.DISPATCH_COMPLETED];
+    if (!dispatchableStatuses.includes(order.status)) {
+        return { ok: false as const, error: `현재 주문 상태(${order.status})에서는 배차를 입력할 수 없습니다.` };
+    }
+
+    const orderQuantityTon = order.items.reduce((sum, item) => sum + item.requestedQuantity, 0);
+    const alreadyDispatchedTon = order.dispatches.reduce((sum, dispatch) => sum + (dispatch.hanwhaQuantityTon ?? 0), 0);
+    if (alreadyDispatchedTon + quantityTon > orderQuantityTon + 0.0001) {
+        return { ok: false as const, error: `배차 수량이 주문 수량을 초과합니다. 주문 ${orderQuantityTon}TON / 기입력 ${alreadyDispatchedTon}TON / 추가 ${quantityTon}TON` };
+    }
+
+    const dispatchDate = order.requestedDeliveryDate ?? new Date();
+    const alreadyCompleted = order.status === OrderStatus.DISPATCH_COMPLETED;
+    const nextTotal = alreadyDispatchedTon + quantityTon;
+    const nextStatus = nextTotal + 0.0001 >= orderQuantityTon ? OrderStatus.DISPATCH_COMPLETED : order.status;
+
+    await prisma.$transaction(async (tx) => {
+        await tx.dispatch.create({
+            data: {
+                orderId,
+                dispatchStatus: 'DISPATCH_COMPLETED',
+                plannedDispatchDate: dispatchDate,
+                dispatchAttemptCount: 1,
+                carrierName: '수기 배차',
+                hanwhaMaterialNameRaw: materialName,
+                hanwhaMaterialName: materialName,
+                hanwhaQuantityTon: quantityTon,
+                hanwhaRawCells: JSON.stringify(['MANUAL', materialName, String(quantityTon), driverInfo]),
+                vehicleNumber: driverInfo,
+                shareWithCustomer: true,
+                memo: `[수기 배차] ${materialName} ${quantityTon}TON / ${driverInfo}`,
+            },
+        });
+        if (!alreadyCompleted && nextStatus !== order.status) {
+            await tx.order.update({ where: { id: orderId }, data: { status: nextStatus } });
+        }
+        await tx.orderStatusHistory.create({
+            data: {
+                orderId,
+                previousStatus: order.status,
+                newStatus: nextStatus,
+                changedByUserId: session.user.id,
+                changeReason: `[수기 배차 입력] ${materialName} ${quantityTon}TON`,
+            },
+        });
+        await syncOrderWarehouseStockMovements(tx, orderId);
+    });
+
+    revalidatePath('/admin');
     revalidatePath(`/admin/orders/${orderId}`);
     revalidatePath(`/portal/orders/${orderId}`);
     return { ok: true as const };

@@ -1,23 +1,21 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useRef, useEffect, useCallback } from 'react';
 import Image from 'next/image';
-import { Building2, UserRound, AlertCircle, LogIn } from 'lucide-react';
+import { Building2, UserRound, AlertCircle, LogIn, Search } from 'lucide-react';
 import { loginCustomer, loginStaff, type LoginResult } from './actions';
-import Combobox, { type ComboboxOption } from '@/components/Combobox';
+import HomeShortcutButton from './HomeShortcutButton';
 
 type Tab = 'customer' | 'staff';
 
-export default function LoginForm({ customers }: { customers: ComboboxOption[] }) {
+export default function LoginForm() {
     const [tab, setTab] = useState<Tab>('customer');
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
-    const [companyName, setCompanyName] = useState('');
 
     function submitCustomer(e: React.FormEvent<HTMLFormElement>) {
         e.preventDefault();
         const fd = new FormData(e.currentTarget);
-        fd.set('companyName', companyName);
         setError(null);
         startTransition(async () => {
             const result = await loginCustomer(fd);
@@ -87,18 +85,7 @@ export default function LoginForm({ customers }: { customers: ComboboxOption[] }
 
                     {tab === 'customer' ? (
                         <form onSubmit={submitCustomer} className="space-y-4">
-                            <div>
-                                <span className="block text-sm font-medium text-slate-700 mb-1.5">
-                                    회사명
-                                </span>
-                                <Combobox
-                                    options={customers}
-                                    value={companyName}
-                                    onChange={(v) => setCompanyName(v)}
-                                    placeholder="회사명 일부 입력 (대소문자 무관)"
-                                    required
-                                />
-                            </div>
+                            <CompanyNameField />
                             <Field
                                 label="비밀번호"
                                 name="businessNumber"
@@ -128,6 +115,8 @@ export default function LoginForm({ customers }: { customers: ComboboxOption[] }
                         </form>
                     )}
 
+                    <HomeShortcutButton />
+
                     <div className="mt-5 pt-5 border-t border-slate-100 text-center">
                         <a
                             href="https://hanyangpetro.com"
@@ -142,6 +131,90 @@ export default function LoginForm({ customers }: { customers: ComboboxOption[] }
             <p className="mt-6 text-center text-xs text-slate-400">
                 © {new Date().getFullYear()} Hanyang Petrochemical Co., Ltd.
             </p>
+        </div>
+    );
+}
+
+function CompanyNameField() {
+    const [query, setQuery] = useState('');
+    const [suggestions, setSuggestions] = useState<string[]>([]);
+    const [open, setOpen] = useState(false);
+    const [selected, setSelected] = useState('');
+    const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const wrapperRef = useRef<HTMLDivElement>(null);
+
+    const fetchSuggestions = useCallback(async (q: string) => {
+        if (q.length < 1) { setSuggestions([]); setOpen(false); return; }
+        try {
+            const res = await fetch(`/api/customers/search-public?q=${encodeURIComponent(q)}`);
+            const data: string[] = await res.json();
+            setSuggestions(data);
+            setOpen(data.length > 0);
+        } catch {
+            setSuggestions([]);
+        }
+    }, []);
+
+    function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+        const val = e.target.value;
+        setQuery(val);
+        setSelected('');
+        if (timerRef.current) clearTimeout(timerRef.current);
+        timerRef.current = setTimeout(() => fetchSuggestions(val), 250);
+    }
+
+    function handleSelect(name: string) {
+        setQuery(name);
+        setSelected(name);
+        setSuggestions([]);
+        setOpen(false);
+    }
+
+    useEffect(() => {
+        function handleClickOutside(e: MouseEvent) {
+            if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+                setOpen(false);
+            }
+        }
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    return (
+        <div ref={wrapperRef} className="relative">
+            <label className="block">
+                <span className="block text-sm font-medium text-slate-700 mb-1.5">회사명</span>
+                <div className="relative">
+                    <input
+                        name="companyName"
+                        type="text"
+                        value={query}
+                        onChange={handleChange}
+                        onFocus={() => { if (suggestions.length > 0) setOpen(true); }}
+                        placeholder="회사명 일부를 입력하면 목록이 나타납니다"
+                        autoComplete="off"
+                        required
+                        className="w-full rounded-lg border border-slate-300 bg-white pl-3.5 pr-9 py-2.5 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    />
+                    <Search size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                </div>
+            </label>
+            {open && (
+                <ul className="absolute z-50 mt-1 w-full rounded-lg border border-slate-200 bg-white shadow-lg text-sm max-h-48 overflow-y-auto">
+                    {suggestions.map((name) => (
+                        <li
+                            key={name}
+                            onMouseDown={() => handleSelect(name)}
+                            className="px-4 py-2.5 cursor-pointer hover:bg-blue-50 hover:text-blue-700"
+                        >
+                            {name}
+                        </li>
+                    ))}
+                </ul>
+            )}
+            {selected && (
+                <p className="mt-1 text-xs text-emerald-600">✓ 선택됨: {selected}</p>
+            )}
         </div>
     );
 }
@@ -162,8 +235,8 @@ function TabButton({
             type="button"
             onClick={onClick}
             className={`flex items-center justify-center gap-2 py-3.5 text-sm font-medium transition ${active
-                    ? 'bg-white text-blue-700 border-b-2 border-blue-600'
-                    : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
+                ? 'bg-white text-blue-700 border-b-2 border-blue-600'
+                : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
                 }`}
         >
             {icon}
