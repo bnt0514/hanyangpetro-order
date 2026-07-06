@@ -4,6 +4,7 @@ import { auth, signOut } from '@/lib/auth';
 import InternalWorkspaceShell from './InternalWorkspaceShell';
 import AdminNav from './AdminNav';
 import MobileDrawerNav from './MobileDrawerNav';
+import StaffViewModeToggle from './StaffViewModeToggle';
 import { canViewAllStaffData, isYangHeeCheol } from '@/lib/staff-permissions';
 import HomepageArchiveLink from '@/components/HomepageArchiveLink';
 
@@ -24,6 +25,9 @@ export default async function AdminLayout({
             storageKey={`hanyangpetro.internal-tabs.${session.user.id}`}
             rightSlot={(
                 <div className="ml-2 flex shrink-0 items-center gap-2">
+                    <span className="staff-mobile-toggle">
+                        <StaffViewModeToggle short />
+                    </span>
                     <HomepageArchiveLink />
                     <Link
                         href="/settings"
@@ -43,7 +47,7 @@ export default async function AdminLayout({
             )}
         >
             <div className="admin-shell-layout bg-[#fff7ed]">
-                <div className="md:hidden">
+                <div className="staff-mobile-view">
                     <MobileDrawerNav
                         isHanwhaManager={isHanwhaManager}
                         canManageCreditLimits={canManageCreditLimits}
@@ -51,7 +55,7 @@ export default async function AdminLayout({
                     />
                 </div>
                 <aside
-                    className="admin-shell-sidebar hidden border-r border-orange-100 bg-orange-50 px-5 py-5 md:block"
+                    className="admin-shell-sidebar staff-desktop-view border-r border-orange-100 bg-orange-50 px-5 py-5"
                 >
                     <AdminNav
                         isHanwhaManager={isHanwhaManager}

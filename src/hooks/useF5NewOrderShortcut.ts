@@ -13,7 +13,9 @@ export function useF5NewOrderShortcut() {
     useEffect(() => {
         function handleKeyDown(event: KeyboardEvent) {
             if (event.key !== 'F5' || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return;
-            if (!window.matchMedia('(min-width: 768px)').matches) return;
+            const staffView = document.documentElement.dataset.staffView;
+            const isMobileView = staffView === 'mobile' || (staffView !== 'desktop' && !window.matchMedia('(min-width: 768px)').matches);
+            if (isMobileView) return;
             event.preventDefault();
             router.push('/admin/orders/new');
         }
