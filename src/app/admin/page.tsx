@@ -228,7 +228,7 @@ export default async function AdminHome({
                         </div>
 
                         <div className="staff-mobile-view mb-4">
-                            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: '0.5rem' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: '0.75rem' }}>
                                 {quickActionCards.map(({ href, mobileLabel, subLabel, Icon, className, iconClassName }) => (
                                     <Link
                                         key={href}
@@ -236,11 +236,11 @@ export default async function AdminHome({
                                         className={`group rounded-lg border shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${className}`}
                                         style={{
                                             display: 'flex',
-                                            minHeight: '4.5rem',
+                                            minHeight: '5.75rem',
                                             alignItems: 'center',
                                             justifyContent: 'flex-start',
-                                            gap: '0.75rem',
-                                            padding: '0.75rem 0.875rem',
+                                            gap: '1rem',
+                                            padding: '1rem',
                                             textAlign: 'left',
                                         }}
                                     >
@@ -248,17 +248,17 @@ export default async function AdminHome({
                                             className={`shrink-0 rounded-lg shadow-sm ${iconClassName}`}
                                             style={{
                                                 display: 'flex',
-                                                height: '2.5rem',
-                                                width: '2.5rem',
+                                                height: '3rem',
+                                                width: '3rem',
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
                                             }}
                                         >
-                                            <Icon size={20} />
+                                            <Icon size={24} />
                                         </span>
                                         <span className="min-w-0 flex-1">
-                                            <span style={{ display: 'block', fontSize: '0.95rem', fontWeight: 900, lineHeight: 1.15 }}>{mobileLabel}</span>
-                                            <span style={{ display: 'block', marginTop: '0.1875rem', fontSize: '0.7rem', fontWeight: 600, lineHeight: 1.2, color: '#64748b' }}>{subLabel}</span>
+                                            <span style={{ display: 'block', fontSize: '1.1rem', fontWeight: 900, lineHeight: 1.15 }}>{mobileLabel}</span>
+                                            <span style={{ display: 'block', marginTop: '0.25rem', fontSize: '0.8rem', fontWeight: 700, lineHeight: 1.2, color: '#64748b' }}>{subLabel}</span>
                                         </span>
                                     </Link>
                                 ))}
