@@ -174,7 +174,11 @@ export default function StatusActions({
     }
 
     function startHanwhaOrder() {
-        const confirmed = window.confirm('한화오더를 진행할까요?');
+        const confirmed = window.confirm(
+            hanwhaOrdered
+                ? '이미 오더가 완료된 상태입니다. 재오더 하시겠습니까?'
+                : '한화오더를 진행할까요?',
+        );
         if (!confirmed) return;
 
         setError(null);
@@ -348,7 +352,7 @@ export default function StatusActions({
                         {hanwhaOrdered && hanwhaOrderedDateStr && (
                             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
                                 <CheckCircle2 size={12} />
-                                기존 오더완료 {hanwhaOrderedDateStr}
+                                한화 오더 완료 {hanwhaOrderedDateStr}
                             </span>
                         )}
                     </div>
