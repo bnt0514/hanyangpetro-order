@@ -46,16 +46,16 @@ export default async function AdminLayout({
                 </div>
             )}
         >
-            <div className="admin-shell-layout bg-[#fff7ed]">
-                <div className="staff-mobile-view">
-                    <MobileDrawerNav
-                        isHanwhaManager={isHanwhaManager}
-                        canManageCreditLimits={canManageCreditLimits}
-                        canViewAllStaffData={canViewAll}
-                    />
-                </div>
+            <div className="staff-mobile-view">
+                <MobileDrawerNav
+                    isHanwhaManager={isHanwhaManager}
+                    canManageCreditLimits={canManageCreditLimits}
+                    canViewAllStaffData={canViewAll}
+                />
+            </div>
+            <div className="admin-shell-layout grid h-[calc(100vh-3rem)] min-h-[calc(100vh-3rem)] grid-cols-[300px_minmax(0,1fr)] overflow-hidden bg-[#fff7ed]">
                 <aside
-                    className="admin-shell-sidebar staff-desktop-view border-r border-orange-100 bg-orange-50 px-5 py-5"
+                    className="admin-shell-sidebar staff-desktop-view h-[calc(100vh-3rem)] min-h-0 w-[300px] min-w-[300px] overflow-y-auto overscroll-contain border-r border-orange-100 bg-orange-50 px-5 py-5"
                 >
                     <AdminNav
                         isHanwhaManager={isHanwhaManager}
@@ -63,7 +63,7 @@ export default async function AdminLayout({
                         canViewAllStaffData={canViewAll}
                     />
                 </aside>
-                <main className="admin-shell-main">
+                <main className="admin-shell-main h-[calc(100vh-3rem)] min-h-[calc(100vh-3rem)] min-w-0 overflow-y-auto overscroll-contain">
                     {children}
                 </main>
             </div>

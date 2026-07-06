@@ -136,7 +136,7 @@ body {
   }
 
   html[data-staff-view='mobile'] .admin-shell-layout {
-    display: block;
+    display: block !important;
     height: auto;
     min-height: calc(100vh - 3rem);
     min-width: 0;
@@ -255,7 +255,7 @@ body {
 
 .staff-mobile-view,
 .staff-mobile-toggle {
-  display: none;
+  display: none !important;
 }
 
 .staff-desktop-view {
@@ -264,14 +264,14 @@ body {
 
 @media (max-width: 767px) {
   .staff-mobile-toggle {
-    display: flex;
+    display: flex !important;
   }
 
   html[data-staff-view='mobile'] .staff-mobile-view {
-    display: block;
+    display: block !important;
   }
 
   html[data-staff-view='mobile'] .staff-desktop-view {
-    display: none;
+    display: none !important;
   }
 }
