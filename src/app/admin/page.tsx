@@ -188,22 +188,22 @@ export default async function AdminHome({
     ];
 
     return (
-        <div className="admin-home-page bg-[#fff7ed]">
+        <div className="min-h-full bg-[#fff7ed] p-3 md:p-6">
             <div className="mx-auto max-w-5xl">
-                        <div className="admin-quick-actions">
+                        <div className="mb-5 grid grid-cols-2 gap-2 md:grid-cols-3 md:gap-3">
                             {quickActionCards.map(({ href, label, mobileLabel, subLabel, Icon, className, iconClassName, mobileHidden }) => (
                                 <Link
                                     key={href}
                                     href={href}
-                                    className={`admin-quick-card group flex min-h-24 items-center gap-4 rounded-lg border p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${mobileHidden ? 'admin-mobile-hidden' : ''} ${className}`}
+                                    className={`group min-h-16 items-center gap-2 rounded-lg border p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md md:min-h-24 md:gap-4 md:p-4 ${mobileHidden ? 'hidden md:flex' : 'flex'} ${className}`}
                                 >
-                                    <span className={`admin-quick-icon flex h-12 w-12 shrink-0 items-center justify-center rounded-lg shadow-sm ${iconClassName}`}>
-                                        <Icon />
+                                    <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg shadow-sm md:h-12 md:w-12 ${iconClassName}`}>
+                                        <Icon size={22} />
                                     </span>
                                     <span className="min-w-0 flex-1">
-                                        <span className="admin-quick-label-mobile text-sm font-black leading-tight">{mobileLabel ?? label}</span>
-                                        <span className="admin-quick-label-desktop block text-lg font-black leading-tight">{label}</span>
-                                        <span className="admin-quick-sub mt-1 block text-xs font-semibold text-slate-500">{subLabel}</span>
+                                        <span className="block text-sm font-black leading-tight md:hidden">{mobileLabel ?? label}</span>
+                                        <span className="hidden text-lg font-black leading-tight md:block">{label}</span>
+                                        <span className="mt-1 hidden text-xs font-semibold text-slate-500 md:block">{subLabel}</span>
                                     </span>
                                 </Link>
                             ))}

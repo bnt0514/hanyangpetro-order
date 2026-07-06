@@ -53,9 +53,26 @@ export default async function AdminLayout({
                     canViewAllStaffData={canViewAll}
                 />
             </div>
-            <div className="admin-shell-layout grid h-[calc(100vh-3rem)] min-h-[calc(100vh-3rem)] grid-cols-[300px_minmax(0,1fr)] overflow-hidden bg-[#fff7ed]">
+            <div
+                className="admin-shell-layout bg-[#fff7ed]"
+                style={{
+                    display: 'grid',
+                    gridTemplateColumns: '300px minmax(0, 1fr)',
+                    height: 'calc(100vh - 3rem)',
+                    minHeight: 'calc(100vh - 3rem)',
+                    overflow: 'hidden',
+                }}
+            >
                 <aside
-                    className="admin-shell-sidebar staff-desktop-view h-[calc(100vh-3rem)] min-h-0 w-[300px] min-w-[300px] overflow-y-auto overscroll-contain border-r border-orange-100 bg-orange-50 px-5 py-5"
+                    className="admin-shell-sidebar staff-desktop-view border-r border-orange-100 bg-orange-50 px-5 py-5"
+                    style={{
+                        height: 'calc(100vh - 3rem)',
+                        minHeight: 0,
+                        width: 300,
+                        minWidth: 300,
+                        overflowY: 'auto',
+                        overscrollBehavior: 'contain',
+                    }}
                 >
                     <AdminNav
                         isHanwhaManager={isHanwhaManager}
@@ -63,7 +80,16 @@ export default async function AdminLayout({
                         canViewAllStaffData={canViewAll}
                     />
                 </aside>
-                <main className="admin-shell-main h-[calc(100vh-3rem)] min-h-[calc(100vh-3rem)] min-w-0 overflow-y-auto overscroll-contain">
+                <main
+                    className="admin-shell-main"
+                    style={{
+                        height: 'calc(100vh - 3rem)',
+                        minHeight: 'calc(100vh - 3rem)',
+                        minWidth: 0,
+                        overflowY: 'auto',
+                        overscrollBehavior: 'contain',
+                    }}
+                >
                     {children}
                 </main>
             </div>
