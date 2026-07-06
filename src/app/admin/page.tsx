@@ -182,30 +182,88 @@ export default async function AdminHome({
         },
     ];
     const quickActionCards = [
-        { href: '/admin/orders/new', label: '오더 등록', subLabel: 'F5 · 신규 주문 입력', Icon: PlusCircle, className: 'border-orange-200 bg-white text-orange-900', iconClassName: 'bg-orange-500 text-white' },
-        { href: '/admin/dispatch', label: '배차 조회', subLabel: '한화 배차내역 확인', Icon: Truck, className: 'border-red-200 bg-white text-red-900', iconClassName: 'bg-red-500 text-white' },
-        { href: '/admin/customers', label: '거래처 관리', subLabel: '거래처/인도처 확인', Icon: Building2, className: 'border-amber-200 bg-white text-amber-900', iconClassName: 'bg-amber-500 text-white' },
+        { href: '/admin/orders/new', label: '오더 등록(F5)', mobileLabel: '오더 등록', subLabel: '신규 주문 입력', Icon: PlusCircle, className: 'border-orange-200 bg-white text-orange-900', iconClassName: 'bg-orange-500 text-white' },
+        { href: '/admin/dispatch', label: '배차 조회', mobileLabel: '배차 조회', subLabel: '한화 배차내역 확인', Icon: Truck, className: 'border-red-200 bg-white text-red-900', iconClassName: 'bg-red-500 text-white' },
+        { href: '/admin/customers', label: '거래처 관리', mobileLabel: '거래처 관리', subLabel: '거래처/인도처 확인', Icon: Building2, className: 'border-amber-200 bg-white text-amber-900', iconClassName: 'bg-amber-500 text-white' },
     ];
 
     return (
         <div className="min-h-full bg-[#fff7ed] p-3 md:p-6">
             <div className="mx-auto max-w-5xl">
-                        <div className="mb-5 grid grid-cols-3 gap-2 md:gap-3">
-                            {quickActionCards.map(({ href, label, subLabel, Icon, className, iconClassName }) => (
+                        <div className="staff-desktop-view mb-5">
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '0.75rem' }}>
+                                {quickActionCards.map(({ href, label, subLabel, Icon, className, iconClassName }) => (
+                                    <Link
+                                        key={href}
+                                        href={href}
+                                        className={`group rounded-lg border shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${className}`}
+                                        style={{
+                                            display: 'flex',
+                                            minHeight: '5rem',
+                                            alignItems: 'center',
+                                            gap: '1rem',
+                                            padding: '1rem',
+                                            textAlign: 'left',
+                                        }}
+                                    >
+                                        <span
+                                            className={`shrink-0 rounded-lg shadow-sm ${iconClassName}`}
+                                            style={{
+                                                display: 'flex',
+                                                height: '3rem',
+                                                width: '3rem',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                            }}
+                                        >
+                                            <Icon size={24} />
+                                        </span>
+                                        <span className="min-w-0 flex-1">
+                                            <span style={{ display: 'block', fontSize: '1.125rem', fontWeight: 900, lineHeight: 1.2 }}>{label}</span>
+                                            <span style={{ display: 'block', marginTop: '0.25rem', fontSize: '0.75rem', fontWeight: 600, lineHeight: 1.2, color: '#64748b' }}>{subLabel}</span>
+                                        </span>
+                                    </Link>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="staff-mobile-view mb-4">
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '0.5rem' }}>
+                            {quickActionCards.map(({ href, mobileLabel, subLabel, Icon, className, iconClassName }) => (
                                 <Link
                                     key={href}
                                     href={href}
-                                    className={`group flex min-h-20 flex-col items-center justify-center gap-1 rounded-lg border p-2 text-center shadow-sm transition hover:-translate-y-0.5 hover:shadow-md md:min-h-24 md:flex-row md:justify-start md:gap-4 md:p-4 md:text-left ${className}`}
+                                    className={`group rounded-lg border shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${className}`}
+                                    style={{
+                                        display: 'flex',
+                                        minHeight: '5rem',
+                                        flexDirection: 'column',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '0.25rem',
+                                        padding: '0.5rem',
+                                        textAlign: 'center',
+                                    }}
                                 >
-                                    <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg shadow-sm md:h-12 md:w-12 ${iconClassName}`}>
+                                    <span
+                                        className={`shrink-0 rounded-lg shadow-sm ${iconClassName}`}
+                                        style={{
+                                            display: 'flex',
+                                            height: '2.25rem',
+                                            width: '2.25rem',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                        }}
+                                    >
                                         <Icon size={20} />
                                     </span>
-                                    <span className="min-w-0 md:flex-1">
-                                        <span className="block text-xs font-black leading-tight md:text-lg">{label}</span>
-                                        <span className="mt-0.5 block text-[10px] font-semibold leading-tight text-slate-500 md:mt-1 md:text-xs">{subLabel}</span>
+                                    <span className="min-w-0">
+                                        <span style={{ display: 'block', fontSize: '0.75rem', fontWeight: 900, lineHeight: 1.15 }}>{mobileLabel}</span>
+                                        <span style={{ display: 'block', marginTop: '0.125rem', fontSize: '0.625rem', fontWeight: 600, lineHeight: 1.15, color: '#64748b' }}>{subLabel}</span>
                                     </span>
                                 </Link>
                             ))}
+                            </div>
                         </div>
 
                         <div className="overflow-hidden rounded-lg border border-orange-300 bg-orange-500 shadow-sm">
