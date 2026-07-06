@@ -26,25 +26,24 @@ body {
 }
 
 .admin-shell-layout {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
   height: calc(100vh - 3rem);
   min-height: calc(100vh - 3rem);
   overflow: hidden;
 }
 
 .admin-shell-sidebar {
-  position: fixed;
-  left: 0;
-  top: 3rem;
-  bottom: 0;
-  z-index: 30;
+  height: calc(100vh - 3rem);
+  min-height: 0;
   width: 300px;
+  min-width: 300px;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
 
 .admin-shell-main {
   height: calc(100vh - 3rem);
-  margin-left: 300px;
   min-height: calc(100vh - 3rem);
   min-width: 0;
   overflow-y: auto;
@@ -108,24 +107,23 @@ body {
 
 @media (min-width: 768px) {
   .admin-shell-layout {
+    display: grid;
+    grid-template-columns: 300px minmax(0, 1fr);
     height: calc(100vh - 3rem);
     overflow: hidden;
   }
 
   .admin-shell-sidebar {
-    position: fixed;
-    left: 0;
-    top: 3rem;
-    bottom: 0;
-    z-index: 30;
+    height: calc(100vh - 3rem);
+    min-height: 0;
     width: 300px;
+    min-width: 300px;
     overflow-y: auto;
     overscroll-behavior: contain;
   }
 
   .admin-shell-main {
     height: calc(100vh - 3rem);
-    margin-left: 300px;
     overflow-y: auto;
     overscroll-behavior: contain;
   }
@@ -133,10 +131,12 @@ body {
 
 @media (max-width: 767px) {
   html:not([data-staff-view='mobile']) .admin-shell-layout {
+    grid-template-columns: 300px minmax(800px, 1fr);
     min-width: 1100px;
   }
 
   html[data-staff-view='mobile'] .admin-shell-layout {
+    display: block;
     height: auto;
     min-height: calc(100vh - 3rem);
     min-width: 0;
@@ -149,7 +149,6 @@ body {
 
   html[data-staff-view='mobile'] .admin-shell-main {
     height: auto;
-    margin-left: 0;
     min-height: calc(100vh - 3rem);
     overflow: visible;
   }
@@ -194,6 +193,63 @@ body {
   html[data-staff-view='mobile'] .admin-quick-label-desktop,
   html[data-staff-view='mobile'] .admin-quick-sub {
     display: none;
+  }
+}
+
+.order-form-dialog {
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.order-form-dialog-panel {
+  width: min(100%, 24rem);
+  max-width: calc(100vw - 2rem);
+  transform: none;
+}
+
+.order-form-field,
+.order-form-field input,
+.order-form-field select,
+.order-form-field textarea,
+.order-form-field button {
+  color-scheme: light;
+}
+
+.order-form-field input,
+.order-form-field select,
+.order-form-field textarea {
+  background-color: #ffffff;
+  color: #0f172a;
+  -webkit-text-fill-color: #0f172a;
+}
+
+.order-form-field input::placeholder,
+.order-form-field textarea::placeholder {
+  color: #64748b;
+  -webkit-text-fill-color: #64748b;
+  opacity: 1;
+}
+
+@media (prefers-color-scheme: dark) {
+  .order-form-field label,
+  .order-form-field .order-form-label {
+    color: #0f172a;
+  }
+
+  .order-form-field input,
+  .order-form-field select,
+  .order-form-field textarea {
+    border-color: #94a3b8;
+    background-color: #ffffff;
+    color: #0f172a;
+    -webkit-text-fill-color: #0f172a;
+  }
+
+  .order-form-field input::placeholder,
+  .order-form-field textarea::placeholder {
+    color: #475569;
+    -webkit-text-fill-color: #475569;
   }
 }
 
