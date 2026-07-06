@@ -6,6 +6,8 @@ import { canManageHanwhaCredentials, getHanwhaPasswordMeta, getHanwhaUsername } 
 import { prisma } from '@/lib/db';
 import HanwhaCredentialClient from './HanwhaCredentialClient';
 import BackButton from '@/components/BackButton';
+import HomepageArchiveLink from '@/components/HomepageArchiveLink';
+import { isYangHeeCheol } from '@/lib/staff-permissions';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,10 +35,13 @@ export default async function HanwhaSettingsPage() {
         <div className="min-h-screen">
             <header className="bg-white border-b border-slate-200">
                 <div className="max-w-4xl mx-auto px-6 h-16 flex items-center justify-between">
-                    <Link href="/admin" className="flex items-center gap-2">
-                        <Image src="/hanyanglogo.png" alt="logo" width={32} height={32} className="h-8 w-auto" />
-                        <span className="font-bold text-slate-800">한양유화 e-Business OS</span>
-                    </Link>
+                    <div className="flex items-center gap-2">
+                        <Link href="/admin" className="flex items-center gap-2">
+                            <Image src="/hanyanglogo.png" alt="logo" width={32} height={32} className="h-8 w-auto" />
+                            <span className="font-bold text-slate-800">한양유화 e-Business OS</span>
+                        </Link>
+                        <HomepageArchiveLink />
+                    </div>
                     <div className="flex items-center gap-4 text-sm">
                         <span className="text-slate-600">
                             {session.user.name}{' '}
@@ -70,6 +75,7 @@ export default async function HanwhaSettingsPage() {
                     source={meta.source}
                     updatedAt={meta.updatedAt?.toISOString() ?? null}
                     updatedByName={lastUpdaterName}
+                    canRunKeepAlive={isYangHeeCheol(session.user)}
                 />
             </main>
         </div>

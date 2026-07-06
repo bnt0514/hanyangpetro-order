@@ -5,8 +5,10 @@ import { prisma } from '@/lib/db';
 import { extractHanwhaDriverFields } from '@/lib/hanwha-dispatch';
 import { isSameQuantity } from '@/lib/product-matching';
 import { revalidatePath } from 'next/cache';
+import { execFile } from 'node:child_process';
 import { scrapeHanwhaDispatch } from '@/lib/hanwha-scraper';
 import { syncOrderWarehouseStockMovements } from '@/lib/warehouse-stock-sync';
+import { isHanwhaAutomationBusy, runHanwhaAutomationQueued } from '@/lib/hanwha-automation-gate';
 import {
     canManageHanwhaCredentials,
     getHanwhaPassword,
@@ -107,8 +109,14 @@ export async function fetchHanwhaDispatch(
     const username = await getHanwhaUsername();
     const password = await getHanwhaPassword();
 
-    // 스크래핑 (시간 오래 걸림)
-    const result = await scrapeHanwhaDispatch(isoDate, { username, password });
+    // 스크래핑 (시간 오래 걸림). 배차조회는 같은 한화 화면을 공유하므로 기존 작업이 있으면 즉시 안내한다.
+    if (isHanwhaAutomationBusy()) {
+        return { ok: false, error: '이미 배차조회가 진행중입니다. 잠시 후 조회해주세요.', errorCode: 'BUSY' };
+    }
+    const result = await runHanwhaAutomationQueued(
+        `배차 조회 ${isoDate}`,
+        () => scrapeHanwhaDispatch(isoDate, { username, password }),
+    );
 
     if (!result.ok) {
         const friendly =
@@ -356,7 +364,7 @@ export async function deleteHanwhaDispatchMatch(matchId: string) {
         }
         const rowId = row?.id ?? dispatch?.hanwhaDispatchRowId;
         if (rowId) {
-            await tx.hanwhaDispatchRow.update({
+            await tx.hanwhaDispatchRow.updateMany({
                 where: { id: rowId },
                 data: { matchedOrderId: null, matchedAt: null, matchedByUserId: null },
             });
@@ -513,6 +521,40 @@ export async function confirmOrderReceipt(orderId: string, reason?: string) {
 export type CredentialUpdateResult =
     | { ok: true; message: string }
     | { ok: false; error: string };
+
+export async function runHanwhaKeepAliveOnce(): Promise<CredentialUpdateResult> {
+    const session = await auth();
+    if (!session?.user || session.user.userKind !== 'staff' || session.user.name !== '양희철') {
+        return { ok: false, error: '양희철만 한화 e-Sales 연결유지를 수동 실행할 수 있습니다.' };
+    }
+
+    return new Promise((resolve) => {
+        execFile(
+            process.execPath,
+            ['scripts/hanwha-esales-keepalive.cjs', '--once'],
+            {
+                cwd: process.cwd(),
+                windowsHide: true,
+                timeout: 120_000,
+            },
+            (error, stdout, stderr) => {
+                if (error) {
+                    resolve({
+                        ok: false,
+                        error: `한화 e-Sales 연결유지 실행 실패: ${stderr.trim() || error.message}`,
+                    });
+                    return;
+                }
+
+                const lastLine = stdout.trim().split(/\r?\n/).filter(Boolean).at(-1);
+                resolve({
+                    ok: true,
+                    message: lastLine || '한화 e-Sales 연결유지를 실행했습니다.',
+                });
+            },
+        );
+    });
+}
 
 /**
  * 한화 H-CRM 비밀번호 갱신.

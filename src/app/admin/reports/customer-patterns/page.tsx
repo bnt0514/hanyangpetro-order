@@ -4,6 +4,7 @@ import { ArrowLeft, Repeat } from 'lucide-react';
 import { auth } from '@/lib/auth';
 import { fmtNumber } from '@/lib/orders';
 import { getPerformanceReport, type PatternRow, type PerformanceSortDir, type PerformanceSortKey } from '@/lib/performance-report';
+import { canViewAllStaffData } from '@/lib/staff-permissions';
 import PerformanceRangeButtons from '../performance/PerformanceRangeButtons';
 
 export const dynamic = 'force-dynamic';
@@ -128,7 +129,7 @@ export default async function CustomerPatternsPage({ searchParams }: { searchPar
     const view = validView(sp.view);
     const sort = validSort(sp.sort);
     const dir = (sp.dir === 'asc' || (!sp.dir && sort === 'name') ? 'asc' : 'desc') as PerformanceSortDir;
-    const canViewAll = session.user.name === '양희철' || session.user.name === '차성식';
+    const canViewAll = canViewAllStaffData(session.user);
     const report = await getPerformanceReport({
         patternFrom: sp.patternFrom,
         patternTo: sp.patternTo,

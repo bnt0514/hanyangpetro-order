@@ -20,8 +20,9 @@ function normalizeCompanyName(value) {
         .trim();
 }
 
-function isHanyangCustomerName(value) {
-    return normalizeCompanyName(value) === '한양유화';
+function isWarehouseInboundCustomerName(value) {
+    const normalized = normalizeCompanyName(value);
+    return normalized === '한양유화' || normalized.includes('비엔티') || normalized.includes('BNT');
 }
 
 async function main() {
@@ -42,7 +43,7 @@ async function main() {
         const dispatchedQuantity = order.dispatches.reduce((sum, dispatch) => sum + (dispatch.hanwhaQuantityTon || 0), 0);
         if (order.dispatches.length > 0 && dispatchedQuantity + 0.0001 < orderQuantity) continue;
 
-        const internal = isHanyangCustomerName(order.customer.companyName);
+        const internal = isWarehouseInboundCustomerName(order.customer.companyName);
         for (const item of order.items) {
             if (item.fulfillmentType !== 'WAREHOUSE') continue;
             const companyEntityId = internal ? item.purchaseEntityId : item.salesEntityId;
@@ -57,8 +58,8 @@ async function main() {
                 movementType: internal ? 'IN' : 'OUT',
                 quantity: item.requestedQuantity,
                 unit: item.unit,
-                sourceType: 'ORDER_DISPATCH_COMPLETED',
-                memo: internal ? '한양유화 창고 입고 오더' : '창고 출고 오더',
+                sourceType: 'ORDER_WAREHOUSE_STOCK',
+                memo: internal ? '창고 입고 수량 반영' : '창고 출고 수량 반영',
             });
         }
     }
@@ -68,7 +69,7 @@ async function main() {
     if (!apply) return;
 
     await prisma.$transaction(async (tx) => {
-        await tx.warehouseStockMovement.deleteMany({ where: { sourceType: 'ORDER_DISPATCH_COMPLETED' } });
+        await tx.warehouseStockMovement.deleteMany({ where: { sourceType: { in: ['ORDER_DISPATCH_COMPLETED', 'ORDER_WAREHOUSE_STOCK'] } } });
         for (const row of rows) {
             await tx.warehouseStockMovement.create({ data: row });
             createCount += 1;

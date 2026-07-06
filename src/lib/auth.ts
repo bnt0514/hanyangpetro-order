@@ -13,6 +13,8 @@ import Credentials from 'next-auth/providers/credentials';
 import { prisma } from '@/lib/db';
 import { normalizeBusinessNumber, verifyPassword } from '@/lib/password';
 
+const AUTO_LOGIN_MAX_AGE = 90 * 24 * 60 * 60;
+
 declare module 'next-auth' {
     interface Session {
         user: {
@@ -27,7 +29,8 @@ declare module 'next-auth' {
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
     trustHost: true,
-    session: { strategy: 'jwt' },
+    secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+    session: { strategy: 'jwt', maxAge: AUTO_LOGIN_MAX_AGE },
     pages: {
         signIn: '/login',
         error: '/login',
@@ -39,10 +42,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             credentials: {
                 loginId: { label: '아이디(이름)', type: 'text' },
                 password: { label: 'Password', type: 'password' },
+                autoLogin: { label: '자동로그인', type: 'text' },
             },
             async authorize(creds) {
                 const loginId = String(creds?.loginId ?? '').trim();
                 const password = String(creds?.password ?? '');
+                const autoLogin = creds?.autoLogin === 'true';
                 if (!loginId || !password) return null;
 
                 // Allow lookup by loginId (Korean name) OR by email (legacy)
@@ -67,6 +72,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                     // these go into JWT via callbacks
                     userKind: 'staff' as const,
                     role: user.role,
+                    autoLogin,
                 } as never;
             },
         }),
@@ -75,11 +81,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             name: 'Customer',
             credentials: {
                 companyName: { label: '회사명', type: 'text' },
-                businessNumber: { label: '사업자등록번호', type: 'text' },
+                businessNumber: { label: '사업자번호(비밀번호)', type: 'text' },
+                autoLogin: { label: '자동로그인', type: 'text' },
             },
             async authorize(creds) {
                 const companyName = String(creds?.companyName ?? '').trim();
                 const rawBn = String(creds?.businessNumber ?? '');
+                const autoLogin = creds?.autoLogin === 'true';
                 if (!companyName || !rawBn) return null;
 
                 const bn = normalizeBusinessNumber(rawBn);
@@ -131,6 +139,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                     userKind: 'customer' as const,
                     customerId: customer.id,
                     customerName: customer.companyName,
+                    autoLogin,
                 } as never;
             },
         }),
@@ -145,12 +154,20 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                     role?: string;
                     customerId?: string;
                     customerName?: string;
+                    autoLogin?: boolean;
                 };
                 token.uid = u.id;
                 token.userKind = u.userKind;
                 token.role = u.role;
                 token.customerId = u.customerId;
                 token.customerName = u.customerName;
+                if (u.autoLogin) {
+                    token.autoLogin = true;
+                }
+            }
+            // autoLogin이면 매 요청마다 90일로 갱신 (쿠키+JWT 모두 유지)
+            if (token.autoLogin) {
+                token.exp = Math.floor(Date.now() / 1000) + AUTO_LOGIN_MAX_AGE;
             }
             return token;
         },

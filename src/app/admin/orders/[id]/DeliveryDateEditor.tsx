@@ -22,8 +22,13 @@ export default function DeliveryDateEditor({
 
     function submit() {
         setMessage(null);
+        const trimmedReason = reason.trim();
+        if (!trimmedReason) {
+            setMessage('도착일 수정 사유를 입력해 주세요.');
+            return;
+        }
         startTransition(async () => {
-            const result = await updateOrderDeliveryDate(orderId, date, reason);
+            const result = await updateOrderDeliveryDate(orderId, date, trimmedReason);
             if (!result.ok) {
                 setMessage(result.error);
                 return;
@@ -34,7 +39,7 @@ export default function DeliveryDateEditor({
         });
     }
 
-    useF8SaveShortcut(submit, { disabled: pending, scopeRef: editorRef });
+    useF8SaveShortcut(submit, { disabled: pending || !reason.trim(), scopeRef: editorRef });
 
     const dateInfo = getDateInfo(date);
 

@@ -31,7 +31,9 @@ export async function getWarehouseStock(companyEntityId: string) {
                 companyEntityId,
                 movementDate: { gt: snapshot.snapshotDate },
                 OR: [
-                    snapshot.productId ? { productId: snapshot.productId } : { productId: null, productName: snapshot.productName },
+                    ...(snapshot.productId ? [{ productId: snapshot.productId }] : []),
+                    ...(snapshot.productCode ? [{ productCode: snapshot.productCode }] : []),
+                    { productName: snapshot.productName },
                 ],
             },
         });

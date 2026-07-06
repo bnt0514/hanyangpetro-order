@@ -3,6 +3,7 @@
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { revalidatePath } from 'next/cache';
+import { isYangHeeCheol } from '@/lib/staff-permissions';
 
 export type LedgerUpdateResult = { ok: true } | { ok: false; error: string };
 
@@ -18,11 +19,19 @@ function parseOptionalPrice(value: number | null | undefined) {
 }
 
 function dateToIso(value: Date | null | undefined) {
-    return value ? value.toISOString().slice(0, 10) : '-';
+    if (!value) return '-';
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, '0');
+    const day = String(value.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
 }
 
 function appendAuditMemo(memo: string | null, line: string) {
     return [memo?.trim(), line].filter(Boolean).join('\n');
+}
+
+function canEditSalesLedgerDate(name: string | null | undefined) {
+    return isYangHeeCheol({ name });
 }
 
 export async function updateSalesLedgerDate(input: {
@@ -32,8 +41,8 @@ export async function updateSalesLedgerDate(input: {
 }): Promise<LedgerUpdateResult> {
     const session = await auth();
     if (!session?.user) return { ok: false, error: '로그인이 필요합니다.' };
-    if (session.user.userKind !== 'staff' || session.user.name !== '양희철') {
-        return { ok: false, error: '원장 수정은 양희철만 가능합니다.' };
+    if (session.user.userKind !== 'staff' || !canEditSalesLedgerDate(session.user.name)) {
+        return { ok: false, error: '매출일자 변경은 양희철만 가능합니다.' };
     }
 
     const salesDate = parseDateOnly(input.salesDate);
@@ -123,8 +132,8 @@ export async function updateLedgerOrderItem(input: {
 }): Promise<LedgerUpdateResult> {
     const session = await auth();
     if (!session?.user) return { ok: false, error: '로그인이 필요합니다.' };
-    if (session.user.userKind !== 'staff' || session.user.name !== '양희철') {
-        return { ok: false, error: '원장 수정은 양희철만 가능합니다.' };
+    if (session.user.userKind !== 'staff' || !canEditSalesLedgerDate(session.user.name)) {
+        return { ok: false, error: '원장 수정은 양희철, 차성식만 가능합니다.' };
     }
 
     const salesDate = parseDateOnly(input.salesDate);

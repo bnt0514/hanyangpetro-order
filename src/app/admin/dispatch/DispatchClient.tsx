@@ -19,7 +19,8 @@ import {
     refetchHanwhaDispatch,
     matchHanwhaDispatchRow,
 } from '@/app/dispatch/actions';
-import { hanwhaDriverInfo } from '@/lib/hanwha-dispatch';
+import DispatchKakaoNoticeButton from '@/components/DispatchKakaoNoticeButton';
+import { hanwhaDriverInfo, extractHanwhaDriverFields } from '@/lib/hanwha-dispatch';
 import { isSameQuantity, matchProductToMaterial } from '@/lib/product-matching';
 import { fmtDateTime, fmtNumber } from '@/lib/orders';
 
@@ -59,6 +60,7 @@ export interface MatchCandidateVM {
     customerCode: string;
     addressLabel: string;
     addressLine1: string;
+    addressLine2: string | null;
     requestedDeliveryDate: string | null;
     itemSummary: string;
     items: MatchCandidateItemVM[];
@@ -77,6 +79,10 @@ function normalizeCompanyMatchText(value: string) {
         .replace(/[()\[\]{}.,/\\_-]/g, '')
         .replace(/앤/g, '엔')
         .trim();
+}
+
+function isChemcoPrecisionSecondFactory(value: string) {
+    return normalizeCompanyMatchText(value).includes('켐코정밀2공장');
 }
 
 export default function DispatchClient({
@@ -113,7 +119,9 @@ export default function DispatchClient({
             }
             if ('cached' in r) {
                 setInfo(
-                    r.cached
+                    r.rowCount === 0
+                        ? '해당일자 배차내역이 없습니다.'
+                        : r.cached
                         ? `캐시에서 ${r.rowCount}건을 표시합니다. (재조회를 누르면 한화 사이트에서 새로 가져옵니다)`
                         : `한화 사이트에서 새로 가져온 ${r.rowCount}건을 저장했습니다.`,
                 );
@@ -146,6 +154,13 @@ export default function DispatchClient({
     }
 
     function autoMatch(line: DispatchRowVM) {
+        const driverFields = extractHanwhaDriverFields(line.rawCells);
+        const hasDriverInfo = Boolean(driverFields.vehicleNumber || driverFields.driverName || driverFields.driverPhone);
+        if (!hasDriverInfo) {
+            setError(`「${line.indoChiName} / ${line.materialName ?? line.materialNameRaw ?? '-'}」 기사정보가 없어 자동매칭할 수 없습니다. 배차조회 후 기사정보가 표시되면 다시 시도해주세요.`);
+            return;
+        }
+
         const keywords = line.indoChiName
             .split(/[\s,./()\[\]]/)
             .filter((w) => w.length >= 2)
@@ -204,7 +219,7 @@ export default function DispatchClient({
                         배차 조회
                     </button>
                     {initial && (
-                        <div className="ml-4 border-l border-slate-200 pl-4">
+                        <div className="ml-4 flex flex-wrap items-center gap-2 border-l border-slate-200 pl-4">
                             <button
                                 type="button"
                                 onClick={() => {
@@ -216,6 +231,9 @@ export default function DispatchClient({
                             >
                                 <RefreshCw size={14} /> 재조회
                             </button>
+                            <span className="max-w-md text-xs leading-relaxed text-amber-700">
+                                조회 결과가 실제 한화 화면과 다르거나 이전 날짜 내역처럼 보이면 재조회를 눌러 새로 가져오세요.
+                            </span>
                         </div>
                     )}
                 </div>
@@ -304,36 +322,70 @@ export default function DispatchClient({
                                                 <thead>
                                                     <tr className="bg-white text-left text-xs font-medium text-slate-500 uppercase">
                                                         <th className="px-4 py-2 w-10">#</th>
+                                                        <th className="px-4 py-2">인도처</th>
                                                         <th className="px-4 py-2">자재명</th>
-                                                        <th className="px-4 py-2">한양 표기</th>
                                                         <th className="px-4 py-2 text-right">수량(TON)</th>
                                                         <th className="px-4 py-2">기사정보</th>
                                                         <th className="px-4 py-2 min-w-80">주문 매칭</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-slate-100">
-                                                    {g.lines.map((l, i) => (
-                                                        <tr key={l.id} className="hover:bg-slate-50/60">
-                                                            <td className="px-4 py-2 text-xs text-slate-400">{i + 1}</td>
-                                                            <td className="px-4 py-2 text-xs font-mono text-slate-600">{l.materialNameRaw ?? '-'}</td>
-                                                            <td className="px-4 py-2 font-medium text-slate-800">{l.materialName ?? '-'}</td>
-                                                            <td className="px-4 py-2 text-right text-slate-700">{l.quantityKg != null ? fmtNumber(l.quantityKg) : '-'}</td>
-                                                            <td className="px-4 py-2 text-xs text-slate-400">{hanwhaDriverInfo(l.rawCells)}</td>
-                                                            <td className="px-4 py-2">
-                                                                <div className="space-y-1.5">
-                                                                    {l.matchedOrderId && (
-                                                                        <div className="text-xs text-emerald-700 font-semibold flex items-center gap-1">
-                                                                            <CheckCircle2 size={12} />
-                                                                            {matchCandidates.find((o) => o.id === l.matchedOrderId)?.orderNo ?? l.matchedOrderId}
-                                                                            <span className="ml-1 text-slate-400 font-normal">(추가 매칭 가능)</span>
-                                                                        </div>
-                                                                    )}
+                                                    {g.lines.map((l, i) => {
+                                                        const matchedOrder = l.matchedOrderId
+                                                            ? matchCandidates.find((o) => o.id === l.matchedOrderId)
+                                                            : null;
+                                                        const driverInfo = hanwhaDriverInfo(l.rawCells);
+                                                        const driverFields = extractHanwhaDriverFields(l.rawCells);
+                                                        const hasDriverInfo = Boolean(driverFields.vehicleNumber || driverFields.driverName || driverFields.driverPhone);
+                                                        return (
+                                                            <tr key={l.id} className="hover:bg-slate-50/60">
+                                                                <td className="px-4 py-2 text-xs text-slate-400">{i + 1}</td>
+                                                                <td className="px-4 py-2 font-medium text-slate-800">{l.indoChiName}</td>
+                                                                <td className="px-4 py-2 font-medium text-slate-800">{l.materialNameRaw ?? '-'}</td>
+                                                                <td className="px-4 py-2 text-right text-slate-700">{l.quantityKg != null ? fmtNumber(l.quantityKg) : '-'}</td>
+                                                                <td className="px-4 py-2 text-xs text-slate-400">{driverInfo}</td>
+                                                                <td className="px-4 py-2">
+                                                                    <div className="space-y-1.5">
+                                                                        {l.matchedOrderId && (
+                                                                            <div className="flex flex-wrap items-center gap-2">
+                                                                                <div className="text-xs text-emerald-700 font-semibold flex items-center gap-1">
+                                                                                    <CheckCircle2 size={12} />
+                                                                                    {matchedOrder?.orderNo ?? l.matchedOrderId}
+                                                                                    <span className="ml-1 text-slate-400 font-normal">(추가 매칭 가능)</span>
+                                                                                </div>
+                                                                            </div>
+                                                                        )}
+                                                                        {hasDriverInfo && (
+                                                                            <DispatchKakaoNoticeButton
+                                                                                rows={[{
+                                                                                    id: l.id,
+                                                                                    indoChiName: l.indoChiName,
+                                                                                    materialNameRaw: l.materialNameRaw,
+                                                                                    materialName: l.materialName,
+                                                                                    quantityTon: l.quantityKg,
+                                                                                    driverInfo,
+                                                                                }]}
+                                                                                title="배차내역"
+                                                                                context={matchedOrder ? {
+                                                                                    orderNo: matchedOrder.orderNo,
+                                                                                    customerName: matchedOrder.customerName,
+                                                                                    deliveryDate: matchedOrder.requestedDeliveryDate?.slice(0, 10) ?? '-',
+                                                                                    deliveryAddress: [matchedOrder.addressLabel, matchedOrder.addressLine1, matchedOrder.addressLine2].filter(Boolean).join(' '),
+                                                                                } : {
+                                                                                    orderNo: '',
+                                                                                    customerName: '',
+                                                                                    deliveryDate: date,
+                                                                                    deliveryAddress: l.indoChiName,
+                                                                                }}
+                                                                            />
+                                                                        )}
                                                                     <div className="flex items-center gap-2">
                                                                         <button
                                                                             type="button"
-                                                                            disabled={matchPending}
+                                                                            disabled={matchPending || !hasDriverInfo}
+                                                                            title={hasDriverInfo ? '자동 매칭' : '기사정보가 없어 자동매칭할 수 없습니다.'}
                                                                             onClick={() => autoMatch(l)}
-                                                                            className="rounded-lg bg-blue-500 hover:bg-blue-600 px-2.5 py-1.5 text-xs font-semibold text-white disabled:opacity-50 shrink-0"
+                                                                            className="rounded-lg bg-blue-500 hover:bg-blue-600 px-2.5 py-1.5 text-xs font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
                                                                         >
                                                                             자동
                                                                         </button>
@@ -346,23 +398,25 @@ export default function DispatchClient({
                                                                             <option value="">{l.matchedOrderId ? '추가 매칭할 주문 선택' : '수동 선택'}</option>
                                                                             {matchCandidates.map((o) => (
                                                                                 <option key={o.id} value={o.id}>
-                                                                                    {o.orderNo} · {o.customerName} · {o.addressLabel} · {o.itemSummary}
+                                                                                    {o.orderNo} · 도착 {o.requestedDeliveryDate?.slice(0, 10) ?? '-'} · {o.customerName} · {o.addressLabel} · {o.itemSummary}
                                                                                 </option>
                                                                             ))}
                                                                         </select>
                                                                         <button
                                                                             type="button"
                                                                             disabled={matchPending || !selectedOrders[l.id]}
+                                                                            title="매칭"
                                                                             onClick={() => match(l.id)}
-                                                                            className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 shrink-0"
+                                                                            className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
                                                                         >
                                                                             매칭
                                                                         </button>
                                                                     </div>
-                                                                </div>
-                                                            </td>
-                                                        </tr>
-                                                    ))}
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
                                                 </tbody>
                                             </table>
                                         </div>
@@ -388,7 +442,10 @@ function scoreAutoMatch(
     const normalizedIndoChiName = normalizeCompanyMatchText(line.indoChiName);
     const addressHits = keywords.filter((kw) => hay.includes(kw));
     const normalizedAddressHit = Boolean(normalizedIndoChiName) && normalizedHay.includes(normalizedIndoChiName);
-    if (addressHits.length === 0 && !normalizedAddressHit) return null;
+    const chemcoSecondFactoryNameHit =
+        isChemcoPrecisionSecondFactory(line.indoChiName) &&
+        isChemcoPrecisionSecondFactory([order.customerName, order.addressLabel].join(' '));
+    if (addressHits.length === 0 && !normalizedAddressHit && !chemcoSecondFactoryNameHit) return null;
 
     const materialExists = Boolean(line.materialName || line.materialNameRaw);
     const itemHits = order.items
@@ -423,16 +480,19 @@ function scoreAutoMatch(
 
     const deliveryDate = order.requestedDeliveryDate?.slice(0, 10) ?? null;
     const dateExact = deliveryDate === dispatchDate;
+    if (!dateExact) return null;
     const bestItem = itemHits[0];
-    const addressScore = Math.max(addressHits.length * 15, normalizedAddressHit ? 30 : 0);
-    const score = addressScore + (dateExact ? 35 : -30) + bestItem.score;
+    const addressScore = chemcoSecondFactoryNameHit
+        ? 80
+        : Math.max(addressHits.length * 15, normalizedAddressHit ? 30 : 0);
+    const score = addressScore + 35 + bestItem.score;
 
     if (score < 70) return null;
 
     return {
         order,
         score,
-        reason: `${dateExact ? '도착일 일치' : '도착일 불일치'}, ${bestItem.reason}`,
+        reason: `${chemcoSecondFactoryNameHit ? '켐코정밀 2공장 도착지명 일치, ' : ''}${dateExact ? '도착일 일치' : '도착일 불일치'}, ${bestItem.reason}`,
     };
 }
 

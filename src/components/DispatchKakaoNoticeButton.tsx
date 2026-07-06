@@ -6,10 +6,11 @@ import { fmtNumber } from '@/lib/orders';
 import type { DispatchNoticeContext, HanwhaDispatchDetailRow } from '@/components/HanwhaDispatchDetails';
 
 function rowLine(row: HanwhaDispatchDetailRow, index: number) {
+    const indoChi = row.indoChiName ?? '-';
     const material = row.materialName ?? row.materialNameRaw ?? '-';
     const quantity = row.quantityTon != null ? `${fmtNumber(row.quantityTon)}TON` : '-';
     const driver = row.driverInfo || '-';
-    return `${index + 1}. ${material} / ${quantity} / ${driver}`;
+    return `${index + 1}. ${indoChi} / ${material} / ${quantity} / ${driver}`;
 }
 
 export default function DispatchKakaoNoticeButton({
@@ -53,9 +54,9 @@ export default function DispatchKakaoNoticeButton({
                 type="button"
                 onClick={copyMessage}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-yellow-400 px-3 py-1.5 text-xs font-bold text-slate-900 hover:bg-yellow-300"
-                title="현재는 알림톡 발송 전 복사용이며, 추후 실제 발송 API로 연결할 수 있습니다"
+                title="배차내역을 복사합니다"
             >
-                <MessageCircle size={14} /> 알림톡 복사
+                <MessageCircle size={14} /> 배차내역 복사
             </button>
             {copied && <span className="text-xs font-medium text-emerald-700">복사됨</span>}
         </div>

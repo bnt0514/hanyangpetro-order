@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db';
+import { LEDGER_DISPATCH_COMPLETED_WHERE, ledgerPurchaseDate, ledgerSalesDate } from '@/lib/ledger-policy';
 import { productIdentityKey } from '@/lib/product-identity';
 
 export type PerformanceView =
@@ -232,10 +233,13 @@ async function fetchSalesFacts(from: Date, toInclusive: Date, salesRepId?: strin
     const [orderItems, importEntries] = await Promise.all([
         prisma.orderItem.findMany({
             where: {
+                OR: [
+                    { salesLedgerDate: { gte: from, lt: toExclusive } },
+                    { salesLedgerDate: null, order: { requestedDeliveryDate: { gte: from, lt: toExclusive } } },
+                ],
                 order: {
                     deletedAt: null,
-                    requestedDeliveryDate: { gte: from, lt: toExclusive },
-                    status: { notIn: ['CANCELLED', 'REJECTED'] },
+                    ...LEDGER_DISPATCH_COMPLETED_WHERE,
                     customer: customerRepFilter,
                 },
             },
@@ -265,7 +269,7 @@ async function fetchSalesFacts(from: Date, toInclusive: Date, salesRepId?: strin
         if (isHanyangCustomerName(customerName)) continue;
         const quantity = item.requestedQuantity ?? 0;
         facts.push({
-            date: item.order.requestedDeliveryDate ?? item.createdAt,
+            date: ledgerSalesDate(item) ?? item.createdAt,
             productKey: productIdentityKey(item.product.productName, item.product.productCode),
             productName: item.product.productName,
             customerKey: item.order.customer.id,
@@ -308,17 +312,30 @@ async function fetchPurchaseFacts(from: Date, toInclusive: Date, salesRepId?: st
         prisma.orderItem.findMany({
             where: {
                 purchaseUnitPrice: { not: null },
+                fulfillmentType: { not: 'WAREHOUSE' }, // 창고 출고는 매입 집계 제외
+                purchaseLedgerDate: { gte: from, lt: toExclusive },
                 order: {
                     deletedAt: null,
-                    requestedDeliveryDate: { gte: from, lt: toExclusive },
-                    status: { notIn: ['CANCELLED', 'REJECTED'] },
+                    ...LEDGER_DISPATCH_COMPLETED_WHERE,
                     customer: customerRepFilter,
                 },
             },
             include: {
                 product: { select: { id: true, productName: true, productCode: true } },
                 purchaseSupplier: { select: { id: true, supplierName: true } },
-                order: { select: { requestedDeliveryDate: true, createdAt: true } },
+                order: {
+                    select: {
+                        requestedDeliveryDate: true,
+                        createdAt: true,
+                        
+                        dispatches: {
+                            where: { dispatchStatus: 'DISPATCH_COMPLETED' },
+                            orderBy: { plannedDispatchDate: 'asc' },
+                            take: 1,
+                            select: { plannedDispatchDate: true },
+                        },
+                    },
+                },
             },
         }),
         prisma.ledgerEntry.findMany({
@@ -341,7 +358,7 @@ async function fetchPurchaseFacts(from: Date, toInclusive: Date, salesRepId?: st
         const supplierKey = item.purchaseSupplierId ?? `name:${normalizeKey(supplierName)}`;
         const quantity = item.requestedQuantity ?? 0;
         facts.push({
-            date: item.order.requestedDeliveryDate ?? item.order.createdAt,
+            date: ledgerPurchaseDate(item) ?? item.order.createdAt,
             productKey: productIdentityKey(item.product.productName, item.product.productCode),
             productName: item.product.productName,
             supplierKey,
@@ -602,3 +619,4 @@ export async function getPerformanceReport(options: {
         irregularPatterns: sortPatternRows(patternRows.filter((r) => r.patternStatus === 'IRREGULAR'), sort, dir),
     };
 }
+

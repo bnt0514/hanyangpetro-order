@@ -24,3 +24,43 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+.staff-mobile-view,
+.staff-mobile-toggle {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .staff-mobile-toggle {
+    display: block;
+  }
+
+  .staff-mobile-view {
+    display: block;
+  }
+
+  .staff-desktop-view {
+    display: none;
+  }
+
+  html[data-staff-view='desktop'] .staff-mobile-view {
+    display: none;
+  }
+
+  html[data-staff-view='desktop'] .staff-desktop-view {
+    display: block;
+    min-width: 0;
+  }
+
+  html[data-staff-view='desktop'] .staff-mobile-toggle {
+    display: flex;
+  }
+
+  html[data-staff-view='mobile'] .staff-mobile-view {
+    display: block;
+  }
+
+  html[data-staff-view='mobile'] .staff-desktop-view {
+    display: none;
+  }
+}

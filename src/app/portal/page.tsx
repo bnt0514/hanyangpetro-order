@@ -6,6 +6,7 @@ import { prisma } from '@/lib/db';
 import { statusLabel, statusColor, fmtDate, fmtDateTime, fmtNumber } from '@/lib/orders';
 import { Plus, Package, BookOpen, Truck, ClipboardList } from 'lucide-react';
 import BackButton from '@/components/BackButton';
+import HomepageArchiveLink from '@/components/HomepageArchiveLink';
 
 export const dynamic = 'force-dynamic';
 
@@ -54,10 +55,13 @@ export default async function PortalHome() {
         <div className="min-h-screen">
             <header className="bg-white border-b border-slate-200">
                 <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
-                    <Link href="/portal" className="flex items-center gap-2">
-                        <Image src="/hanyanglogo.png" alt="logo" width={32} height={32} className="h-8 w-auto" />
-                        <span className="text-sm font-bold text-slate-800 sm:text-base">한양유화&BNT 거래처 포털</span>
-                    </Link>
+                    <div className="flex items-center gap-2">
+                        <Link href="/portal" className="flex items-center gap-2">
+                            <Image src="/hanyanglogo.png" alt="logo" width={32} height={32} className="h-8 w-auto" />
+                            <span className="text-sm font-bold text-slate-800 sm:text-base">한양유화&BNT 거래처 포털</span>
+                        </Link>
+                        <HomepageArchiveLink />
+                    </div>
                     <div className="flex items-center gap-4 text-sm">
                         <span className="text-slate-600">
                             {session.user.customerName}{' '}

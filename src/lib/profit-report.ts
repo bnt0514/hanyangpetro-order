@@ -1,4 +1,5 @@
-﻿import { prisma } from '@/lib/db';
+import { prisma } from '@/lib/db';
+import { LEDGER_DISPATCH_COMPLETED_WHERE, ledgerPurchaseDate, ledgerSalesDate } from '@/lib/ledger-policy';
 
 export type ProfitSortKey = 'name' | 'quantity' | 'sales' | 'purchase' | 'profit' | 'receivable';
 export type ProfitSortDir = 'asc' | 'desc';
@@ -66,6 +67,12 @@ function normalizeCompanyName(value: string | null | undefined) {
 
 function isHanyangCustomerName(value: string | null | undefined) {
     return normalizeCompanyName(value) === '한양유화';
+}
+
+// 창고 입고 거래처: 한양유화, 비엔티 → 매입만 집계, 매출 제외
+function isWarehouseInboundCustomer(value: string | null | undefined) {
+    const n = normalizeCompanyName(value);
+    return n === '한양유화' || n.includes('비엔티') || n.includes('BNT');
 }
 
 function normalizeProductKey(value: string | null | undefined) {
@@ -181,16 +188,40 @@ export async function getProfitReport(options: {
             },
         }), prisma.orderItem.findMany({
             where: {
+                OR: [
+                    { salesLedgerDate: { gte: from, lt: toExclusive } },
+                    { salesLedgerDate: null, order: { requestedDeliveryDate: { gte: from, lt: toExclusive } } },
+                    { purchaseLedgerDate: { gte: from, lt: toExclusive } },
+                ],
                 order: {
                     deletedAt: null,
-                    requestedDeliveryDate: { gte: from, lt: toExclusive },
-                    status: { notIn: ['CANCELLED', 'REJECTED'] },
+                    ...LEDGER_DISPATCH_COMPLETED_WHERE,
                     customer: repWhere,
                 },
             },
-            include: {
+            select: {
+                id: true,
+                fulfillmentType: true,
+                requestedQuantity: true,
+                salesUnitPrice: true,
+                purchaseUnitPrice: true,
+                salesLedgerDate: true,
+                purchaseLedgerDate: true,
+                productId: true,
+                purchaseSupplierId: true,
                 product: { select: { id: true, productName: true, productCode: true } },
-                order: { include: { customer: { include: { defaultSalesRep: { select: { name: true } } } } } },
+                order: {
+                    include: {
+                        customer: { include: { defaultSalesRep: { select: { name: true } } } },
+                        
+                        dispatches: {
+                            where: { dispatchStatus: 'DISPATCH_COMPLETED' },
+                            orderBy: { plannedDispatchDate: 'asc' },
+                            take: 1,
+                            select: { plannedDispatchDate: true },
+                        },
+                    },
+                },
             },
         }),
         prisma.creditTransaction.findMany({
@@ -299,20 +330,44 @@ export async function getProfitReport(options: {
         }
     }
 
+    // 이미 LedgerEntry에 집계된 orderItem은 제외 (이중집계 방지)
+    const ledgerOrderItemIds = new Set(
+        ledgerEntries
+            .filter((e): e is typeof e & { orderItemId: string } => e.orderItemId != null)
+            .map((e) => e.orderItemId),
+    );
+
     for (const item of orderItems) {
-        const date = item.order.requestedDeliveryDate || item.createdAt;
+        if (ledgerOrderItemIds.has(item.id)) continue; // LedgerEntry에 이미 집계됨
+        const salesDate = new Date(ledgerSalesDate(item) ?? item.order.createdAt);
+        const purchaseDateRaw = ledgerPurchaseDate(item);
+        const purchaseDate = new Date(purchaseDateRaw ?? item.order.createdAt);
+        const date = salesDate; // addSales용 (매출일자)
         const quantity = item.requestedQuantity || 0;
-        const salesSupply = item.salesUnitPrice == null ? 0 : quantity * item.salesUnitPrice;
-        const purchaseSupply = item.purchaseUnitPrice == null ? 0 : quantity * item.purchaseUnitPrice;
+        const isWarehouse = item.fulfillmentType === 'WAREHOUSE';
+        const isInbound = isWarehouse && isWarehouseInboundCustomer(item.order.customer.companyName);
         const productKey = item.productId;
         const productLabel = item.product.productName;
         const productKeys = productLookupKeys(item.product, item.product.productName);
         const customer = item.order.customer;
-        if (isHanyangCustomerName(customer.companyName)) continue;
-        const explicitCost = purchaseSupply > 0 ? { supply: purchaseSupply, vat: 0, total: purchaseSupply } : null;
-        addSales(date, productKey, productLabel, productKeys, customer.id, customer.companyName, customer.defaultSalesRepId, customer.defaultSalesRep?.name || '미지정', quantity, salesSupply, 0, salesSupply, explicitCost);
+        if (isInbound) {
+            // 창고 입고(한양유화/비엔티 + WAREHOUSE): 매입만 집계 (단가 없어도 수량 집계)
+            const purchaseSupply = item.purchaseUnitPrice != null ? quantity * item.purchaseUnitPrice : 0;
+            if (quantity > 0) {
+                const month = addToMap(monthly, monthKey(purchaseDate), monthKey(purchaseDate));
+                const product = addToMap(byProduct, productKey, productLabel);
+                for (const row of [summary, month, product]) addPurchase(row, purchaseSupply, 0, purchaseSupply);
+            }
+        } else {
+            // 창고 출고 또는 일반 직납: 매출 집계 (단가 없어도 수량 집계)
+            if (isHanyangCustomerName(customer.companyName)) continue;
+            const salesSupply = item.salesUnitPrice == null ? 0 : quantity * item.salesUnitPrice;
+            const isWarehouseOutbound = isWarehouse && !isInbound;
+            const purchaseSupply = !isWarehouseOutbound && item.purchaseUnitPrice != null ? quantity * item.purchaseUnitPrice : 0;
+            const explicitCost = purchaseSupply > 0 ? { supply: purchaseSupply, vat: 0, total: purchaseSupply } : null;
+            addSales(date, productKey, productLabel, productKeys, customer.id, customer.companyName, customer.defaultSalesRepId, customer.defaultSalesRep?.name || '미지정', quantity, salesSupply, 0, salesSupply, explicitCost);
+        }
     }
-
     if (selectedRepId === 'all') {
         for (const entry of purchaseLedgerEntries) {
             const productKey = entry.productId || `name:${normalizeProductKey(entry.productName)}`;
@@ -363,5 +418,6 @@ export async function getProfitReport(options: {
         repCustomers: sortRows(Array.from(repCustomers.values()).filter((row) => row.salesTotal > 0), sort, dir),
     };
 }
+
 
 

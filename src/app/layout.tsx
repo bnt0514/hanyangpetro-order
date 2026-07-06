@@ -3,8 +3,8 @@ import './globals.css';
 import GlobalBackButton from '@/components/GlobalBackButton';
 
 export const metadata: Metadata = {
-  title: '한양유화 e-Business OS',
-  description: '주식회사 한양유화 주문 관제 시스템',
+  title: '한양유화 BNT OS',
+  description: '한양유화 BNT 주문 관제 시스템',
   icons: { icon: '/hanyanglogo.png', apple: '/hanyanglogo.png' },
   manifest: '/manifest.json',
 };

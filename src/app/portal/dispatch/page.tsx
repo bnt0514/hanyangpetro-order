@@ -4,18 +4,12 @@ import Link from 'next/link';
 import { prisma } from '@/lib/db';
 import { fmtDate, fmtNumber } from '@/lib/orders';
 import { ArrowLeft, Truck } from 'lucide-react';
+import PortalDispatchRangeForm from './PortalDispatchRangeForm';
 
 export const dynamic = 'force-dynamic';
 
 function isoDate(date: Date) {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-}
-
-function rangeShortcut(days: number) {
-    const to = new Date();
-    const from = new Date();
-    from.setDate(to.getDate() - (days - 1));
-    return { from: isoDate(from), to: isoDate(to) };
 }
 
 function driverText(dispatch: { vehicleNumber: string | null; driverName: string | null; driverPhone: string | null }) {
@@ -63,19 +57,7 @@ export default async function PortalDispatchPage({ searchParams }: { searchParam
                     <h1 className="text-xl font-bold text-slate-800 md:text-2xl">배차조회</h1>
                 </div>
 
-                <form className="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm">
-                    <div className="grid grid-cols-2 gap-2">
-                        <input type="date" name="from" defaultValue={from} className="rounded-xl border border-slate-300 px-3 py-2 text-sm" />
-                        <input type="date" name="to" defaultValue={to} className="rounded-xl border border-slate-300 px-3 py-2 text-sm" />
-                    </div>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                        <RangeButton label="당일" range={{ from: today, to: today }} />
-                        <RangeButton label="최근 1주일" range={rangeShortcut(7)} />
-                        <RangeButton label="최근 1개월" range={rangeShortcut(31)} />
-                        <RangeButton label="최근 3개월" range={rangeShortcut(93)} />
-                        <button className="rounded-full bg-slate-900 px-3 py-1.5 text-xs font-bold text-white">조회</button>
-                    </div>
-                </form>
+                <PortalDispatchRangeForm from={from} to={to} />
 
                 {dispatches.length === 0 ? (
                     <div className="rounded-3xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-400">
@@ -113,6 +95,3 @@ export default async function PortalDispatchPage({ searchParams }: { searchParam
     );
 }
 
-function RangeButton({ label, range }: { label: string; range: { from: string; to: string } }) {
-    return <Link href={`/portal/dispatch?from=${range.from}&to=${range.to}`} className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-600">{label}</Link>;
-}

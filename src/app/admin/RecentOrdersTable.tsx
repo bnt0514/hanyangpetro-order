@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { statusLabel, statusColor, fmtDate, fmtDateTime, fmtNumber } from '@/lib/orders';
 import DashboardNextActionButton from './DashboardNextActionButton';
@@ -12,9 +12,9 @@ export type RecentOrderRow = {
     id: string;
     orderNo: string;
     status: string;
-    createdAt: string; // ISO string
-    requestedDeliveryDate: string | null; // ISO string
-    customer: { companyName: string };
+    createdAt: string;
+    requestedDeliveryDate: string | null;
+    customer: { companyName: string; defaultSalesRepId?: string | null; defaultSalesRep?: { name: string } | null };
     deliveryAddress: { label: string };
     items: { id: string; product: { productName: string }; requestedQuantity: number; unit: string }[];
     requestedByUser: { name: string } | null;
@@ -24,6 +24,23 @@ export type RecentOrderRow = {
 
 function compareText(a: string, b: string) {
     return a.localeCompare(b, 'ko-KR', { numeric: true, sensitivity: 'base' });
+}
+
+function normalizeSearch(value: string | null | undefined) {
+    return (value ?? '').toLocaleLowerCase('ko-KR').replace(/\s+/g, '');
+}
+
+function orderSearchText(order: RecentOrderRow) {
+    return [
+        order.orderNo,
+        order.customer.companyName,
+        order.customer.defaultSalesRep?.name,
+        order.deliveryAddress.label,
+        order.requestedByUser?.name,
+        order.requestedByCustomerUser?.name,
+        statusLabel(order.status),
+        ...order.items.map((item) => item.product.productName),
+    ].map((value) => normalizeSearch(value)).join(' ');
 }
 
 function SortHeader({
@@ -56,24 +73,36 @@ export default function RecentOrdersTable({
     orders,
     initialSort,
     initialDir,
+    searchQuery = '',
 }: {
     orders: RecentOrderRow[];
     initialSort: RecentSort;
     initialDir: SortDir;
+    searchQuery?: string;
 }) {
     const [sort, setSort] = useState<RecentSort>(initialSort);
     const [dir, setDir] = useState<SortDir>(initialDir);
 
+    useEffect(() => {
+        setSort(initialSort);
+        setDir(initialDir);
+    }, [initialSort, initialDir]);
+
     function handleSort(key: RecentSort) {
         if (sort === key) {
-            setDir((d) => (d === 'asc' ? 'desc' : 'asc'));
-        } else {
-            setSort(key);
-            setDir('asc');
+            setDir((current) => (current === 'asc' ? 'desc' : 'asc'));
+            return;
         }
+        setSort(key);
+        setDir('asc');
     }
 
-    const sorted = [...orders].sort((a, b) => {
+    const normalizedQuery = normalizeSearch(searchQuery);
+    const filtered = normalizedQuery
+        ? orders.filter((order) => orderSearchText(order).includes(normalizedQuery))
+        : orders;
+
+    const sorted = [...filtered].sort((a, b) => {
         let result = 0;
         if (sort === 'createdAt') result = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
         if (sort === 'deliveryDate') result = (a.requestedDeliveryDate ? new Date(a.requestedDeliveryDate).getTime() : 0) - (b.requestedDeliveryDate ? new Date(b.requestedDeliveryDate).getTime() : 0);
@@ -107,63 +136,58 @@ export default function RecentOrdersTable({
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                    {sorted.map((o) => (
-                        <tr
-                            key={o.id}
-                            className="hover:bg-blue-50/40 cursor-pointer transition"
-                        >
+                    {sorted.map((order) => (
+                        <tr key={order.id} className="cursor-pointer transition hover:bg-blue-50/40">
                             <td className="px-6 py-3 font-mono text-xs text-slate-700">
-                                <Link href={`/admin/orders/${o.id}`} className="block">
-                                    {o.orderNo}
+                                <Link href={`/admin/orders/${order.id}`} className="block">
+                                    {order.orderNo}
                                 </Link>
                             </td>
                             <td className="px-6 py-3 font-medium text-slate-800">
-                                <Link href={`/admin/orders/${o.id}`} className="block">
-                                    {o.customer.companyName}
+                                <Link href={`/admin/orders/${order.id}`} className="block">
+                                    {order.customer.companyName}
                                 </Link>
                             </td>
                             <td className="px-6 py-3 text-slate-600">
-                                <Link href={`/admin/orders/${o.id}`} className="block">
-                                    {o.deliveryAddress.label}
+                                <Link href={`/admin/orders/${order.id}`} className="block">
+                                    {order.deliveryAddress.label}
                                 </Link>
                             </td>
                             <td className="px-6 py-3 text-slate-600">
-                                <Link href={`/admin/orders/${o.id}`} className="block">
-                                    {o.items.map((it) => (
-                                        <div key={it.id} className="text-xs">
-                                            {it.product.productName}{' '}
+                                <Link href={`/admin/orders/${order.id}`} className="block">
+                                    {order.items.map((item) => (
+                                        <div key={item.id} className="text-xs">
+                                            {item.product.productName}{' '}
                                             <span className="text-slate-400">
-                                                ({fmtNumber(it.requestedQuantity)}{it.unit})
+                                                ({fmtNumber(item.requestedQuantity)}{item.unit})
                                             </span>
                                         </div>
                                     ))}
                                 </Link>
                             </td>
                             <td className="px-6 py-3 text-slate-600">
-                                <Link href={`/admin/orders/${o.id}`} className="block">
-                                    {fmtDate(o.requestedDeliveryDate ? new Date(o.requestedDeliveryDate) : null)}
+                                <Link href={`/admin/orders/${order.id}`} className="block">
+                                    {fmtDate(order.requestedDeliveryDate ? new Date(order.requestedDeliveryDate) : null)}
                                 </Link>
                             </td>
                             <td className="px-6 py-3">
                                 <div className="flex items-center gap-2 whitespace-nowrap">
-                                    <span
-                                        className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${statusColor(o.status)}`}
-                                    >
-                                        {statusLabel(o.status)}
+                                    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${statusColor(order.status)}`}>
+                                        {statusLabel(order.status)}
                                     </span>
-                                    {o.deliveryDateChangeRequests?.[0] && (
-                                        <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${o.deliveryDateChangeRequests[0].status === 'PENDING' ? 'bg-amber-100 text-amber-800' : o.deliveryDateChangeRequests[0].status === 'APPROVED' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                                            ⚠ 도착일요청
+                                    {order.deliveryDateChangeRequests?.[0] && (
+                                        <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${order.deliveryDateChangeRequests[0].status === 'PENDING' ? 'bg-amber-100 text-amber-800' : order.deliveryDateChangeRequests[0].status === 'APPROVED' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                                            도착일요청
                                         </span>
                                     )}
-                                    <DashboardNextActionButton orderId={o.id} currentStatus={o.status} />
+                                    <DashboardNextActionButton orderId={order.id} currentStatus={order.status} />
                                 </div>
                             </td>
                             <td className="px-6 py-3 text-xs text-slate-500">
-                                {o.requestedByUser?.name ?? o.requestedByCustomerUser?.name ?? '-'}
+                                {order.requestedByUser?.name ?? order.requestedByCustomerUser?.name ?? '-'}
                             </td>
                             <td className="px-6 py-3 text-xs text-slate-500">
-                                {fmtDateTime(new Date(o.createdAt))}
+                                {fmtDateTime(new Date(order.createdAt))}
                             </td>
                         </tr>
                     ))}

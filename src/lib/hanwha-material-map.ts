@@ -32,7 +32,7 @@ const MATERIALS_BY_STANDARD_NAME: Record<string, string[]> = {
     'EVA<2040>': ['MF_EVA_2040_FB500_LD1', 'MF_EVA_2040_FFS_LD1'],
     'mLLDPE<M1810HA>': ['MF_LLD_M1810HA_FFS_LP1/LP 2', 'MF_LLD_M1810HA_FB700'],
     'mLLDPE<M3505EN>': ['MF_LLD_M3505EN_FFS_LP1/LP 2'],
-    'mLLDPE<M1605EN>': ['MF_LLD_M1605EN_FB700_LP2', 'MF_LLD_M1605EN_FFS'],
+    'mLLDPE<M1605EN>': ['MF_LLD_M1605EN_FB700_LP2', 'MF_LLD_M1605EN_SEW'],
     'LLDPE<V1408DN>': ['MF_LLD_V1408DN_FB500_LP2', 'MF_LLD_V1408DN_FFS_LP1/LP 2'],
     'EVA<2315>': ['MF_EVA_2315_FFS_LD1'],
     'mLLDPE<M1835HN>': ['MF_LLD_M1835HN_FFS_LP1/LP 2', 'MF_LLD_M1835HN_FB700'],
@@ -102,6 +102,10 @@ export function resolveHanwhaMaterialName(input: {
     const bagType = getBagToken(input.bagType);
     const mapped = findMappedHanwhaMaterials(input.productName);
     if (mapped.length > 0) {
+        if (bagType === 'FFS' && normalizeStandardName(input.productName) === normalizeStandardName('mLLDPE<M1605EN>')) {
+            const sewMaterial = mapped.find((material) => normalizeMaterial(material).includes('_SEW'));
+            if (sewMaterial) return sewMaterial;
+        }
         const exactBagMaterial = mapped.find((material) => materialBagRank(material, bagType) === 0);
         return exactBagMaterial ?? fallbackMaterialName(input.productName, bagType);
     }

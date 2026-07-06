@@ -4,6 +4,7 @@ import { notFound, redirect } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import CustomerEditor from './CustomerEditor';
+import { canViewAllStaffData } from '@/lib/staff-permissions';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,6 +35,7 @@ export default async function CustomerEditPage({
     ]);
 
     if (!customer) notFound();
+    if (!canViewAllStaffData(session.user) && customer.defaultSalesRepId !== session.user.id) notFound();
 
     return (
         <div className="min-h-screen bg-slate-50">

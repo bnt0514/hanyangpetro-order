@@ -19,8 +19,9 @@ function normalizeCompanyName(value: string | null | undefined) {
         .trim();
 }
 
-function isHanyangCustomerName(value: string | null | undefined) {
-    return normalizeCompanyName(value) === '한양유화';
+function isWarehouseInboundCustomerName(value: string | null | undefined) {
+    const normalized = normalizeCompanyName(value);
+    return normalized === '한양유화' || normalized.includes('비엔티') || normalized.includes('BNT');
 }
 
 export async function syncOrderWarehouseStockMovements(tx: Prisma.TransactionClient, orderId: string) {
@@ -51,13 +52,13 @@ export async function syncOrderWarehouseStockMovements(tx: Prisma.TransactionCli
     }
 
     if (order.deletedAt) return;
+    const internalPurchaseOnly = isWarehouseInboundCustomerName(order.customer.companyName);
     if (!STOCK_EFFECTIVE_STATUSES.has(order.status)) return;
 
     const orderQuantity = order.items.reduce((sum, item) => sum + item.requestedQuantity, 0);
     const dispatchedQuantity = order.dispatches.reduce((sum, dispatch) => sum + (dispatch.hanwhaQuantityTon ?? 0), 0);
     if (order.dispatches.length > 0 && dispatchedQuantity + 0.0001 < orderQuantity) return;
 
-    const internalPurchaseOnly = isHanyangCustomerName(order.customer.companyName);
     const movementDate = order.requestedDeliveryDate ?? new Date();
 
     for (const item of order.items) {
@@ -80,8 +81,8 @@ export async function syncOrderWarehouseStockMovements(tx: Prisma.TransactionCli
                 movementType: internalPurchaseOnly ? 'IN' : 'OUT',
                 quantity: item.requestedQuantity,
                 unit: item.unit,
-                sourceType: 'ORDER_DISPATCH_COMPLETED',
-                memo: internalPurchaseOnly ? '한양유화 창고 입고 오더' : '창고 출고 오더',
+                sourceType: 'ORDER_WAREHOUSE_STOCK',
+                memo: internalPurchaseOnly ? '창고 입고 수량 반영' : '창고 출고 수량 반영',
             },
         });
     }

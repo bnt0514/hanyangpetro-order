@@ -20,11 +20,11 @@ type NavGroup = {
 function AccordionGroup({ group, defaultOpen = false }: { group: NavGroup; defaultOpen?: boolean }) {
     const [open, setOpen] = useState(defaultOpen);
     return (
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             <button
                 type="button"
                 onClick={() => setOpen((v) => !v)}
-                className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-slate-50 transition"
+                className="flex w-full items-center justify-between px-5 py-4 text-left transition hover:bg-slate-50"
             >
                 <span className="flex items-center gap-2 font-semibold text-slate-700">
                     <span className="text-lg">{group.icon}</span>
@@ -36,7 +36,7 @@ function AccordionGroup({ group, defaultOpen = false }: { group: NavGroup; defau
                 />
             </button>
             {open && (
-                <div className="border-t border-slate-100 px-4 pb-4 pt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 gap-2 border-t border-slate-100 px-4 pb-4 pt-3">
                     {group.items.map((item) => (
                         <Link
                             key={item.href}
@@ -56,63 +56,83 @@ function AccordionGroup({ group, defaultOpen = false }: { group: NavGroup; defau
 export default function AdminNav({
     isHanwhaManager,
     canManageCreditLimits,
+    canViewAllStaffData,
 }: {
     isHanwhaManager: boolean;
     canManageCreditLimits: boolean;
+    canViewAllStaffData: boolean;
 }) {
     const groups: NavGroup[] = [
         {
             title: '주문 / 배차',
             icon: '📦',
             items: [
-                { href: '/admin/orders/new', label: '신규 주문 등록', icon: '➕', color: 'border-blue-200 bg-blue-50 text-blue-700' },
-                { href: '/admin/dispatch', label: '한화 배차 조회', icon: '🚚', color: 'border-cyan-200 bg-cyan-50 text-cyan-700' },
+                { href: '/admin/orders/new', label: '오더 등록', icon: '➕', color: 'border-blue-200 bg-blue-50 text-blue-700' },
+                { href: '/admin/orders/sheet-reconcile', label: '매입매출 오더 대조', icon: '↔', color: 'border-orange-200 bg-white text-orange-700' },
+                { href: '/admin/dispatch', label: '배차 조회', icon: '🚚', color: 'border-cyan-200 bg-cyan-50 text-cyan-700' },
+                ...(isHanwhaManager
+                    ? [{ href: '/admin/settings/hanwha', label: '한화 비번', icon: '🔑', color: 'border-orange-100 bg-white text-slate-700' }]
+                    : []),
                 { href: '/admin/orders/deleted', label: '삭제된 주문', icon: '🗑', color: 'border-slate-200 bg-slate-50 text-slate-500' },
             ],
         },
         {
-            title: '거래처 / 패턴 / 창고 / 품목',
-            icon: '🏢',
+            title: '거래처 / 여신',
+            icon: '🤝',
             items: [
-                { href: '/admin/customers', label: '거래처등록 및 수정', icon: '✏️', color: 'border-emerald-200 bg-emerald-50 text-emerald-700' },
-                { href: '/admin/ledger', label: '거래처원장 조회', icon: '📒', color: 'border-teal-200 bg-teal-50 text-teal-700' },
-                { href: '/admin/reports/customer-patterns', label: '거래처주문패턴', icon: '🔁', color: 'border-emerald-200 bg-emerald-50 text-emerald-700' },
-                { href: '/admin/warehouse', label: '창고 재고', icon: '🏭', color: 'border-blue-200 bg-blue-50 text-blue-700' },
-                { href: '/admin/products', label: '품목 추가 및 수정', icon: '🧾', color: 'border-indigo-200 bg-indigo-50 text-indigo-700' },
+                { href: '/admin/customers', label: '거래처 관리', icon: '🏢', color: 'border-emerald-200 bg-emerald-50 text-emerald-700' },
+                { href: '/admin/reports/customer-patterns', label: '거래처 패턴', icon: '🔁', color: 'border-emerald-200 bg-white text-emerald-700' },
+                ...(canViewAllStaffData
+                    ? [{ href: '/admin/credit-overrides', label: '여신 초과 승인', icon: '🛡', color: 'border-red-200 bg-red-50 text-red-600' }]
+                    : []),
+                ...(canManageCreditLimits
+                    ? [{ href: '/admin/credit-limits', label: '여신 한도 관리', icon: '🧮', color: 'border-amber-200 bg-amber-50 text-amber-700' }]
+                    : []),
             ],
         },
         {
-            title: '수익 / 매입매출 / 단가',
-            icon: '📈',
+            title: '원장 / 수금',
+            icon: '📒',
             items: [
-                { href: '/admin/reports/profit', label: '월별 수익/담당자', icon: '📊', color: 'border-purple-200 bg-purple-50 text-purple-700' },
-                { href: '/admin/reports/sales-daily', label: '매입매출조회', icon: '📅', color: 'border-orange-200 bg-orange-50 text-orange-700' },
-                { href: '/admin/reports/performance', label: '매입매출기간조회', icon: '📈', color: 'border-blue-200 bg-blue-50 text-blue-700' },
+                { href: '/admin/ledger', label: '원장 통합조회', icon: '📒', color: 'border-teal-200 bg-teal-50 text-teal-700' },
+                ...(canViewAllStaffData
+                    ? [
+                        { href: '/admin/finance-transactions', label: '입출금 등록', icon: '💳', color: 'border-emerald-200 bg-emerald-50 text-emerald-700' },
+                        { href: '/admin/collections', label: '수금 대조', icon: '₩', color: 'border-emerald-200 bg-white text-emerald-700' },
+                        { href: '/admin/ledger/manual-entry', label: '수기 원장 입력', icon: '✍️', color: 'border-amber-200 bg-amber-50 text-amber-700' },
+                    ]
+                    : []),
+            ],
+        },
+        {
+            title: '재고 / 품목 / 단가',
+            icon: '🏭',
+            items: [
+                { href: '/admin/warehouse', label: '창고 재고', icon: '🏭', color: 'border-blue-200 bg-blue-50 text-blue-700' },
+                { href: '/admin/products', label: '품목 관리', icon: '🧾', color: 'border-indigo-200 bg-indigo-50 text-indigo-700' },
                 ...(isHanwhaManager
                     ? [{ href: '/admin/prices', label: '단가 관리', icon: '💲', color: 'border-indigo-200 bg-indigo-50 text-indigo-700' }]
                     : []),
-                ...(isHanwhaManager
-                    ? [{ href: '/admin/settings/hanwha', label: '한화 비번 관리', icon: '🔑', color: 'border-slate-200 bg-slate-50 text-slate-600' }]
-                    : []),
             ],
         },
         {
-            title: '여신 / 신용관리',
-            icon: '🛡️',
+            title: '분석 / 리포트',
+            icon: '📈',
             items: [
-                { href: '/admin/credit-overrides', label: '여신 초과 승인', icon: '🛡', color: 'border-red-200 bg-red-50 text-red-600' },
-                ...(canManageCreditLimits
-                    ? [{ href: '/admin/credit-limits', label: '거래처별 여신관리', icon: '🧮', color: 'border-amber-200 bg-amber-50 text-amber-700' }]
+                { href: '/admin/reports/sales-daily', label: '매입매출 조회', icon: '📅', color: 'border-orange-200 bg-orange-50 text-orange-700' },
+                { href: '/admin/reports/performance', label: '기간별 매입매출', icon: '📈', color: 'border-blue-200 bg-blue-50 text-blue-700' },
+                ...(canViewAllStaffData
+                    ? [{ href: '/admin/reports/profit', label: '수익 분석', icon: '📊', color: 'border-purple-200 bg-purple-50 text-purple-700' }]
                     : []),
             ],
         },
     ];
 
     return (
-        <div className="mb-8 space-y-3">
+        <nav className="space-y-3">
             {groups.map((group, i) => (
                 <AccordionGroup key={group.title} group={group} defaultOpen={i === 0} />
             ))}
-        </div>
+        </nav>
     );
 }

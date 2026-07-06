@@ -1,6 +1,7 @@
 'use client';
 
 import { useTransition, useState } from 'react';
+import Link from 'next/link';
 import { CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { approveCreditOverride, rejectCreditOverride } from '@/app/admin/credit/actions';
 
@@ -63,7 +64,7 @@ export function OverrideRow({
         overAmount: number;
         createdAt: Date;
         requestedBy: { name: string } | null;
-        order: { orderNo: string; customer: { companyName: string } };
+        order: { id: string; orderNo: string; customer: { companyName: string } };
     };
     isExecutive: boolean;
 }) {
@@ -72,7 +73,12 @@ export function OverrideRow({
             <div className="flex items-start justify-between flex-wrap gap-2">
                 <div>
                     <p className="font-bold text-slate-800 text-lg">{override.order.customer.companyName}</p>
-                    <p className="text-xs font-mono text-slate-400">{override.order.orderNo}</p>
+                    <Link
+                        href={`/admin/orders/${override.order.id}`}
+                        className="text-xs font-mono font-semibold text-blue-600 underline-offset-2 hover:text-blue-800 hover:underline"
+                    >
+                        {override.order.orderNo}
+                    </Link>
                 </div>
                 <span
                     className={`text-xs px-2.5 py-1 rounded-full font-semibold ${override.status === 'PENDING'

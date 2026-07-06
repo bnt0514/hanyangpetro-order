@@ -49,6 +49,7 @@ export async function createProductAction(formData: FormData) {
             brand: text(formData, 'brand'),
             productGroup: text(formData, 'productGroup'),
             hanwhaMaterialName: text(formData, 'hanwhaMaterialName'),
+            hanwhaItemCode: text(formData, 'hanwhaItemCode'),
             isActive: true,
         },
     });
@@ -74,6 +75,7 @@ export async function updateProductAction(formData: FormData) {
             brand: text(formData, 'brand'),
             productGroup: text(formData, 'productGroup'),
             hanwhaMaterialName: text(formData, 'hanwhaMaterialName'),
+            hanwhaItemCode: text(formData, 'hanwhaItemCode'),
             isActive: formData.get('isActive') === 'on',
         },
     });

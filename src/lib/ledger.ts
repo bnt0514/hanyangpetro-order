@@ -1,4 +1,5 @@
-﻿import { prisma } from '@/lib/db';
+import { prisma } from '@/lib/db';
+import { LEDGER_DISPATCH_COMPLETED_WHERE, ledgerSalesDate } from '@/lib/ledger-policy';
 
 export type LedgerProductComparison = {
     productId: string;
@@ -13,7 +14,7 @@ export type LedgerProductComparison = {
 
 export type LedgerRow = {
     itemId: string;
-    rowSource: 'ORDER' | 'IMPORT';
+    rowSource: 'ORDER' | 'IMPORT' | 'MANUAL' | 'RECEIPT';
     orderId: string | null;
     orderNo: string;
     salesDate: Date | null;
@@ -27,6 +28,12 @@ export type LedgerRow = {
     vatAmount?: number | null;
     totalAmount?: number | null;
     memo: string | null;
+    receiptId?: string | null;
+    receiptType?: string | null;
+    noteNumber?: string | null;
+    noteMaturityDate?: Date | null;
+    noteIssuer?: string | null;
+    noteDescription?: string | null;
 };
 
 export type CompanyLedger = {
@@ -43,9 +50,14 @@ export type CompanyLedger = {
 export type ReceiptRow = {
     id: string;
     txDate: Date;
+    txType: string;
     amount: number;
     memo: string | null;
     source: string;
+    noteNumber: string | null;
+    noteMaturityDate: Date | null;
+    noteIssuer: string | null;
+    noteDescription: string | null;
 };
 
 export type CustomerLedgerResult = {
@@ -144,7 +156,7 @@ export async function getCustomerLedger(customerId: string, fromIso?: string, to
                 order: {
                     customerId,
                     deletedAt: null,
-                    status: { in: ['DISPATCH_COMPLETED', 'READY_TO_SHIP', 'SHIPPING', 'SHIPPED', 'DELIVERY_CONFIRM_PENDING', 'DELIVERY_CONFIRMED', 'DELIVERY_DISPUTED', 'ERP_INPUT_WAITING', 'ERP_INPUT_COMPLETED', 'INVOICE_WAITING', 'INVOICE_COMPLETED', 'COMPLETED'] },
+                    ...LEDGER_DISPATCH_COMPLETED_WHERE,
                 },
             },
             include: {
@@ -163,7 +175,7 @@ export async function getCustomerLedger(customerId: string, fromIso?: string, to
                 order: {
                     customerId,
                     deletedAt: null,
-                    status: { in: ['DISPATCH_COMPLETED', 'READY_TO_SHIP', 'SHIPPING', 'SHIPPED', 'DELIVERY_CONFIRM_PENDING', 'DELIVERY_CONFIRMED', 'DELIVERY_DISPUTED', 'ERP_INPUT_WAITING', 'ERP_INPUT_COMPLETED', 'INVOICE_WAITING', 'INVOICE_COMPLETED', 'COMPLETED'] },
+                    ...LEDGER_DISPATCH_COMPLETED_WHERE,
                 },
             },
             include: {
@@ -199,7 +211,7 @@ export async function getCustomerLedger(customerId: string, fromIso?: string, to
         }),
         // 기간 내 수금(입금)
         prisma.creditTransaction.findMany({
-            where: { customerId, txType: 'IN', txDate: { gte: from, lt: toExclusive } },
+            where: { customerId, txType: { in: ['IN', 'NOTE_IN'] }, txDate: { gte: from, lt: toExclusive } },
             orderBy: { txDate: 'asc' },
         }),
         // 기준일 이후 전체 매출 (미수금 잔액 계산용) - 오더 품목 기준
@@ -213,7 +225,7 @@ export async function getCustomerLedger(customerId: string, fromIso?: string, to
                     order: {
                         customerId,
                         deletedAt: null,
-                        status: { in: ['DISPATCH_COMPLETED', 'READY_TO_SHIP', 'SHIPPING', 'SHIPPED', 'DELIVERY_CONFIRM_PENDING', 'DELIVERY_CONFIRMED', 'DELIVERY_DISPUTED', 'ERP_INPUT_WAITING', 'ERP_INPUT_COMPLETED', 'INVOICE_WAITING', 'INVOICE_COMPLETED', 'COMPLETED'] },
+                        ...LEDGER_DISPATCH_COMPLETED_WHERE,
                     },
                     salesUnitPrice: { not: null },
                 },
@@ -234,7 +246,7 @@ export async function getCustomerLedger(customerId: string, fromIso?: string, to
         // 기준일 이후 전체 수금 (미수금 잔액 계산용)
         openingDate
             ? prisma.creditTransaction.aggregate({
-                where: { customerId, txType: 'IN', txDate: { gte: openingDate } },
+                where: { customerId, txType: { in: ['IN', 'NOTE_IN'] }, txDate: { gte: openingDate } },
                 _sum: { amount: true },
             })
             : Promise.resolve({ _sum: { amount: 0 } }),
@@ -287,7 +299,7 @@ export async function getCustomerLedger(customerId: string, fromIso?: string, to
     for (const item of currentItems) {
         const companyId = item.salesEntityId ?? 'UNASSIGNED';
         const companyName = item.salesEntity?.displayName ?? '미지정';
-        const salesDate = item.salesLedgerDate ?? item.order.requestedDeliveryDate;
+        const salesDate = ledgerSalesDate(item);
         const amount = item.salesUnitPrice == null ? null : item.requestedQuantity * item.salesUnitPrice;
         const vatAmount = amount == null ? null : Math.round(amount * 0.1);
         const totalAmount = amount == null ? null : amount + (vatAmount ?? 0);
@@ -320,7 +332,7 @@ export async function getCustomerLedger(customerId: string, fromIso?: string, to
     for (const entry of currentImports) {
         const matchedItem = currentItems.find((item) => {
             if (matchedOrderItemIds.has(item.id)) return false;
-            const itemSalesDate = item.salesLedgerDate ?? item.order.requestedDeliveryDate;
+            const itemSalesDate = ledgerSalesDate(item);
             const entryAmount = entry.supplyAmount ?? (entry.unitPrice == null ? null : entry.quantity * entry.unitPrice);
             const itemAmount = item.salesUnitPrice == null ? null : item.requestedQuantity * item.salesUnitPrice;
             const sameProduct = entry.productId
@@ -344,7 +356,7 @@ export async function getCustomerLedger(customerId: string, fromIso?: string, to
         const ledger = getLedger(companyId, companyName);
         ledger.rows.push({
             itemId: `ledger:${entry.id}`,
-            rowSource: 'IMPORT',
+            rowSource: entry.sourceType === 'MANUAL' ? 'MANUAL' : 'IMPORT',
             orderId: entry.order?.id ?? null,
             orderNo: entry.order?.orderNo ?? '',
             salesDate: entry.transactionDate,
@@ -366,9 +378,41 @@ export async function getCustomerLedger(customerId: string, fromIso?: string, to
         addCurrentAggregation(companyId, productId, entry.product?.productName ?? entry.productName, entry.quantity, amount);
     }
 
+    if (periodReceipts.length > 0) {
+        const receiptLedger = Array.from(ledgerMap.values())[0] ?? getLedger('UNASSIGNED', '미지정');
+        for (const receipt of periodReceipts) {
+            const isNote = receipt.txType === 'NOTE_IN';
+            receiptLedger.rows.push({
+                itemId: `receipt:${receipt.id}`,
+                rowSource: 'RECEIPT',
+                orderId: null,
+                orderNo: isNote ? '어음' : '입금',
+                salesDate: receipt.txDate,
+                productId: isNote ? 'RECEIPT:NOTE_IN' : 'RECEIPT:IN',
+                productName: isNote ? '어음수취' : '입금/송금',
+                productCode: '-',
+                quantity: 0,
+                unit: '',
+                unitPrice: null,
+                amount: -receipt.amount,
+                vatAmount: null,
+                totalAmount: -receipt.amount,
+                memo: receipt.memo,
+                receiptId: receipt.id,
+                receiptType: receipt.txType,
+                noteNumber: receipt.noteNumber,
+                noteMaturityDate: receipt.noteMaturityDate,
+                noteIssuer: receipt.noteIssuer,
+                noteDescription: receipt.noteDescription,
+            });
+            receiptLedger.totalAmount -= receipt.amount;
+            receiptLedger.totalWithVat -= receipt.amount;
+        }
+    }
+
     for (const ledger of ledgerMap.values()) {
         ledger.rows.sort((a, b) => (a.salesDate?.getTime() ?? 0) - (b.salesDate?.getTime() ?? 0) || a.orderNo.localeCompare(b.orderNo, 'ko') || a.productName.localeCompare(b.productName, 'ko'));
-        const productIds = Array.from(new Set(ledger.rows.map((row) => row.productId)));
+        const productIds = Array.from(new Set(ledger.rows.filter((row) => row.rowSource !== 'RECEIPT').map((row) => row.productId)));
         ledger.comparisons = productIds.map((productId) => {
             const current = currentByCompanyProduct.get(`${ledger.companyEntityId}:${productId}`) ?? { productName: '-', quantity: 0, amount: 0 };
             const previous = previousByCompanyProduct.get(`${ledger.companyEntityId}:${productId}`) ?? { quantity: 0, amount: 0 };
@@ -403,9 +447,14 @@ export async function getCustomerLedger(customerId: string, fromIso?: string, to
         receipts: periodReceipts.map(r => ({
             id: r.id,
             txDate: r.txDate,
+            txType: r.txType,
             amount: r.amount,
             memo: r.memo,
             source: r.source,
+            noteNumber: r.noteNumber,
+            noteMaturityDate: r.noteMaturityDate,
+            noteIssuer: r.noteIssuer,
+            noteDescription: r.noteDescription,
         })),
         periodReceiptTotal,
         openingReceivable,
@@ -413,3 +462,4 @@ export async function getCustomerLedger(customerId: string, fromIso?: string, to
         netReceivable,
     };
 }
+

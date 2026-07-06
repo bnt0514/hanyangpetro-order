@@ -8,7 +8,7 @@ import { confirmOrderReceipt } from '@/app/dispatch/actions';
 import { statusLabel } from '@/lib/orders';
 
 const STATUS_GROUPS: { label: string; statuses: string[] }[] = [
-    { label: '신규 / 검토', statuses: ['REQUESTED', 'PENDING_SALES_REVIEW', 'SALES_REVIEWING'] },
+    { label: '신규 / 검토', statuses: ['REQUESTED', 'PENDING_SALES_REVIEW', 'SALES_REVIEWING', 'CREDIT_OVER_LIMIT'] },
     { label: '승인 / 보류 / 반려', statuses: ['APPROVED', 'ON_HOLD', 'REJECTED'] },
     { label: '배차', statuses: ['DISPATCH_WAITING', 'DISPATCH_COMPLETED', 'DISPATCH_FAILED'] },
     { label: '출고 / 수령', statuses: ['READY_TO_SHIP', 'SHIPPING', 'SHIPPED', 'DELIVERY_CONFIRM_PENDING', 'DELIVERY_CONFIRMED', 'DELIVERY_DISPUTED'] },

@@ -18,6 +18,10 @@ function normalizeCompanyName(value: string | null | undefined) {
         .trim();
 }
 
+function isPositivePrice(value: number | null | undefined): value is number {
+    return value != null && value > 0;
+}
+
 export async function GET(
     _req: Request,
     ctx: { params: Promise<{ id: string }> },
@@ -59,6 +63,8 @@ export async function GET(
                 addressLine1: true,
                 addressLine2: true,
                 contactPhone: true,
+                defaultDriverCustomerNotice: true,
+                defaultOrderExtraRequest: true,
                 isDefault: true,
             },
             orderBy: [{ isDefault: 'desc' }, { label: 'asc' }],
@@ -205,6 +211,9 @@ export async function GET(
         if (selectedProductKeys.has(key)) productKeyById.set(product.id, key);
     }
     const relatedProductIds = Array.from(productKeyById.keys());
+    const purchasePriceCutoff = new Date();
+    purchasePriceCutoff.setDate(1);
+    purchasePriceCutoff.setHours(0, 0, 0, 0);
 
     const [savedPrices, recentPricedItems, recentSalesLedgerEntries, recentPurchaseLedgerEntries] = relatedProductIds.length > 0
         ? await Promise.all([
@@ -250,27 +259,30 @@ export async function GET(
                 orderBy: [{ transactionDate: 'desc' }, { createdAt: 'desc' }],
                 take: 1000,
             }),
-            prisma.ledgerEntry.findMany({
-                where: {
-                    ledgerType: 'PURCHASE',
-                    unitPrice: { not: null },
-                    OR: [
-                        { productId: { in: relatedProductIds } },
-                        { productId: null },
-                    ],
-                },
-                select: {
-                    productId: true,
-                    productName: true,
-                    supplierId: true,
-                    supplier: { select: { supplierName: true } },
-                    unitPrice: true,
-                    transactionDate: true,
-                    createdAt: true,
-                },
-                orderBy: [{ transactionDate: 'desc' }, { createdAt: 'desc' }],
-                take: 2000,
-            }),
+            (() => {
+                return prisma.ledgerEntry.findMany({
+                    where: {
+                        ledgerType: 'PURCHASE',
+                        unitPrice: { gt: 0 },
+                        transactionDate: { lt: purchasePriceCutoff },
+                        OR: [
+                            { productId: { in: relatedProductIds } },
+                            { productId: null },
+                        ],
+                    },
+                    select: {
+                        productId: true,
+                        productName: true,
+                        supplierId: true,
+                        supplier: { select: { supplierName: true } },
+                        unitPrice: true,
+                        transactionDate: true,
+                        createdAt: true,
+                    },
+                    orderBy: [{ transactionDate: 'desc' }, { createdAt: 'desc' }],
+                    take: 2000,
+                });
+            })(),
         ])
         : [[], [], [], []];
 
@@ -283,7 +295,7 @@ export async function GET(
         if (price.priceType === 'SALES' && !lastSalesPriceByProductKey.has(key)) {
             lastSalesPriceByProductKey.set(key, price.unitPrice);
         }
-        if (price.priceType === 'PURCHASE' && !lastPurchasePriceByProductKey.has(key)) {
+        if (price.priceType === 'PURCHASE' && price.lastUsedAt < purchasePriceCutoff && isPositivePrice(price.unitPrice) && !lastPurchasePriceByProductKey.has(key)) {
             lastPurchasePriceByProductKey.set(key, price.unitPrice);
         }
     }
@@ -298,7 +310,8 @@ export async function GET(
         if (item.salesUnitPrice != null && !lastSalesPriceByProductKey.has(key)) {
             lastSalesPriceByProductKey.set(key, item.salesUnitPrice);
         }
-        if (item.purchaseUnitPrice != null && !lastPurchasePriceByProductKey.has(key)) {
+        const itemDate = item.order.requestedDeliveryDate ?? item.createdAt;
+        if (itemDate < purchasePriceCutoff && isPositivePrice(item.purchaseUnitPrice) && !lastPurchasePriceByProductKey.has(key)) {
             lastPurchasePriceByProductKey.set(key, item.purchaseUnitPrice);
         }
         if (item.purchaseSupplierId && item.purchaseSupplier && !lastPurchaseSupplierByProductKey.has(key)) {
@@ -425,6 +438,8 @@ export async function GET(
             addressLine1: a.addressLine1,
             addressLine2: a.addressLine2,
             contactPhone: a.contactPhone,
+            defaultDriverCustomerNotice: a.defaultDriverCustomerNotice,
+            defaultOrderExtraRequest: a.defaultOrderExtraRequest,
         })),
         products: uniqueProductOpts,
         companyEntities,

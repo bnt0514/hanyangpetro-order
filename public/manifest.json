@@ -1,13 +1,13 @@
 {
-    "name": "한양유화 e-Business OS",
-    "short_name": "한양유화",
-    "description": "주식회사 한양유화 주문 관제 시스템",
+    "name": "한양유화 BNT OS",
+    "short_name": "한양유화 BNT",
+    "description": "한양유화 BNT 주문 관제 시스템",
     "start_url": "/",
     "scope": "/",
     "display": "standalone",
     "orientation": "portrait",
     "background_color": "#f8fafc",
-    "theme_color": "#0f172a",
+    "theme_color": "#ea580c",
     "icons": [
         {
             "src": "/hanyanglogo.png",

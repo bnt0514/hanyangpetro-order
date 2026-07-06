@@ -32,6 +32,7 @@
     "stock:resync:preview": "node scripts/resync-warehouse-stock-movements.js",
     "stock:resync": "node scripts/resync-warehouse-stock-movements.js --apply",
     "finance:import": "node scripts/import-daily-finance.js",
+    "orders:reconcile-sheet": "node scripts/reconcile-order-sheet.js",
     "sync": "tsx scripts/sync-from-desktop.ts"
   },
   "prisma": {

@@ -5,7 +5,19 @@ import { PlusCircle } from 'lucide-react';
 import { createManualDispatch } from '@/app/dispatch/actions';
 import { useF8SaveShortcut } from '@/hooks/useF8SaveShortcut';
 
-export default function ManualDispatchForm({ orderId }: { orderId: string }) {
+type ManualDispatchItem = {
+    productName: string;
+    quantity: number;
+    unit: string;
+};
+
+export default function ManualDispatchForm({
+    orderId,
+    items,
+}: {
+    orderId: string;
+    items: ManualDispatchItem[];
+}) {
     const formRef = useRef<HTMLFormElement>(null);
     const [message, setMessage] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -36,7 +48,19 @@ export default function ManualDispatchForm({ orderId }: { orderId: string }) {
                 <input type="hidden" name="orderId" value={orderId} />
                 <label>
                     <span className="mb-1 block text-xs font-medium text-slate-500">품목</span>
-                    <input name="materialName" required placeholder="예: LDPE<5318>" className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100" />
+                    <select
+                        name="materialName"
+                        required
+                        defaultValue=""
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
+                    >
+                        <option value="" disabled>품목 선택</option>
+                        {items.map((item) => (
+                            <option key={item.productName} value={item.productName}>
+                                {item.productName} / 주문 {item.quantity.toLocaleString('ko-KR')}{item.unit}
+                            </option>
+                        ))}
+                    </select>
                 </label>
                 <label>
                     <span className="mb-1 block text-xs font-medium text-slate-500">수량(TON)</span>

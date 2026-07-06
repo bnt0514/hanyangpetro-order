@@ -12,17 +12,17 @@ function parseDateOnly(value: string) {
 }
 
 function dateToIso(value: Date | null | undefined) {
-    return value ? value.toISOString().slice(0, 10) : '-';
+    if (!value) return '-';
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, '0');
+    const day = String(value.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
 }
 
 function appendAuditMemo(memo: string | null, line: string) {
     return [memo?.trim(), line].filter(Boolean).join('\n');
 }
 
-function dispatchCompletedDate(statusHistory: { createdAt: Date }[]) {
-    if (statusHistory.length === 0) return null;
-    return parseDateOnly(dateToIso(statusHistory[0].createdAt));
-}
 
 export async function updatePurchaseLedgerDate(input: {
     itemId: string;
@@ -87,11 +87,6 @@ export async function updatePurchaseLedgerDate(input: {
                     status: true,
                     requestedDeliveryDate: true,
                     deletedAt: true,
-                    statusHistory: {
-                        where: { newStatus: 'DISPATCH_COMPLETED' },
-                        orderBy: { createdAt: 'desc' },
-                        take: 1,
-                    },
                 },
             },
         },
@@ -100,7 +95,7 @@ export async function updatePurchaseLedgerDate(input: {
         return { ok: false, error: '매입 원장 항목을 찾을 수 없습니다.' };
     }
 
-    const previousDate = item.purchaseLedgerDate ?? dispatchCompletedDate(item.order.statusHistory) ?? item.order.requestedDeliveryDate;
+    const previousDate = item.purchaseLedgerDate;
 
     await prisma.$transaction(async (tx) => {
         await tx.orderItem.updateMany({
@@ -123,3 +118,4 @@ export async function updatePurchaseLedgerDate(input: {
     revalidatePath(`/admin/suppliers/${item.purchaseSupplierId}/ledger`);
     return { ok: true };
 }
+

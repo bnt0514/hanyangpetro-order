@@ -6,6 +6,7 @@ import { prisma } from '@/lib/db';
 import { ArrowLeft, Trash2 } from 'lucide-react';
 import { statusLabel, statusColor, fmtDate, fmtDateTime } from '@/lib/orders';
 import BackButton from '@/components/BackButton';
+import HomepageArchiveLink from '@/components/HomepageArchiveLink';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,10 +28,13 @@ export default async function DeletedOrdersPage() {
         <div className="min-h-screen bg-slate-50">
             <header className="bg-white border-b border-slate-200">
                 <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
-                    <Link href="/admin" className="flex items-center gap-2">
-                        <Image src="/hanyanglogo.png" alt="logo" width={32} height={32} className="h-8 w-auto" />
-                        <span className="font-bold text-slate-800">한양유화 e-Business OS</span>
-                    </Link>
+                    <div className="flex items-center gap-2">
+                        <Link href="/admin" className="flex items-center gap-2">
+                            <Image src="/hanyanglogo.png" alt="logo" width={32} height={32} className="h-8 w-auto" />
+                            <span className="font-bold text-slate-800">한양유화 e-Business OS</span>
+                        </Link>
+                        <HomepageArchiveLink />
+                    </div>
                     <span className="text-sm text-slate-600">{session.user.name}</span>
                 </div>
             </header>

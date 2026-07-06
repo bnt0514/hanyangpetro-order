@@ -1,19 +1,20 @@
-﻿import { auth, signOut } from '@/lib/auth';
+import { auth } from '@/lib/auth';
 import { redirect } from 'next/navigation';
-import Image from 'next/image';
 import Link from 'next/link';
 import { prisma } from '@/lib/db';
-import { fmtNumber, statusLabel } from '@/lib/orders';
-import { Plus, Package, AlertTriangle, CheckCircle2 } from 'lucide-react';
-import AdminNav from './AdminNav';
+import { fmtDate, fmtNumber, statusColor, statusLabel } from '@/lib/orders';
+import { ClipboardList, PackageCheck, Truck, BadgeCheck, PlusCircle, Building2 } from 'lucide-react';
 import F5NewOrderShortcut from './F5NewOrderShortcut';
-import RecentOrdersTable from './RecentOrdersTable';
+import RecentOrdersPanel from './RecentOrdersPanel';
+import MobileStatusLink from './MobileStatusLink';
+import { canViewAllStaffData, isYangHeeCheol as isYangHeeCheolUser } from '@/lib/staff-permissions';
 
 export const dynamic = 'force-dynamic';
 
 type RecentRange = 'latest20' | '7d' | '14d' | '1m' | '3m' | 'all';
 type RecentSort = 'createdAt' | 'orderNo' | 'deliveryDate' | 'customer' | 'status';
 type SortDir = 'asc' | 'desc';
+type RecentStatus = 'all' | 'intake' | 'approved' | 'dispatchWaiting' | 'dispatched';
 
 const rangeOptions: { value: RecentRange; label: string }[] = [
     { value: 'latest20', label: '최신 20건' },
@@ -32,12 +33,24 @@ const sortOptions: { value: RecentSort; label: string }[] = [
     { value: 'status', label: '상태' },
 ];
 
+const statusOptions: Record<RecentStatus, { label: string; statuses: string[] }> = {
+    all: { label: '전체', statuses: [] },
+    intake: { label: '접수된 오더', statuses: ['REQUESTED', 'PENDING_SALES_REVIEW', 'SALES_REVIEWING', 'CREDIT_OVER_LIMIT', 'ON_HOLD'] },
+    approved: { label: '승인완료 오더', statuses: ['APPROVED', 'SUPPLIER_ORDER_REQUIRED'] },
+    dispatchWaiting: { label: '배차대기', statuses: ['SUPPLIER_ORDER_COMPLETED', 'DISPATCH_WAITING', 'DISPATCHING', 'DISPATCH_FAILED', 'DISPATCH_RETRY_SCHEDULED'] },
+    dispatched: { label: '배차 완료', statuses: ['DISPATCH_COMPLETED', 'READY_TO_SHIP', 'SHIPPING', 'SHIPPED', 'DELIVERY_CONFIRM_PENDING'] },
+};
+
 function isRecentRange(value?: string): value is RecentRange {
     return rangeOptions.some((option) => option.value === value);
 }
 
 function isRecentSort(value?: string): value is RecentSort {
     return sortOptions.some((option) => option.value === value);
+}
+
+function isRecentStatus(value?: string): value is RecentStatus {
+    return value === 'all' || value === 'intake' || value === 'approved' || value === 'dispatchWaiting' || value === 'dispatched';
 }
 
 function startDateForRange(range: RecentRange, today: Date) {
@@ -58,7 +71,7 @@ function compareText(a: string, b: string) {
 export default async function AdminHome({
     searchParams,
 }: {
-    searchParams: Promise<{ recentRange?: string; recentSort?: string; recentDir?: string; recentOwner?: string; recentUserId?: string }>;
+    searchParams: Promise<{ recentRange?: string; recentSort?: string; recentDir?: string; recentOwner?: string; recentUserId?: string; recentStatus?: string }>;
 }) {
     const session = await auth();
     if (!session?.user) redirect('/login');
@@ -68,12 +81,12 @@ export default async function AdminHome({
     const recentRange = isRecentRange(sp.recentRange) ? sp.recentRange : 'latest20';
     const recentSort = isRecentSort(sp.recentSort) ? sp.recentSort : 'createdAt';
     const recentDir: SortDir = sp.recentDir === 'asc' ? 'asc' : 'desc';
-    const isYangHeeCheol = session.user.name === '양희철';
+    const recentStatus = isRecentStatus(sp.recentStatus) ? sp.recentStatus : 'all';
+    const isYangHeeCheol = isYangHeeCheolUser(session.user);
     const recentOwner = sp.recentOwner === 'mine' ? 'mine' : sp.recentOwner === 'user' && isYangHeeCheol ? 'user' : 'all';
     const selectedRecentUserId = isYangHeeCheol && recentOwner === 'user' ? sp.recentUserId ?? '' : '';
 
-    const isHanwhaManager = session.user.role === 'EXECUTIVE' || session.user.role === 'ADMIN';
-    const canManageCreditLimits = session.user.id === 'cmojpskkh0000994c99z7ro6d' || session.user.name === '양희철';
+    const canViewAll = canViewAllStaffData(session.user);
 
     // ── 통계 ────────────────────────────────────────────────
     const today = new Date();
@@ -91,27 +104,22 @@ export default async function AdminHome({
             ],
         }
         : {};
+    const dashboardStatusWhere = recentStatus === 'all'
+        ? {}
+        : { status: { in: statusOptions[recentStatus].statuses } };
 
-    const [todayCount, approvedTodayCount, onHoldCount, shippedTodayCount, recentRaw, staffUsers] = await Promise.all([
-        prisma.order.count({ where: { createdAt: { gte: today, lt: tomorrow } } }),
-        // 오늘 승인완료된 주문 수 (이후 배차 진행 포함, 보류/반려/삭제 제외)
-        prisma.order.count({
-            where: {
-                deletedAt: null,
-                status: { notIn: ['ON_HOLD', 'REJECTED', 'CANCELLED'] },
-                statusHistory: { some: { newStatus: 'APPROVED', createdAt: { gte: today, lt: tomorrow } } },
-            },
-        }),
-        prisma.order.count({ where: { status: 'ON_HOLD' } }),
-        prisma.order.count({
-            where: { status: { in: ['SHIPPED', 'COMPLETED'] }, updatedAt: { gte: today, lt: tomorrow } },
-        }),
+    const baseOpenWhere = { deletedAt: null, ...recentOwnerWhere };
+    const [intakeCount, approvedCount, dispatchWaitingCount, dispatchedCount, recentRaw, dashboardRaw, staffUsers] = await Promise.all([
+        prisma.order.count({ where: { ...baseOpenWhere, status: { in: statusOptions.intake.statuses } } }),
+        prisma.order.count({ where: { ...baseOpenWhere, status: { in: statusOptions.approved.statuses } } }),
+        prisma.order.count({ where: { ...baseOpenWhere, status: { in: statusOptions.dispatchWaiting.statuses } } }),
+        prisma.order.count({ where: { ...baseOpenWhere, status: { in: statusOptions.dispatched.statuses } } }),
         prisma.order.findMany({
             where: { deletedAt: null, ...(recentStart ? { createdAt: { gte: recentStart } } : {}), ...recentOwnerWhere },
             orderBy: { createdAt: 'desc' },
             take: recentRange === 'latest20' ? 20 : undefined,
             include: {
-                customer: { select: { companyName: true } },
+                customer: { select: { companyName: true, defaultSalesRepId: true, defaultSalesRep: { select: { name: true } } } },
                 deliveryAddress: { select: { label: true } },
                 items: { include: { product: { select: { productName: true } } } },
                 requestedByUser: { select: { name: true } },
@@ -119,6 +127,21 @@ export default async function AdminHome({
                 deliveryDateChangeRequests: { orderBy: { createdAt: 'desc' }, take: 1, select: { status: true } },
             },
         }),
+        recentStatus === 'all'
+            ? Promise.resolve([])
+            : prisma.order.findMany({
+                where: { deletedAt: null, ...recentOwnerWhere, ...dashboardStatusWhere },
+                orderBy: { createdAt: 'desc' },
+                take: 20,
+                include: {
+                    customer: { select: { companyName: true, defaultSalesRepId: true, defaultSalesRep: { select: { name: true } } } },
+                    deliveryAddress: { select: { label: true } },
+                    items: { include: { product: { select: { productName: true } } } },
+                    requestedByUser: { select: { name: true } },
+                    requestedByCustomerUser: { select: { name: true } },
+                    deliveryDateChangeRequests: { orderBy: { createdAt: 'desc' }, take: 1, select: { status: true } },
+                },
+            }),
         isYangHeeCheol
             ? prisma.user.findMany({
                 where: { isActive: true },
@@ -137,156 +160,191 @@ export default async function AdminHome({
         if (recentSort === 'status') result = compareText(statusLabel(a.status), statusLabel(b.status));
         return recentDir === 'asc' ? result : -result;
     });
+    const dashboardOrders = [...dashboardRaw].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
     const recentRangeLabel = rangeOptions.find((option) => option.value === recentRange)?.label ?? '최신 20건';
+    const recentStatusLabel = statusOptions[recentStatus].label;
 
-    const cards = [
-        { label: '오늘 신규 주문', value: todayCount, tone: 'blue' as const, Icon: Plus },
-        { label: '오늘 승인완료', value: approvedTodayCount, tone: 'emerald' as const, Icon: CheckCircle2 },
-        { label: '보류 주문', value: onHoldCount, tone: 'orange' as const, Icon: AlertTriangle },
-        { label: '오늘 출고/완료', value: shippedTodayCount, tone: 'emerald' as const, Icon: CheckCircle2 },
+    const dashboardCards = [
+        { key: 'intake', label: '접수된 오더', description: '오더 승인이 필요한 주문', value: intakeCount, Icon: ClipboardList, className: 'border-orange-200 bg-white text-orange-950', iconClassName: 'bg-orange-500 text-white' },
+        { key: 'approved', label: '승인완료 오더', description: '한화 주문이 필요한 오더', value: approvedCount, Icon: PackageCheck, className: 'border-amber-200 bg-white text-amber-950', iconClassName: 'bg-amber-500 text-white' },
+        { key: 'dispatchWaiting', label: '배차대기', description: '한화 주문/혹은 타사 주문 완료되어 배차 대기중', value: dispatchWaitingCount, Icon: Truck, className: 'border-red-200 bg-white text-red-950', iconClassName: 'bg-red-500 text-white' },
+        {
+            key: 'dispatched',
+            label: '배차 완료',
+            description: '주문 완료 후 배차까지 완료 된 상태',
+            value: dispatchedCount,
+            Icon: BadgeCheck,
+            className: 'bg-white text-emerald-950',
+            iconClassName: 'text-white',
+            style: { borderColor: '#86efac' },
+            iconStyle: { backgroundColor: '#16a34a', color: '#ffffff' },
+        },
+    ];
+    const quickActionCards = [
+        { href: '/admin/orders/new', label: '오더등록(F5)', subLabel: '신규 주문 입력', Icon: PlusCircle, className: 'border-orange-200 bg-white text-orange-900', iconClassName: 'bg-orange-500 text-white' },
+        { href: '/admin/dispatch', label: '배차조회', subLabel: '한화 배차내역 확인', Icon: Truck, className: 'border-red-200 bg-white text-red-900', iconClassName: 'bg-red-500 text-white' },
+        { href: '/admin/customers', label: '거래처 관리', subLabel: '거래처/인도처 확인', Icon: Building2, className: 'border-amber-200 bg-white text-amber-900', iconClassName: 'bg-amber-500 text-white' },
     ];
 
-    const toneClass: Record<string, string> = {
-        blue: 'bg-blue-50 text-blue-700 border-blue-100',
-        amber: 'bg-amber-50 text-amber-700 border-amber-100',
-        orange: 'bg-orange-50 text-orange-700 border-orange-100',
-        emerald: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-    };
-
     return (
-        <div className="min-h-screen">
-            <header className="bg-white border-b border-slate-200">
-                <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-                    <Link href="/admin" className="flex items-center gap-2">
-                        <Image src="/hanyanglogo.png" alt="logo" width={32} height={32} className="h-8 w-auto" />
-                        <span className="font-bold text-slate-800">한양유화 e-Business OS</span>
-                    </Link>
-                    <div className="flex items-center gap-4 text-sm">
-                        <span className="text-slate-600">
-                            {session.user.name}{' '}
-                            <span className="text-xs text-slate-400">({session.user.role})</span>
-                        </span>
-                        <Link href="/settings" className="text-slate-500 hover:text-blue-600 transition text-sm">비밀번호 변경</Link>
-                        <form
-                            action={async () => {
-                                'use server';
-                                await signOut({ redirectTo: '/login' });
-                            }}
-                        >
-                            <button className="text-slate-500 hover:text-red-600 transition">로그아웃</button>
-                        </form>
-                    </div>
-                </div>
-            </header>
-
-            <main className="max-w-7xl mx-auto p-6">
-                <h1 className="text-2xl font-bold text-slate-800 mb-4">대시보드</h1>
-
-                <AdminNav isHanwhaManager={isHanwhaManager} canManageCreditLimits={canManageCreditLimits} />
-
-                {/* 통계 카드 */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                    {cards.map(({ label, value, tone, Icon }) => (
-                        <div
-                            key={label}
-                            className={`rounded-xl border p-5 shadow-sm ${toneClass[tone]}`}
-                        >
-                            <div className="flex items-center justify-between">
-                                <p className="text-sm font-medium opacity-80">{label}</p>
-                                <Icon size={18} className="opacity-60" />
-                            </div>
-                            <p className="mt-2 text-3xl font-bold">{fmtNumber(value)}</p>
-                        </div>
-                    ))}
-                </div>
-
-                <F5NewOrderShortcut />
-
-                {/* 신규 주문 등록 버튼 */}
-                <Link
-                    href="/admin/orders/new"
-                    className="flex items-center justify-center gap-3 w-full rounded-2xl bg-slate-900 hover:bg-slate-700 text-white font-bold text-lg py-6 mb-6 shadow-md transition-colors"
-                >
-                    <Plus size={26} />
-                    신규 주문 등록 (F5)
-                </Link>
-
-                {/* 최근 주문 */}
-                <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                    <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-slate-100">
-                        <div className="flex items-center gap-2">
-                            <Package size={18} className="text-slate-500" />
-                            <h2 className="font-semibold text-slate-800">최근 주문</h2>
-                            <span className="text-xs text-slate-400">{recentRangeLabel} · {recent.length}건</span>
-                        </div>
-                        <form className="flex flex-wrap items-center gap-2 text-xs">
-                            <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
-                                <button
-                                    type="submit"
-                                    name="recentOwner"
-                                    value="all"
-                                    className={`rounded-md px-2.5 py-1.5 font-semibold ${recentOwner === 'all' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-white'}`}
+        <div className="min-h-full bg-[#fff7ed] px-6 py-6">
+            <div className="mx-auto max-w-5xl">
+                        <div className="mb-5 grid grid-cols-3 gap-3">
+                            {quickActionCards.map(({ href, label, subLabel, Icon, className, iconClassName }) => (
+                                <Link
+                                    key={href}
+                                    href={href}
+                                    className={`group flex min-h-24 items-center gap-4 rounded-lg border p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${className}`}
                                 >
-                                    전체오더보기
-                                </button>
-                                <button
-                                    type="submit"
-                                    name="recentOwner"
-                                    value="mine"
-                                    className={`rounded-md px-2.5 py-1.5 font-semibold ${recentOwner === 'mine' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-white'}`}
-                                >
-                                    내 오더만 보기
-                                </button>
-                            </div>
-                            {isYangHeeCheol && (
-                                <>
-                                    <input type="hidden" name="recentOwner" value={recentOwner === 'user' ? 'user' : recentOwner} />
-                                    <select name="recentUserId" defaultValue={selectedRecentUserId} className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-slate-700 outline-none focus:border-blue-500">
-                                        <option value="">전체 담당자</option>
-                                        {staffUsers.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
-                                    </select>
-                                    <button type="submit" name="recentOwner" value="user" className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 font-semibold text-blue-700 hover:bg-blue-100">담당자 적용</button>
-                                </>
-                            )}
-                            <select name="recentRange" defaultValue={recentRange} className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-slate-700 outline-none focus:border-blue-500">
-                                {rangeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                            </select>
-                            <select name="recentSort" defaultValue={recentSort} className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-slate-700 outline-none focus:border-blue-500">
-                                {sortOptions.map((option) => <option key={option.value} value={option.value}>{option.label}순</option>)}
-                            </select>
-                            <select name="recentDir" defaultValue={recentDir} className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-slate-700 outline-none focus:border-blue-500">
-                                <option value="desc">내림차순</option>
-                                <option value="asc">오름차순</option>
-                            </select>
-                            <button type="submit" className="rounded-lg bg-slate-800 px-3 py-1.5 font-semibold text-white hover:bg-slate-900">적용</button>
-                        </form>
-                    </div>
+                                    <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg shadow-sm ${iconClassName}`}>
+                                        <Icon size={22} />
+                                    </span>
+                                    <span className="min-w-0 flex-1">
+                                        <span className="block text-lg font-black leading-tight">{label}</span>
+                                        <span className="mt-1 block text-xs font-semibold text-slate-500">{subLabel}</span>
+                                    </span>
+                                </Link>
+                            ))}
+                        </div>
 
-                    <RecentOrdersTable
-                        orders={recent.map((o) => ({
-                            id: o.id,
-                            orderNo: o.orderNo,
-                            status: o.status,
-                            createdAt: o.createdAt.toISOString(),
-                            requestedDeliveryDate: o.requestedDeliveryDate?.toISOString() ?? null,
-                            customer: { companyName: o.customer.companyName },
-                            deliveryAddress: { label: o.deliveryAddress.label },
-                            items: o.items.map((it) => ({
-                                id: it.id,
-                                product: { productName: it.product.productName },
-                                requestedQuantity: it.requestedQuantity,
-                                unit: it.unit,
-                            })),
-                            requestedByUser: o.requestedByUser ?? null,
-                            requestedByCustomerUser: o.requestedByCustomerUser ?? null,
-                            deliveryDateChangeRequests: o.deliveryDateChangeRequests,
-                        }))}
-                        initialSort={recentSort}
-                        initialDir={recentDir}
-                    />
-                </section>
-            </main>
+                        <div className="overflow-hidden rounded-lg border border-orange-300 bg-orange-500 shadow-sm">
+                            <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 text-white">
+                                <h1 className="text-2xl font-black">대시보드</h1>
+                                {recentStatus !== 'all' && (
+                                    <Link href="/admin" className="rounded-full border border-white/40 bg-white/15 px-3 py-1.5 text-xs font-bold text-white hover:bg-white/25">
+                                        전체 보기
+                                    </Link>
+                                )}
+                            </div>
+
+                            <div className="space-y-3 bg-orange-50 p-4">
+                                <div className="grid grid-cols-1 gap-3">
+                                    {dashboardCards.map(({ key, label, description, value, Icon, className, iconClassName, style, iconStyle }) => (
+                                        <MobileStatusLink
+                                            key={label}
+                                            href={`/admin?recentStatus=${key}`}
+                                            className={`group flex items-center gap-4 rounded-lg border p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${recentStatus === key ? 'ring-2 ring-red-400' : ''} ${className}`}
+                                            style={style}
+                                        >
+                                            <span className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-lg shadow-sm ${iconClassName}`} style={iconStyle}>
+                                                <Icon size={24} />
+                                            </span>
+                                            <span className="min-w-0 flex-1">
+                                                <span className="block text-xl font-black leading-tight">{label}</span>
+                                                <span className="mt-1 block text-sm font-semibold text-slate-500">{description}</span>
+                                            </span>
+                                            <span className="shrink-0 text-right">
+                                                <span className="block text-4xl font-black leading-none">{fmtNumber(value)}</span>
+                                                <span className="mt-1 block text-xs font-bold text-slate-400">건</span>
+                                            </span>
+                                        </MobileStatusLink>
+                                    ))}
+                                </div>
+
+                                <div id="dashboard-orders" className="rounded-lg border border-orange-200 bg-white p-4">
+                                    <div className="mb-3 flex items-center justify-between gap-3">
+                                        <div>
+                                            <h2 className="text-lg font-black text-slate-900">
+                                                {recentStatus === 'all' ? '상태별 오더' : recentStatusLabel}
+                                            </h2>
+                                            <p className="text-xs font-semibold text-slate-500">
+                                                상태 카드를 누르면 해당 오더가 카드 형태로 표시됩니다.
+                                            </p>
+                                        </div>
+                                        {recentStatus !== 'all' && (
+                                            <span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-black text-orange-700">
+                                                {fmtNumber(dashboardOrders.length)}건
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    {recentStatus === 'all' ? (
+                                        <div className="rounded-lg border border-dashed border-orange-200 bg-orange-50 px-4 py-8 text-center text-sm font-semibold text-orange-700">
+                                            위 상태 카드를 선택하면 해당 오더들이 이곳에 카드로 표시됩니다.
+                                        </div>
+                                    ) : dashboardOrders.length === 0 ? (
+                                        <div className="rounded-lg border border-dashed border-orange-200 bg-orange-50 px-4 py-8 text-center text-sm font-semibold text-orange-700">
+                                            해당 상태의 오더가 없습니다.
+                                        </div>
+                                    ) : (
+                                        <div className="grid gap-2">
+                                            {dashboardOrders.map((order) => (
+                                                <Link
+                                                    key={order.id}
+                                                    href={`/admin/orders/${order.id}`}
+                                                    className="block rounded-lg border border-orange-100 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-orange-300 hover:shadow-md"
+                                                >
+                                                    <div className="flex flex-wrap items-start justify-between gap-3">
+                                                        <div className="min-w-0">
+                                                            <div className="flex flex-wrap items-center gap-2">
+                                                                <span className="font-mono text-xs font-black text-orange-700">{order.orderNo}</span>
+                                                                <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-bold ${statusColor(order.status)}`}>
+                                                                    {statusLabel(order.status)}
+                                                                </span>
+                                                            </div>
+                                                            <p className="mt-2 truncate text-lg font-black text-slate-900">{order.customer.companyName}</p>
+                                                            <p className="mt-1 text-sm font-semibold text-slate-500">{order.deliveryAddress.label}</p>
+                                                        </div>
+                                                        <div className="shrink-0 text-right">
+                                                            <p className="text-xs font-bold text-slate-400">도착일</p>
+                                                            <p className="text-base font-black text-slate-800">{fmtDate(order.requestedDeliveryDate)}</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="mt-3 grid gap-1 rounded-lg bg-orange-50/70 px-3 py-2">
+                                                        {order.items.map((item) => (
+                                                            <div key={item.id} className="flex items-center justify-between gap-3 text-sm">
+                                                                <span className="min-w-0 truncate font-bold text-slate-700">{item.product.productName}</span>
+                                                                <span className="shrink-0 font-black text-orange-700">
+                                                                    {fmtNumber(item.requestedQuantity)}{item.unit}
+                                                                </span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </Link>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        <F5NewOrderShortcut />
+
+                        <div id="mobile-orders" className="mt-5">
+                            <RecentOrdersPanel
+                                initialRows={recent.map((o) => ({
+                                    id: o.id,
+                                    orderNo: o.orderNo,
+                                    status: o.status,
+                                    createdAt: o.createdAt.toISOString(),
+                                    requestedDeliveryDate: o.requestedDeliveryDate?.toISOString() ?? null,
+                                    customer: {
+                                        companyName: o.customer.companyName,
+                                        defaultSalesRepId: o.customer.defaultSalesRepId,
+                                        defaultSalesRep: o.customer.defaultSalesRep,
+                                    },
+                                    deliveryAddress: { label: o.deliveryAddress.label },
+                                    items: o.items.map((it) => ({
+                                        id: it.id,
+                                        product: { productName: it.product.productName },
+                                        requestedQuantity: it.requestedQuantity,
+                                        unit: it.unit,
+                                    })),
+                                    requestedByUser: o.requestedByUser ?? null,
+                                    requestedByCustomerUser: o.requestedByCustomerUser ?? null,
+                                    deliveryDateChangeRequests: o.deliveryDateChangeRequests,
+                                }))}
+                                initialRange={recentRange}
+                                initialSort={recentSort}
+                                initialDir={recentDir}
+                                initialOwner={recentOwner === 'mine' ? 'mine' : 'all'}
+                                initialUserId={selectedRecentUserId}
+                                canViewAllRecentOrders={canViewAll}
+                            />
+                        </div>
+                        <p className="mt-2 text-right text-xs text-slate-400">{recentRangeLabel} · {recent.length}건</p>
+            </div>
         </div>
     );
 }

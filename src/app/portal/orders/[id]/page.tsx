@@ -10,6 +10,7 @@ import { ArrowLeft, MapPin, Calendar, FileText, Clock } from 'lucide-react';
 import CancelButton from './CancelButton';
 import BackButton from '@/components/BackButton';
 import DeliveryDateChangeRequestButton from './DeliveryDateChangeRequestButton';
+import HomepageArchiveLink from '@/components/HomepageArchiveLink';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,6 +51,7 @@ export default async function PortalOrderDetail({
     const dispatchDetails: HanwhaDispatchDetailRow[] = dispatchRows.length > 0
         ? dispatchRows.map((row) => ({
             id: row.id,
+            indoChiName: row.indoChiName,
             materialNameRaw: row.materialNameRaw,
             materialName: row.materialName,
             quantityTon: row.quantityKg,
@@ -57,6 +59,7 @@ export default async function PortalOrderDetail({
         }))
         : hanwhaDispatches.map((dispatch) => ({
             id: dispatch.id,
+            indoChiName: order.deliveryAddress.label,
             materialNameRaw: dispatch.hanwhaMaterialNameRaw ?? parseHanwhaMaterialFromMemo(dispatch.memo),
             materialName: dispatch.hanwhaMaterialName ?? parseHanwhaMaterialFromMemo(dispatch.memo),
             quantityTon: dispatch.hanwhaQuantityTon,
@@ -68,10 +71,13 @@ export default async function PortalOrderDetail({
         <div className="min-h-screen">
             <header className="bg-white border-b border-slate-200">
                 <div className="max-w-3xl mx-auto px-6 h-16 flex items-center justify-between">
-                    <Link href="/portal" className="flex items-center gap-2">
-                        <Image src="/hanyanglogo.png" alt="logo" width={32} height={32} className="h-8 w-auto" />
-                        <span className="text-sm font-bold text-slate-800 sm:text-base">한양유화&BNT 거래처 포털</span>
-                    </Link>
+                    <div className="flex items-center gap-2">
+                        <Link href="/portal" className="flex items-center gap-2">
+                            <Image src="/hanyanglogo.png" alt="logo" width={32} height={32} className="h-8 w-auto" />
+                            <span className="text-sm font-bold text-slate-800 sm:text-base">한양유화&BNT 거래처 포털</span>
+                        </Link>
+                        <HomepageArchiveLink />
+                    </div>
                     <div className="flex items-center gap-4 text-sm">
                         <span className="text-slate-600">{session.user.customerName}</span>
                         <form

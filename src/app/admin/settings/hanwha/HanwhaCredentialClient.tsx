@@ -2,8 +2,8 @@
 
 import { useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Eye, EyeOff, KeyRound, Loader2, AlertCircle, CheckCircle2, Save } from 'lucide-react';
-import { updateHanwhaPassword } from '@/app/dispatch/actions';
+import { Eye, EyeOff, KeyRound, Loader2, AlertCircle, CheckCircle2, Save, RefreshCw } from 'lucide-react';
+import { runHanwhaKeepAliveOnce, updateHanwhaPassword } from '@/app/dispatch/actions';
 import { fmtDateTime } from '@/lib/orders';
 import { useF8SaveShortcut } from '@/hooks/useF8SaveShortcut';
 
@@ -13,6 +13,7 @@ interface Props {
     source: 'db' | 'env' | 'none';
     updatedAt: string | null;
     updatedByName: string | null;
+    canRunKeepAlive: boolean;
 }
 
 export default function HanwhaCredentialClient({
@@ -21,6 +22,7 @@ export default function HanwhaCredentialClient({
     source,
     updatedAt,
     updatedByName,
+    canRunKeepAlive,
 }: Props) {
     const router = useRouter();
     const formRef = useRef<HTMLFormElement | null>(null);
@@ -28,6 +30,7 @@ export default function HanwhaCredentialClient({
     const [pw2, setPw2] = useState('');
     const [show, setShow] = useState(false);
     const [pending, startTransition] = useTransition();
+    const [keepAlivePending, startKeepAliveTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
     const [info, setInfo] = useState<string | null>(null);
 
@@ -53,6 +56,19 @@ export default function HanwhaCredentialClient({
     }
 
     useF8SaveShortcut(() => formRef.current?.requestSubmit(), { disabled: pending || !pw || !pw2, scopeRef: formRef });
+
+    function runKeepAlive() {
+        setError(null);
+        setInfo(null);
+        startKeepAliveTransition(async () => {
+            const r = await runHanwhaKeepAliveOnce();
+            if (!r.ok) {
+                setError(r.error);
+                return;
+            }
+            setInfo(r.message);
+        });
+    }
 
     return (
         <div className="mt-6 space-y-6">
@@ -144,6 +160,21 @@ export default function HanwhaCredentialClient({
                     )}
 
                     <div className="flex items-center gap-3 pt-2">
+                        {canRunKeepAlive && (
+                            <button
+                                type="button"
+                                disabled={keepAlivePending || pending}
+                                onClick={runKeepAlive}
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-60"
+                            >
+                                {keepAlivePending ? (
+                                    <Loader2 size={16} className="animate-spin" />
+                                ) : (
+                                    <RefreshCw size={16} />
+                                )}
+                                연결유지 실행
+                            </button>
+                        )}
                         <button
                             type="submit"
                             disabled={pending || !pw || !pw2}

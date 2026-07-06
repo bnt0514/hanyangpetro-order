@@ -180,5 +180,5 @@ try {
         console.log(`${field.index}. ${field.tag} name=${field.name ?? ''} type=${field.type ?? ''} label=${field.label}`);
     }
 } finally {
-    await browser.close();
+    console.log('Inspection finished; browser left open.');
 }

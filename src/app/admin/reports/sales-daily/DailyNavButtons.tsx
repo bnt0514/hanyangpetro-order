@@ -21,8 +21,19 @@ function shiftDay(dateStr: string, n: number): string {
 
 function shiftMonth(dateStr: string, n: number): string {
     const d = new Date(`${dateStr}T00:00:00`);
-    d.setMonth(d.getMonth() + n);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const shifted = new Date(d.getFullYear(), d.getMonth() + n, 1);
+    return `${shifted.getFullYear()}-${String(shifted.getMonth() + 1).padStart(2, '0')}-01`;
+}
+
+function lastDayOfMonth(dateStr: string): string {
+    const d = new Date(`${dateStr}T00:00:00`);
+    const last = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+    return `${last.getFullYear()}-${String(last.getMonth() + 1).padStart(2, '0')}-${String(last.getDate()).padStart(2, '0')}`;
+}
+
+function monthRange(dateStr: string, offset: number) {
+    const first = shiftMonth(dateStr, offset);
+    return { from: first, to: lastDayOfMonth(first) };
 }
 
 function firstOfMonth(dateStr: string): string {
@@ -41,24 +52,35 @@ function yesterdayIso(): string {
 
 function lastMonthFrom(): string {
     const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth()).padStart(2, '0')}-01`.replace('-00-', '-12-').replace(/-(\d)-/, '-0$1-');
+    const lastMonth = new Date(d.getFullYear(), d.getMonth() - 1, 1);
+    return `${lastMonth.getFullYear()}-${String(lastMonth.getMonth() + 1).padStart(2, '0')}-01`;
 }
 
 function last3MonthsFrom(): string {
     const d = new Date();
-    d.setMonth(d.getMonth() - 2);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+    const first = new Date(d.getFullYear(), d.getMonth() - 2, 1);
+    return `${first.getFullYear()}-${String(first.getMonth() + 1).padStart(2, '0')}-01`;
 }
 
 export default function DailyNavButtons({ from, to, mode, groupBy }: Props) {
     const today = todayIso();
     const yesterday = yesterdayIso();
+    const prevMonthRange = monthRange(from, -1);
+    const nextMonthRange = monthRange(from, 1);
+
+    // 익월(다음달) 상한: 오늘 기준 다음달까지만 허용
+    const nextMonthLimit = (() => {
+        const d = new Date();
+        const next = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+        return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`;
+    })();
+    const isAtNextMonthLimit = from.slice(0, 7) >= nextMonthLimit;
 
     // last month: first day of last month ~ last day of last month
     const lastMonthFirst = (() => {
         const d = new Date();
-        d.setMonth(d.getMonth() - 1);
-        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+        const first = new Date(d.getFullYear(), d.getMonth() - 1, 1);
+        return `${first.getFullYear()}-${String(first.getMonth() + 1).padStart(2, '0')}-01`;
     })();
     const lastMonthLast = (() => {
         const d = new Date();
@@ -107,7 +129,7 @@ export default function DailyNavButtons({ from, to, mode, groupBy }: Props) {
             <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 px-2 py-1">
                 <Link
                     scroll={false}
-                    href={buildUrl({ ...base, from: firstOfMonth(shiftMonth(from, -1)), to: shiftMonth(to, -1) })}
+                    href={buildUrl({ ...base, from: prevMonthRange.from, to: prevMonthRange.to })}
                     className={navBtnCls}
                 >← 전월</Link>
                 <Link
@@ -115,11 +137,15 @@ export default function DailyNavButtons({ from, to, mode, groupBy }: Props) {
                     href={buildUrl({ ...base, from: firstOfMonth(today), to: today })}
                     className={navBtnCls}
                 >이번달</Link>
-                <Link
-                    scroll={false}
-                    href={buildUrl({ ...base, from: firstOfMonth(shiftMonth(from, 1)), to: shiftMonth(to, 1) })}
-                    className={navBtnCls}
-                >다음월 →</Link>
+                {isAtNextMonthLimit ? (
+                    <span className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-300 cursor-not-allowed select-none">다음월 →</span>
+                ) : (
+                    <Link
+                        scroll={false}
+                        href={buildUrl({ ...base, from: nextMonthRange.from, to: nextMonthRange.to })}
+                        className={navBtnCls}
+                    >다음월 →</Link>
+                )}
             </div>
 
             {/* Quick shortcuts */}

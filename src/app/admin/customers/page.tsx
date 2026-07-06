@@ -2,8 +2,9 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Building2, Plus, BookOpen } from 'lucide-react';
+import { ArrowLeft, Building2, Plus, BookOpen, FileSpreadsheet } from 'lucide-react';
 import { deactivateCustomer } from './actions';
+import { canViewAllStaffData } from '@/lib/staff-permissions';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,16 +19,20 @@ export default async function CustomersPage({
 
     const { q = '' } = await searchParams;
     const query = q.trim();
+    const canViewAll = canViewAllStaffData(session.user);
     const customers = await prisma.customer.findMany({
-        where: query
-            ? {
-                OR: [
-                    { companyName: { contains: query } },
-                    { customerCode: { contains: query } },
-                    { businessNumber: { contains: query } },
-                ],
-            }
-            : undefined,
+        where: {
+            ...(canViewAll ? {} : { defaultSalesRepId: session.user.id }),
+            ...(query
+                ? {
+                    OR: [
+                        { companyName: { contains: query } },
+                        { customerCode: { contains: query } },
+                        { businessNumber: { contains: query } },
+                    ],
+                }
+                : {}),
+        },
         orderBy: [{ isActive: 'desc' }, { companyName: 'asc' }],
         include: { _count: { select: { addresses: true, orders: true } } },
         take: 300,
@@ -47,10 +52,10 @@ export default async function CustomersPage({
                         <Plus size={16} /> 신규거래처 등록
                     </Link>
                     <Link
-                        href="/admin/customers/import"
+                        href="/admin/customers/ecount"
                         className="inline-flex items-center gap-2 rounded-xl border border-blue-300 bg-white px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50"
                     >
-                        도착지 가져오기
+                        <FileSpreadsheet size={16} /> 이카운트 거래처정보
                     </Link>
                 </div>
             </header>

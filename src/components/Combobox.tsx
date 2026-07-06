@@ -12,6 +12,9 @@ interface Props {
     options: ComboboxOption[];
     value: string;
     onChange: (value: string, label: string) => void;
+    className?: string;
+    dropdownClassName?: string;
+    optionLabelClassName?: string;
     placeholder?: string;
     label?: string;
     required?: boolean;
@@ -19,10 +22,13 @@ interface Props {
     emptyText?: string;
     /** value가 비어있을 때 input에 표시할 기본 텍스트 (예: 거래처명 자동 채우기) */
     defaultText?: string;
+    searchSublabel?: boolean;
     /** 옵션 매칭 없이 자유 텍스트가 입력된 채로 확정될 때 호출 */
     onFreeText?: (text: string) => void;
     /** 값이 입력되어 있어도 포커스 시 전체 옵션을 보여줌 */
     showAllOnFocus?: boolean;
+    /** 정규화된 검색어별로 표시 가능한 정규화 label을 제한 */
+    normalizedLabelAllowlistByQuery?: Record<string, string[]>;
 }
 
 /* ── 매칭 정규화 ────────────────────────────────────────────
@@ -46,20 +52,26 @@ export default function Combobox({
     options,
     value,
     onChange,
+    className = '',
+    dropdownClassName = '',
+    optionLabelClassName = 'truncate',
     placeholder,
     label,
     required,
     disabled,
     emptyText = '결과 없음',
     defaultText,
+    searchSublabel = true,
     onFreeText,
     showAllOnFocus = false,
+    normalizedLabelAllowlistByQuery,
 }: Props) {
     const id = useId();
     const wrapRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const isTypingRef = useRef(false);
     const skipNextBlurCommitRef = useRef(false);
+    const [isTyping, setIsTyping] = useState(false);
 
     const valueLabel = useMemo(
         () => options.find((o) => o.value === value)?.label ?? '',
@@ -91,13 +103,16 @@ export default function Combobox({
     // ── 필터 + 정렬 (대소문자 무관 + 부분 포함) ───────────────
     // 점수: 0=완전일치, 1=startsWith, 2=contains
     const filtered = useMemo(() => {
-        if (showAllOnFocus && showAll && !isTypingRef.current) return options.slice(0, 100);
+        if (showAllOnFocus && showAll && !isTyping) return options.slice(0, 100);
         const q = normalize(text);
+        const allowlist = normalizedLabelAllowlistByQuery?.[q];
+        const allowedLabels = allowlist ? new Set(allowlist) : null;
         const scored: { opt: ComboboxOption; score: number }[] = [];
 
         for (const opt of options) {
             const nl = normalize(opt.label);
-            const ns = normalize(opt.sublabel ?? '');
+            if (allowedLabels && !allowedLabels.has(nl)) continue;
+            const ns = searchSublabel ? normalize(opt.sublabel ?? '') : '';
             if (q === '') {
                 scored.push({ opt, score: 3 });
                 continue;
@@ -107,7 +122,7 @@ export default function Combobox({
             else if (nl.includes(q) || ns.includes(q)) scored.push({ opt, score: 2 });
         }
 
-        return scored
+        const sorted = scored
             .sort((a, b) => {
                 if (a.score !== b.score) return a.score - b.score;
                 // 동점이면 normalized label 길이가 짧을수록 우선 (3120 > 3120MF)
@@ -115,13 +130,25 @@ export default function Combobox({
                 if (lenDiff !== 0) return lenDiff;
                 return a.opt.label.localeCompare(b.opt.label, 'ko');
             })
-            .map((s) => s.opt)
-            .slice(0, 100);
-    }, [options, showAll, showAllOnFocus, text]);
+            .map((s) => s.opt);
+
+        if (allowedLabels) {
+            const seenLabels = new Set<string>();
+            return sorted.filter((opt) => {
+                const key = normalize(opt.label);
+                if (seenLabels.has(key)) return false;
+                seenLabels.add(key);
+                return true;
+            }).slice(0, 100);
+        }
+
+        return sorted.slice(0, 100);
+    }, [isTyping, normalizedLabelAllowlistByQuery, options, searchSublabel, showAll, showAllOnFocus, text]);
 
     const select = useCallback(
         (opt: ComboboxOption) => {
             isTypingRef.current = false;
+            setIsTyping(false);
             skipNextBlurCommitRef.current = true;
             onChange(opt.value, opt.label);
             setText(opt.label);
@@ -144,7 +171,7 @@ export default function Combobox({
             return;
         }
         const exact = options.find(
-            (o) => normalize(o.label) === q || normalize(o.sublabel ?? '') === q,
+            (o) => normalize(o.label) === q || (searchSublabel && normalize(o.sublabel ?? '') === q),
         );
         if (exact) {
             select(exact);
@@ -173,6 +200,7 @@ export default function Combobox({
         } else if (e.key === 'Escape') {
             setOpen(false);
             isTypingRef.current = false;
+            setIsTyping(false);
             setText(valueLabel);
         } else if (e.key === 'Tab') {
             skipNextBlurCommitRef.current = true;
@@ -181,7 +209,7 @@ export default function Combobox({
     }
 
     return (
-        <div ref={wrapRef} className="block">
+        <div ref={wrapRef} className={`block ${className}`}>
             {label && (
                 <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-1.5">
                     {label}
@@ -199,6 +227,7 @@ export default function Combobox({
                     autoComplete="off"
                     onChange={(e) => {
                         isTypingRef.current = true;
+                        setIsTyping(true);
                         setShowAll(false);
                         setText(e.target.value);
                         setOpen(true);
@@ -217,6 +246,7 @@ export default function Combobox({
                                 return;
                             }
                             isTypingRef.current = false;
+                            setIsTyping(false);
                             setShowAll(false);
                             commit();
                         }, 150);
@@ -225,7 +255,7 @@ export default function Combobox({
                     className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50 disabled:text-slate-500"
                 />
                 {open && !disabled && (
-                    <div className="absolute z-30 mt-1 w-full max-h-72 overflow-auto rounded-lg border border-slate-200 bg-white shadow-lg">
+                    <div className={`absolute z-30 mt-1 w-full max-h-72 overflow-auto rounded-lg border border-slate-200 bg-white shadow-lg ${dropdownClassName}`}>
                         {filtered.length === 0 ? (
                             <div className="px-3 py-2 text-sm text-slate-400">{emptyText}</div>
                         ) : (
@@ -243,7 +273,7 @@ export default function Combobox({
                                         : 'text-slate-700 hover:bg-slate-50'
                                         }`}
                                 >
-                                    <span className="truncate">{opt.label}</span>
+                                    <span className={optionLabelClassName}>{opt.label}</span>
                                     {opt.sublabel && (
                                         <span className="ml-3 shrink-0 text-xs text-slate-400">
                                             {opt.sublabel}

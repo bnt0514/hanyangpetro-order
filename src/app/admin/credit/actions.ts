@@ -4,6 +4,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { revalidatePath } from 'next/cache';
 import type { Brand, ProductGroup } from '@/lib/price-constants';
+import { calculateCustomerReceivable } from '@/lib/credit-balance';
 
 // BRANDS, PRODUCT_GROUPS는 src/lib/price-constants.ts 에서 import해서 사용하세요.
 
@@ -87,7 +88,7 @@ export async function simulateCreditCheck(orderId: string): Promise<CreditSimRes
     let estimatedTotal = 0;
 
     for (const item of order.items) {
-        const unitPrice = await getEffectivePrice(item.productId, today);
+        const unitPrice = item.salesUnitPrice ?? await getEffectivePrice(item.productId, today);
         // 수량은 TON 기준
         const qty = item.unit === 'KG' ? item.requestedQuantity / 1000 : item.requestedQuantity;
         const lineTotal = unitPrice * qty;
@@ -103,7 +104,7 @@ export async function simulateCreditCheck(orderId: string): Promise<CreditSimRes
         });
     }
 
-    const receivable = order.customer.receivableAmount;
+    const receivable = await calculateCustomerReceivable(order.customerId) ?? order.customer.receivableAmount;
     const creditLimit = order.customer.creditLimit;
     const projected = receivable + estimatedTotal;
     const isOver = projected > creditLimit && creditLimit > 0;
@@ -206,7 +207,7 @@ export type ReviewResult = { ok: true } | { ok: false; error: string };
 
 export async function approveCreditOverride(overrideId: string): Promise<ReviewResult> {
     const session = await auth();
-    if (!session?.user || session.user.role !== 'EXECUTIVE') {
+    if (!session?.user || session.user.name !== '양희철') {
         return { ok: false, error: '대표(양희철)만 승인할 수 있습니다.' };
     }
 
@@ -229,7 +230,7 @@ export async function approveCreditOverride(overrideId: string): Promise<ReviewR
 
 export async function rejectCreditOverride(overrideId: string, reason: string): Promise<ReviewResult> {
     const session = await auth();
-    if (!session?.user || session.user.role !== 'EXECUTIVE') {
+    if (!session?.user || session.user.name !== '양희철') {
         return { ok: false, error: '대표(양희철)만 처리할 수 있습니다.' };
     }
 

@@ -11,6 +11,8 @@ import {
     type DailyReportRow,
 } from '@/lib/sales-daily-report';
 import DailyNavButtons from './DailyNavButtons';
+import DailyDateRangeForm from './DailyDateRangeForm';
+import { canViewAllStaffData } from '@/lib/staff-permissions';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,6 +24,11 @@ function fmtMoney(v: number) {
 function fmtMoneySmall(v: number) {
     if (v === 0) return <span className="text-slate-300">-</span>;
     return <span>{Math.round(v).toLocaleString('ko-KR')}원</span>;
+}
+
+function CounterpartyNames({ names }: { names: string[] }) {
+    if (names.length === 0) return <span className="text-slate-300">-</span>;
+    return <span className="text-xs text-slate-600">{names.join(', ')}</span>;
 }
 
 function isMode(v?: string): v is DailyReportMode {
@@ -57,6 +64,7 @@ function SummaryCard({ label, value, sub, tone = 'slate' }: {
 
 function DailyTable({ rows, groupBy, mode }: { rows: DailyReportRow[]; groupBy: DailyReportGroupBy; mode: DailyReportMode }) {
     const showGroup = groupBy !== 'total';
+    const showProductCounterparties = groupBy === 'product';
     const showPeriod = mode === 'daily' || groupBy === 'total';
 
     if (rows.length === 0) {
@@ -69,12 +77,21 @@ function DailyTable({ rows, groupBy, mode }: { rows: DailyReportRow[]; groupBy: 
 
     return (
         <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-sm">
+            <table className="w-full min-w-[1080px] text-sm">
                 <thead>
                     <tr className="bg-slate-50 text-left text-xs font-semibold text-slate-500 sticky top-0">
                         <th className="px-4 py-3 sticky left-0 bg-slate-50 z-10">{mode === 'daily' ? '날짜' : '월'}</th>
                         {showGroup && (
                             <th className="px-4 py-3">{groupBy === 'product' ? '품목' : '거래처'}</th>
+                        )}
+                        {groupBy === 'product' && (
+                            <th className="px-4 py-3">오더번호</th>
+                        )}
+                        {showProductCounterparties && (
+                            <>
+                                <th className="px-4 py-3 text-blue-600">매출처</th>
+                                <th className="px-4 py-3 text-amber-600">매입처</th>
+                            </>
                         )}
                         <th className="px-4 py-3 text-right text-blue-600">매출수량</th>
                         <th className="px-4 py-3 text-right text-blue-600">매출금액</th>
@@ -93,6 +110,31 @@ function DailyTable({ rows, groupBy, mode }: { rows: DailyReportRow[]; groupBy: 
                             <td className="px-4 py-2.5 font-mono text-xs text-slate-600 sticky left-0 bg-white">{row.period}</td>
                             {showGroup && (
                                 <td className="px-4 py-2.5 font-medium text-slate-800">{row.label}</td>
+                            )}
+                            {groupBy === 'product' && (
+                                <td className="px-4 py-2.5">
+                                    {row.orderRefs.length > 0 ? (
+                                        <div className="flex max-w-[280px] flex-wrap gap-1.5">
+                                            {row.orderRefs.map((order) => (
+                                                <Link
+                                                    key={order.id}
+                                                    href={`/admin/orders/${order.id}`}
+                                                    className="rounded-full bg-blue-50 px-2 py-0.5 font-mono text-[11px] font-semibold text-blue-700 hover:bg-blue-100 hover:text-blue-900 hover:underline"
+                                                >
+                                                    {order.orderNo}
+                                                </Link>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <span className="text-slate-300">-</span>
+                                    )}
+                                </td>
+                            )}
+                            {showProductCounterparties && (
+                                <>
+                                    <td className="px-4 py-2.5"><CounterpartyNames names={row.salesCounterparties} /></td>
+                                    <td className="px-4 py-2.5"><CounterpartyNames names={row.purchaseCounterparties} /></td>
+                                </>
                             )}
                             <td className="px-4 py-2.5 text-right text-slate-700">
                                 {row.salesQuantity > 0 ? `${fmtNumber(row.salesQuantity)} T` : <span className="text-slate-300">-</span>}
@@ -132,7 +174,7 @@ function DailyTable({ rows, groupBy, mode }: { rows: DailyReportRow[]; groupBy: 
 export default async function SalesDailyPage({
     searchParams,
 }: {
-    searchParams: Promise<{ from?: string; to?: string; mode?: string; groupBy?: string }>;
+    searchParams: Promise<{ from?: string; to?: string; mode?: string; groupBy?: string; filterQ?: string }>;
 }) {
     const session = await auth();
     if (!session?.user) redirect('/login');
@@ -144,8 +186,10 @@ export default async function SalesDailyPage({
     const to = sp.to || today;
     const mode: DailyReportMode = isMode(sp.mode) ? sp.mode : 'daily';
     const groupBy: DailyReportGroupBy = isGroupBy(sp.groupBy) ? sp.groupBy : 'total';
+    const filterQ = sp.filterQ?.trim() || '';
+    const canViewAll = canViewAllStaffData(session.user);
 
-    const report = await getSalesDailyReport({ fromIso: from, toIso: to, mode, groupBy });
+    const report = await getSalesDailyReport({ fromIso: from, toIso: to, mode, groupBy, filterQ, viewerUserId: session.user.id, canViewAll });
 
     const modeOptions: { value: DailyReportMode; label: string }[] = [
         { value: 'daily', label: '일별' },
@@ -158,7 +202,7 @@ export default async function SalesDailyPage({
         { value: 'customer', label: '거래처별' },
     ];
 
-    const baseQuery = { from, to, mode, groupBy };
+    const baseQuery = { from, to, mode, groupBy, ...(filterQ ? { filterQ } : {}) };
 
     return (
         <div className="min-h-screen bg-slate-50">
@@ -180,17 +224,8 @@ export default async function SalesDailyPage({
                         <h1 className="text-lg font-bold text-slate-800">매입매출조회</h1>
                         <span className="text-xs text-slate-400">일별·월별 매출·매입 현황</span>
                     </div>
-                    <form className="flex flex-wrap items-end gap-3 text-sm">
-                        <div className="flex flex-col gap-1">
-                            <span className="text-xs font-medium text-slate-500">조회 기간</span>
-                            <div className="flex items-center gap-1.5">
-                                <input type="date" name="from" defaultValue={from}
-                                    className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm" />
-                                <span className="text-slate-400">~</span>
-                                <input type="date" name="to" defaultValue={to}
-                                    className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm" />
-                            </div>
-                        </div>
+                    <div className="flex flex-wrap items-end gap-3 text-sm">
+                        <DailyDateRangeForm from={from} to={to} mode={mode} groupBy={groupBy} filterQ={filterQ} />
                         <div className="flex flex-col gap-1">
                             <span className="text-xs font-medium text-slate-500">표시 방식</span>
                             <div className="flex gap-1">
@@ -215,11 +250,7 @@ export default async function SalesDailyPage({
                                 ))}
                             </div>
                         </div>
-                        <button type="submit"
-                            className="rounded-lg bg-slate-900 px-4 py-2 font-semibold text-white hover:bg-slate-800">
-                            조회
-                        </button>
-                    </form>
+                    </div>
                 </div>
 
                 {/* 빠른 날짜 이동 */}

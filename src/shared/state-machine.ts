@@ -33,6 +33,12 @@ export const ORDER_STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
         OrderStatus.ON_HOLD,
         OrderStatus.CANCELLED,
     ],
+    CREDIT_OVER_LIMIT: [
+        OrderStatus.APPROVED,
+        OrderStatus.REJECTED,
+        OrderStatus.ON_HOLD,
+        OrderStatus.CANCELLED,
+    ],
     ON_HOLD: [
         OrderStatus.SALES_REVIEWING,
         OrderStatus.APPROVED,

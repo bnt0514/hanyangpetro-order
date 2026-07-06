@@ -9,6 +9,7 @@ export type LoginResult = { ok: false; error: string } | { ok: true };
 export async function loginCustomer(formData: FormData): Promise<LoginResult> {
     const companyName = String(formData.get('companyName') ?? '').trim();
     const businessNumber = String(formData.get('businessNumber') ?? '').trim();
+    const autoLogin = formData.get('autoLogin') === 'on' ? 'true' : 'false';
 
     if (!companyName || !businessNumber) {
         return { ok: false, error: '회사명과 비밀번호를 모두 입력해주세요.' };
@@ -18,6 +19,7 @@ export async function loginCustomer(formData: FormData): Promise<LoginResult> {
         await signIn('customer', {
             companyName,
             businessNumber,
+            autoLogin,
             redirect: false,
         });
     } catch (e) {
@@ -33,6 +35,7 @@ export async function loginCustomer(formData: FormData): Promise<LoginResult> {
 export async function loginStaff(formData: FormData): Promise<LoginResult> {
     const loginId = String(formData.get('loginId') ?? '').trim();
     const password = String(formData.get('password') ?? '');
+    const autoLogin = formData.get('autoLogin') === 'on' ? 'true' : 'false';
 
     if (!loginId || !password) {
         return { ok: false, error: '아이디와 비밀번호를 모두 입력해주세요.' };
@@ -42,6 +45,7 @@ export async function loginStaff(formData: FormData): Promise<LoginResult> {
         await signIn('staff', {
             loginId,
             password,
+            autoLogin,
             redirect: false,
         });
     } catch (e) {

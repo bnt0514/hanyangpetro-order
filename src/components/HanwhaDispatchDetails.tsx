@@ -5,6 +5,7 @@ import DispatchKakaoNoticeButton from '@/components/DispatchKakaoNoticeButton';
 
 export type HanwhaDispatchDetailRow = {
     id: string;
+    indoChiName: string | null;
     materialNameRaw: string | null;
     materialName: string | null;
     quantityTon: number | null;
@@ -65,8 +66,8 @@ export default function HanwhaDispatchDetails({
                     <thead>
                         <tr className="bg-white text-left text-xs font-medium text-slate-500 uppercase">
                             <th className="px-6 py-3 w-10">#</th>
+                            <th className="px-6 py-3">인도처</th>
                             <th className="px-6 py-3">자재명</th>
-                            <th className="px-6 py-3">한양 표기</th>
                             <th className="px-6 py-3 text-right">수량(TON)</th>
                             <th className="px-6 py-3">기사정보</th>
                             {showDeleteAction && <th className="px-6 py-3 text-right">관리</th>}
@@ -76,8 +77,8 @@ export default function HanwhaDispatchDetails({
                         {rows.map((row, index) => (
                             <tr key={row.id}>
                                 <td className="px-6 py-3 text-xs text-slate-400">{index + 1}</td>
-                                <td className="px-6 py-3 text-xs font-mono text-slate-600">{row.materialNameRaw ?? '-'}</td>
-                                <td className="px-6 py-3 font-medium text-slate-800">{row.materialName ?? '-'}</td>
+                                <td className="px-6 py-3 font-medium text-slate-800">{row.indoChiName ?? '-'}</td>
+                                <td className="px-6 py-3 font-medium text-slate-800">{row.materialNameRaw ?? '-'}</td>
                                 <td className="px-6 py-3 text-right text-slate-700">
                                     {row.quantityTon != null ? fmtNumber(row.quantityTon) : '-'}
                                 </td>

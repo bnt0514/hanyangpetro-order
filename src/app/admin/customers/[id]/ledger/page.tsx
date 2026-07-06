@@ -2,10 +2,14 @@ import { auth } from '@/lib/auth';
 import { redirect, notFound } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, BookOpen } from 'lucide-react';
-import { defaultLedgerRange, getCustomerLedger, type CompanyLedger, type ReceiptRow } from '@/lib/ledger';
+import { defaultLedgerRange, getCustomerLedger, type CompanyLedger } from '@/lib/ledger';
 import { fmtDate, fmtNumber } from '@/lib/orders';
+import { prisma } from '@/lib/db';
 import LedgerRangeForm from './LedgerRangeForm';
-import SalesLedgerDateEditor from './SalesLedgerDateEditor';
+import ManualEntryDeleteButton from './ManualEntryDeleteButton';
+import LedgerRowEditButton, { type LedgerProductOption } from '@/app/admin/ledger/LedgerRowEditButton';
+import LedgerQuickAddForm from '@/app/admin/ledger/LedgerQuickAddForm';
+import { canEditCustomerLedger, canViewAllStaffData } from '@/lib/staff-permissions';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,7 +24,11 @@ function fmtAmount(value: number | null | undefined) {
 }
 
 function dateToInput(value: Date | null | undefined) {
-    return value ? value.toISOString().slice(0, 10) : '';
+    if (!value) return '';
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, '0');
+    const day = String(value.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
 }
 
 function deltaClass(value: number | null) {
@@ -34,7 +42,7 @@ function deltaText(value: number | null, suffix = '') {
     return `${value > 0 ? '▲' : '▼'} ${Math.abs(value).toLocaleString('ko-KR')}${suffix}`;
 }
 
-function LedgerTable({ ledger }: { ledger: CompanyLedger }) {
+function LedgerTable({ ledger, customerId, canEdit, products }: { ledger: CompanyLedger; customerId: string; canEdit: boolean; products: LedgerProductOption[] }) {
     return (
         <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
             <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-6 py-4">
@@ -42,6 +50,7 @@ function LedgerTable({ ledger }: { ledger: CompanyLedger }) {
                     <h2 className="text-lg font-semibold text-slate-800">{ledger.companyName} 거래처원장</h2>
                     <p className="mt-1 text-xs text-slate-500">매출일자=원장 반영일 기준 · 변경 시 오더 도착일은 유지되고 이력에 기록됩니다.</p>
                 </div>
+                <LedgerQuickAddForm canEdit={canEdit} mode="SALES" customerId={customerId} companyEntityId={ledger.companyEntityId} products={products} />
             </div>
             <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -58,18 +67,43 @@ function LedgerTable({ ledger }: { ledger: CompanyLedger }) {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                        {ledger.rows.map((row, index) => {
-                            const previous = ledger.rows[index - 1];
-                            const sameOrderAsPrevious = previous?.orderId && previous.orderId === row.orderId;
+                        {ledger.rows.map((row) => {
+                            const financeHref = row.noteNumber
+                                ? `/admin/finance-transactions?txType=NOTE_IN&q=${encodeURIComponent(row.noteNumber)}`
+                                : row.receiptId
+                                    ? `/admin/finance-transactions?q=${encodeURIComponent(row.memo ?? row.receiptId)}`
+                                    : null;
                             return (
                                 <tr key={row.itemId} className="hover:bg-slate-50/70">
                                     <td className="px-5 py-3 text-slate-600">
-                                        {sameOrderAsPrevious ? '' : (
-                                            <SalesLedgerDateEditor itemId={row.itemId} salesDate={dateToInput(row.salesDate)} />
-                                        )}
+                                        <div className="flex items-center gap-2">
+                                            <span>{row.salesDate ? fmtDate(row.salesDate) : '-'}</span>
+                                            {row.rowSource !== 'RECEIPT' && <LedgerRowEditButton
+                                                canEdit={canEdit}
+                                                mode="SALES"
+                                                rowId={row.itemId}
+                                                transactionDate={dateToInput(row.salesDate)}
+                                                productId={row.productId && !row.productId.startsWith('IMPORTED:') ? row.productId : null}
+                                                productName={row.productName}
+                                                quantity={row.quantity}
+                                                unit={row.unit}
+                                                unitPrice={row.unitPrice}
+                                                memo={row.memo}
+                                                products={products}
+                                            />}
+                                        </div>
                                     </td>
                                     <td className="px-5 py-3 font-mono text-xs">
-                                        {row.orderId ? (
+                                        {row.rowSource === 'RECEIPT' && financeHref ? (
+                                            <Link href={financeHref} className="inline-flex rounded-full bg-green-50 px-2.5 py-1 font-semibold text-green-700 hover:bg-green-100 hover:text-green-900">
+                                                {row.orderNo}
+                                            </Link>
+                                        ) : row.rowSource === 'MANUAL' ? (
+                                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-700">
+                                                ✍️ 수동입력
+                                                {canEdit && <ManualEntryDeleteButton ledgerEntryId={row.itemId.replace('ledger:', '')} />}
+                                            </span>
+                                        ) : row.orderId ? (
                                             <Link href={`/admin/orders/${row.orderId}`} className="inline-flex rounded-full bg-blue-50 px-2.5 py-1 font-semibold text-blue-700 hover:bg-blue-100 hover:text-blue-900">
                                                 {row.orderNo}
                                             </Link>
@@ -77,17 +111,26 @@ function LedgerTable({ ledger }: { ledger: CompanyLedger }) {
                                             <span className="text-slate-300">-</span>
                                         )}
                                     </td>
-                                    <td className="px-5 py-3 text-slate-700"><span className="font-medium">{row.productName}</span></td>
-                                    <td className="px-5 py-3 text-right text-slate-700">{fmtNumber(row.quantity)}</td>
+                                    <td className="px-5 py-3 text-slate-700">
+                                        <span className="font-medium">{row.productName}</span>
+                                        {row.rowSource === 'RECEIPT' && (
+                                            <div className="mt-1 text-xs text-slate-400">
+                                                {row.noteNumber ? `어음번호 ${row.noteNumber}` : row.memo ?? '-'}
+                                                {row.noteMaturityDate ? ` / 만기 ${fmtDate(row.noteMaturityDate)}` : ''}
+                                                {row.noteIssuer ? ` / 발행인 ${row.noteIssuer}` : ''}
+                                            </div>
+                                        )}
+                                    </td>
+                                    <td className="px-5 py-3 text-right text-slate-700">{row.rowSource === 'RECEIPT' ? '-' : fmtNumber(row.quantity)}</td>
                                     <td className="px-5 py-3 text-right text-slate-700">{fmtAmount(row.unitPrice)}</td>
-                                    <td className="px-5 py-3 text-right font-medium text-slate-800">{fmtAmount(row.amount)}</td>
+                                    <td className={`px-5 py-3 text-right font-medium ${row.rowSource === 'RECEIPT' ? 'text-green-700' : 'text-slate-800'}`}>{fmtAmount(row.amount)}</td>
                                     <td className="px-5 py-3 text-right text-slate-700">{fmtAmount(row.vatAmount)}</td>
-                                    <td className="px-5 py-3 text-right font-semibold text-slate-900">{fmtAmount(row.totalAmount)}</td>
+                                    <td className={`px-5 py-3 text-right font-semibold ${row.rowSource === 'RECEIPT' ? 'text-green-700' : 'text-slate-900'}`}>{fmtAmount(row.totalAmount)}</td>
                                 </tr>
                             );
                         })}
                     </tbody>
-                    <tfoot>
+                    {ledger.companyEntityId !== 'RECEIPTS' && <tfoot>
                         <tr className="border-t border-slate-200 bg-slate-50 text-sm font-semibold text-slate-800">
                             <td className="px-5 py-3" colSpan={3}>합계</td>
                             <td className="px-5 py-3 text-right">{fmtNumber(ledger.totalQuantity)}</td>
@@ -96,7 +139,7 @@ function LedgerTable({ ledger }: { ledger: CompanyLedger }) {
                             <td className="px-5 py-3 text-right">{fmtAmount(ledger.totalVatAmount)}</td>
                             <td className="px-5 py-3 text-right">{fmtAmount(ledger.totalWithVat)}</td>
                         </tr>
-                    </tfoot>
+                    </tfoot>}
                 </table>
             </div>
             {ledger.comparisons.length > 0 && (
@@ -124,8 +167,19 @@ export default async function AdminCustomerLedgerPage({ params, searchParams }: 
 
     const [{ id }, sp] = await Promise.all([params, searchParams]);
     const range = defaultLedgerRange();
-    const ledger = await getCustomerLedger(id, sp.from || range.from, sp.to || range.to);
+    const [ledger, products, currentUser, customerAccess] = await Promise.all([
+        getCustomerLedger(id, sp.from || range.from, sp.to || range.to),
+        prisma.product.findMany({
+            where: { isActive: true },
+            select: { id: true, productName: true, productCode: true },
+            orderBy: [{ productName: 'asc' }],
+        }),
+        prisma.user.findUnique({ where: { id: session.user.id }, select: { name: true, isActive: true } }),
+        prisma.customer.findUnique({ where: { id }, select: { defaultSalesRepId: true } }),
+    ]);
     if (!ledger) notFound();
+    if (!canViewAllStaffData(session.user) && customerAccess?.defaultSalesRepId !== session.user.id) notFound();
+    const canEditLedger = !!currentUser?.isActive && canEditCustomerLedger(currentUser);
 
     return (
         <div className="min-h-screen bg-slate-50">
@@ -156,44 +210,15 @@ export default async function AdminCustomerLedgerPage({ params, searchParams }: 
                     <button className="rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-800">조회</button>
                 </form>
                 {ledger.ledgers.length === 0 ? (
-                    <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-400">조회 기간 내 매출 원장 항목이 없습니다.</div>
+                    <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-400">
+                        <p>조회 기간 내 매출 원장 항목이 없습니다.</p>
+                        <div className="mt-4 flex justify-center">
+                            <LedgerQuickAddForm canEdit={canEditLedger} mode="SALES" customerId={ledger.customerId} products={products} />
+                        </div>
+                    </div>
                 ) : ledger.ledgers.map((companyLedger) => (
-                    <LedgerTable key={companyLedger.companyEntityId} ledger={companyLedger} />
+                    <LedgerTable key={companyLedger.companyEntityId} ledger={companyLedger} customerId={ledger.customerId} canEdit={canEditLedger} products={products} />
                 ))}
-
-                {/* 수금 내역 */}
-                {ledger.receipts.length > 0 && (
-                    <section className="rounded-2xl border border-green-200 bg-white shadow-sm overflow-hidden">
-                        <div className="flex items-center justify-between gap-3 border-b border-green-100 px-6 py-4 bg-green-50">
-                            <div>
-                                <h2 className="text-lg font-semibold text-green-800">수금 내역</h2>
-                                <p className="mt-1 text-xs text-green-600">기간 내 입금 합계: {fmtMoney(ledger.periodReceiptTotal)}</p>
-                            </div>
-                        </div>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="bg-slate-50 text-left text-xs font-medium text-slate-500 uppercase">
-                                        <th className="px-5 py-3">입금일자</th>
-                                        <th className="px-5 py-3 text-right">금액</th>
-                                        <th className="px-5 py-3">비고</th>
-                                        <th className="px-5 py-3">출처</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                    {ledger.receipts.map((r: ReceiptRow) => (
-                                        <tr key={r.id}>
-                                            <td className="px-5 py-3 text-slate-600">{fmtDate(r.txDate)}</td>
-                                            <td className="px-5 py-3 text-right font-medium text-green-700">{fmtMoney(r.amount)}</td>
-                                            <td className="px-5 py-3 text-slate-500">{r.memo ?? '-'}</td>
-                                            <td className="px-5 py-3 text-xs text-slate-400">{r.source}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </section>
-                )}
 
                 {/* 미수금 잔액 */}
                 <section className="rounded-2xl border border-slate-200 bg-white shadow-sm px-6 py-5">

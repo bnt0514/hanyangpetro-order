@@ -4,6 +4,7 @@ import { ArrowLeft, BarChart3 } from 'lucide-react';
 import { auth } from '@/lib/auth';
 import { fmtNumber } from '@/lib/orders';
 import { defaultProfitRange, getProfitReport, type ProfitReportRow, type ProfitSortDir, type ProfitSortKey } from '@/lib/profit-report';
+import { canViewAllStaffData } from '@/lib/staff-permissions';
 
 export const dynamic = 'force-dynamic';
 
@@ -168,7 +169,7 @@ export default async function AdminProfitReportPage({ searchParams }: { searchPa
 
     const sp = await searchParams;
     const range = defaultProfitRange();
-    const canViewAll = session.user.role === 'EXECUTIVE' || session.user.role === 'ADMIN';
+    const canViewAll = canViewAllStaffData(session.user);
     const view = validView(sp.view);
     const sort = validSort(sp.sort || (view === 'monthly' ? 'name' : 'sales'));
     const dir = (sp.dir === 'asc' || (!sp.dir && sort === 'name') ? 'asc' : 'desc') as ProfitSortDir;

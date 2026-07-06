@@ -6,6 +6,8 @@ import { ArrowLeft } from 'lucide-react';
 import { prisma } from '@/lib/db';
 import OrderForm from '@/components/OrderForm';
 import BackButton from '@/components/BackButton';
+import HomepageArchiveLink from '@/components/HomepageArchiveLink';
+import { isYangHeeCheol } from '@/lib/staff-permissions';
 
 export default async function StaffNewOrderPage() {
     const session = await auth();
@@ -66,7 +68,7 @@ export default async function StaffNewOrderPage() {
 
     const allAddressOptions = [...addressOptions, ...autoAddressOptions];
 
-    const isYangHuiCheol = session.user.name === '양희철';
+    const isYangHuiCheol = isYangHeeCheol(session.user);
     const hanyangEntity = await prisma.companyEntity.findFirst({
         where: {
             isActive: true,
@@ -84,10 +86,13 @@ export default async function StaffNewOrderPage() {
         <div className="min-h-screen">
             <header className="bg-white border-b border-slate-200">
                 <div className="max-w-3xl mx-auto px-6 h-16 flex items-center justify-between">
-                    <Link href="/admin" className="flex items-center gap-2">
-                        <Image src="/hanyanglogo.png" alt="logo" width={32} height={32} className="h-8 w-auto" />
-                        <span className="font-bold text-slate-800">한양유화 e-Business OS</span>
-                    </Link>
+                    <div className="flex items-center gap-2">
+                        <Link href="/admin" className="flex items-center gap-2">
+                            <Image src="/hanyanglogo.png" alt="logo" width={32} height={32} className="h-8 w-auto" />
+                            <span className="font-bold text-slate-800">한양유화 e-Business OS</span>
+                        </Link>
+                        <HomepageArchiveLink />
+                    </div>
                     <Link
                         href="/admin"
                         className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700"

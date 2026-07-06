@@ -68,6 +68,11 @@ export default function DashboardNextActionButton({ orderId, currentStatus }: { 
                 window.alert(result.error);
                 return;
             }
+
+            const changedStatus = action!.kind === 'receipt' ? 'COMPLETED' : action!.nextStatus;
+            window.dispatchEvent(new CustomEvent('dashboard-order-status-changed', {
+                detail: { orderId, status: changedStatus },
+            }));
             router.refresh();
         });
     }

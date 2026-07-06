@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { Building2, UserRound, AlertCircle, LogIn, Search } from 'lucide-react';
 import { loginCustomer, loginStaff, type LoginResult } from './actions';
 import HomeShortcutButton from './HomeShortcutButton';
+import HomepageArchiveLink from '@/components/HomepageArchiveLink';
 
 type Tab = 'customer' | 'staff';
 
@@ -45,10 +46,11 @@ export default function LoginForm() {
                     priority
                     className="h-24 w-auto drop-shadow-md"
                 />
-                <h1 className="mt-4 text-2xl font-bold text-slate-800 tracking-tight">
-                    주식회사 한양유화
-                </h1>
-                <p className="mt-1 text-sm text-slate-500">e-Business OS · 주문 관제 시스템</p>
+                <div className="mt-4 flex items-center justify-center gap-2">
+                    <p className="text-base font-bold text-slate-800">한양유화 BNT OS</p>
+                    <HomepageArchiveLink />
+                </div>
+                <p className="mt-1 text-sm text-slate-500">주문 관리 시스템</p>
             </div>
 
             {/* Card */}
@@ -93,7 +95,8 @@ export default function LoginForm() {
                                 autoComplete="current-password"
                                 required
                             />
-                            <SubmitButton pending={pending}>거래처 로그인</SubmitButton>
+                                                        <AutoLoginCheckbox />
+<SubmitButton pending={pending}>거래처 로그인</SubmitButton>
                         </form>
                     ) : (
                         <form onSubmit={submitStaff} className="space-y-4">
@@ -111,27 +114,35 @@ export default function LoginForm() {
                                 autoComplete="current-password"
                                 required
                             />
+                            <AutoLoginCheckbox />
                             <SubmitButton pending={pending}>직원 로그인</SubmitButton>
                         </form>
                     )}
 
                     <HomeShortcutButton />
 
-                    <div className="mt-5 pt-5 border-t border-slate-100 text-center">
-                        <a
-                            href="https://hanyangpetro.com"
-                            className="text-xs text-slate-500 hover:text-slate-700 transition"
-                        >
-                            ← 회사 홈페이지로 이동
-                        </a>
-                    </div>
                 </div>
             </div>
 
             <p className="mt-6 text-center text-xs text-slate-400">
-                © {new Date().getFullYear()} Hanyang Petrochemical Co., Ltd.
+                © {new Date().getFullYear()} BNT · Hanyang Petrochemical
             </p>
         </div>
+    );
+}
+
+
+function AutoLoginCheckbox() {
+    return (
+        <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+                type="checkbox"
+                name="autoLogin"
+                defaultChecked
+                className="h-4 w-4 rounded border-slate-300 accent-blue-600"
+            />
+            <span className="text-sm text-slate-600">자동 로그인 (이 기기에서 90일간 유지)</span>
+        </label>
     );
 }
 

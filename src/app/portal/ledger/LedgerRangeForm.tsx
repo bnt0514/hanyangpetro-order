@@ -46,9 +46,8 @@ export default function LedgerRangeForm({ from, to }: { from: string; to: string
 
     function goRecentThreeMonths() {
         const today = new Date();
-        const fromDate = new Date(today);
-        fromDate.setMonth(today.getMonth() - 3);
-        const firstDay = `${fromDate.getFullYear()}-${String(fromDate.getMonth() + 1).padStart(2, '0')}-${String(fromDate.getDate()).padStart(2, '0')}`;
+        const fromDate = new Date(today.getFullYear(), today.getMonth() - 2, 1);
+        const firstDay = `${fromDate.getFullYear()}-${String(fromDate.getMonth() + 1).padStart(2, '0')}-01`;
         const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
         submitRange(firstDay, todayStr);
     }

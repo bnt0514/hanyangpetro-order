@@ -13,6 +13,7 @@ import {
 } from '@/lib/performance-report';
 import PerformanceRangeButtons from './PerformanceRangeButtons';
 import PerformanceMultiFilter, { type PerformanceFilterOption } from './PerformanceMultiFilter';
+import { canViewAllStaffData } from '@/lib/staff-permissions';
 
 export const dynamic = 'force-dynamic';
 
@@ -253,7 +254,7 @@ export default async function AdminPerformanceReportPage({ searchParams }: { sea
     const session = await auth();
     if (!session?.user) redirect('/login');
     if (session.user.userKind !== 'staff') redirect('/portal');
-    const canViewAll = session.user.name === '양희철' || session.user.name === '차성식';
+    const canViewAll = canViewAllStaffData(session.user);
 
     const sp = await searchParams;
     const view = validView(sp.view);

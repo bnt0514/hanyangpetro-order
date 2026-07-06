@@ -188,3 +188,22 @@ export function getDateInfo(iso: string): DateInfo | null {
 
     return { type: 'business', message: `${DAY_NAMES[dow]}입니다`, isWarning: false };
 }
+
+export function isBusinessDate(iso: string) {
+    const info = getDateInfo(iso);
+    return info?.type === 'business';
+}
+
+export function previousBusinessDate(date: Date | null | undefined) {
+    if (!date) return null;
+    const cursor = new Date(date);
+    cursor.setHours(0, 0, 0, 0);
+    cursor.setDate(cursor.getDate() - 1);
+
+    for (let i = 0; i < 14; i += 1) {
+        const iso = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`;
+        if (isBusinessDate(iso)) return new Date(cursor);
+        cursor.setDate(cursor.getDate() - 1);
+    }
+    return new Date(cursor);
+}

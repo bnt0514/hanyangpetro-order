@@ -1,22 +1,16 @@
 /**
- * 한화전산시스템(H-CRM) 출고/배차 정보 스크래퍼
- * --------------------------------------------------------------
- * Python(Selenium) 기반 기존 자동화를 Playwright로 포팅.
- * 인도처별 Line 정보의 모든 셀(td)을 통째로 가져온다.
+ * Hanwha e-Sales dispatch scraper.
  *
- * 사용 예:
- *   const result = await scrapeHanwhaDispatch('2026-04-30');
+ * Keeps the existing return shape used by dispatch/actions.ts:
+ * destination row -> line rows -> material/quantity/rawCells.
  */
-import { chromium, type Browser, type Page } from 'playwright';
+import path from 'path';
+import { chromium, type Page } from 'playwright';
 
 export interface ScrapedLine {
-    /** 자재명(원본) */
     materialNameRaw: string | null;
-    /** 한양 표기로 변환한 자재명 */
     materialName: string | null;
-    /** 출고 수량 (kg) */
     quantityKg: number | null;
-    /** Line 행의 모든 td 텍스트 (원본 그대로) */
     rawCells: string[];
 }
 
@@ -36,39 +30,815 @@ export interface ScrapeResult {
 }
 
 export interface ScrapeOptions {
-    /** DB에서 로드한 자격증명 (없으면 .env 사용) */
     username?: string | null;
     password?: string | null;
 }
 
-/**
- * "2026-04-30" → "2026. 4. 30."  (한화 input 포맷)
- */
-function toHanwhaDate(isoDate: string): string {
-    const [y, m, d] = isoDate.split('-').map(Number);
-    return `${y}. ${m}. ${d}.`;
+const ESALES_LOGIN_URL = 'https://esales.hanwhasolutions.com/esplus/resources/login.html';
+const REMOTE_DEBUGGING_PORT = 9224;
+const dialogHandlerPages = new WeakSet<Page>();
+
+type AcquiredESalesPage = {
+    page: Page;
+};
+
+function chromePath() {
+    return process.env.CHROME_PATH?.trim() || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
 }
 
-/**
- * MF_LD_953 → LDPE<953>  같은 한양 자재명 변환
- */
+function controlledProfileDir() {
+    return path.join(process.cwd(), 'tmp', 'hanwha-esales-controlled-profile');
+}
+
+function sleep(ms: number) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isoToYmd(isoDate: string) {
+    return isoDate.replace(/\D/g, '');
+}
+
 function convertMaterialName(name: string): string {
     if (!name) return name;
-    let s = name;
+    let s = name.trim();
     if (s.startsWith('MF_')) s = s.slice(3);
     s = s.replace(/_/g, ' ');
     const map: Record<string, string> = {
         LD: 'LDPE',
         LLD: 'LLDPE',
-        mLLD: 'mLLDPE',
+        MLLD: 'mLLDPE',
         HD: 'HDPE',
         EVA: 'EVA',
     };
-    const parts = s.split(' ');
-    if (parts[0] in map && parts[1]) {
-        return `${map[parts[0]]}<${parts[1]}>`;
-    }
+    const parts = s.split(/\s+/);
+    const family = map[parts[0]?.toUpperCase()];
+    if (family && parts[1]) return `${family}<${parts[1]}>`;
     return s;
+}
+
+function parseQuantityKg(value: string | null | undefined) {
+    const raw = (value ?? '').replace(/,/g, '').trim();
+    if (!raw || !/^-?\d+(\.\d+)?$/.test(raw)) return null;
+    const numeric = Number(raw);
+    return Number.isFinite(numeric) ? numeric : null;
+}
+
+function findColumnIndex(headers: string[], patterns: RegExp[], fallback = -1) {
+    const index = headers.findIndex((header) => patterns.some((pattern) => pattern.test(header)));
+    return index >= 0 ? index : fallback;
+}
+
+async function launchControlledChrome() {
+    const { spawn } = await import('child_process');
+    const child = spawn(chromePath(), [
+        `--remote-debugging-port=${REMOTE_DEBUGGING_PORT}`,
+        `--user-data-dir=${controlledProfileDir()}`,
+        '--no-first-run',
+        '--disable-session-crashed-bubble',
+        '--hide-crash-restore-bubble',
+        '--new-window',
+        ESALES_LOGIN_URL,
+    ], {
+        detached: true,
+        stdio: 'ignore',
+        windowsHide: false,
+    });
+    child.unref();
+}
+
+async function waitForCdp() {
+    const endpoint = `http://127.0.0.1:${REMOTE_DEBUGGING_PORT}/json/version`;
+    for (let i = 0; i < 40; i += 1) {
+        try {
+            const response = await fetch(endpoint);
+            if (response.ok) return;
+        } catch {
+            // Chrome is still starting.
+        }
+        await sleep(250);
+    }
+    throw new Error('Chrome remote debugging endpoint did not start.');
+}
+
+async function isCdpOpen() {
+    try {
+        const response = await fetch(`http://127.0.0.1:${REMOTE_DEBUGGING_PORT}/json/version`);
+        return response.ok;
+    } catch {
+        return false;
+    }
+}
+
+async function hasLoggedInESalesShell(page: Page) {
+    return page.evaluate(() => {
+        function visible(el: Element | null): el is HTMLElement {
+            return !!el && el instanceof HTMLElement && el.offsetParent !== null;
+        }
+        function textOf(el: Element | null) {
+            return (el?.textContent || '').replace(/\s+/g, ' ').trim();
+        }
+        const visibleText = Array.from(document.querySelectorAll('div,button,[role="button"],[role="treeitem"]'))
+            .filter(visible)
+            .map(textOf)
+            .join(' ');
+        if (
+            visibleText.includes('주문입력(대리점)')
+            || visibleText.includes('주문 진행 조회')
+            || visibleText.includes('배차 조회')
+            || visibleText.includes('대리점오더 등록')
+            || visibleText.includes('입차예정일')
+            || visibleText.includes('Header 정보')
+            || visibleText.includes('Line 정보')
+        ) return true;
+        return Array.from(document.querySelectorAll([
+            'div[id*="POP_ORDER_REG"]',
+            'div[id*="ESD_PARTNER_INFO_V"]',
+            'div[id*="ESD_SALES_ITEM_V"]',
+        ].join(','))).some(visible);
+    }).catch(() => false);
+}
+
+async function getDispatchESalesPage(): Promise<AcquiredESalesPage> {
+    if (!await isCdpOpen()) {
+        await launchControlledChrome();
+    }
+    await waitForCdp();
+
+    const browser = await chromium.connectOverCDP(`http://127.0.0.1:${REMOTE_DEBUGGING_PORT}`);
+    const context = browser.contexts()[0] ?? await browser.newContext();
+
+    const esalesPages = context.pages().filter((candidate) => candidate.url().includes('esales.hanwhasolutions.com'));
+    for (const candidate of esalesPages) {
+        if (!await hasLoggedInESalesShell(candidate)) continue;
+        registerDialogHandler(candidate);
+        await candidate.bringToFront().catch(() => undefined);
+        await candidate.waitForLoadState('domcontentloaded', { timeout: 10_000 }).catch(() => undefined);
+        return { page: candidate };
+    }
+
+    const existingESalesPage = esalesPages[0];
+    const page = existingESalesPage ?? await context.newPage();
+    registerDialogHandler(page);
+    if (!existingESalesPage) {
+        await page.goto(ESALES_LOGIN_URL, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+    }
+    await page.waitForLoadState('domcontentloaded', { timeout: 60_000 }).catch(() => undefined);
+    await page.bringToFront();
+    return { page };
+}
+
+function registerDialogHandler(page: Page) {
+    if (dialogHandlerPages.has(page)) return;
+    dialogHandlerPages.add(page);
+    page.on('dialog', async (dialog) => {
+        try {
+            await dialog.accept();
+        } catch {
+            // Nexacro dialogs may already be gone by the time Playwright responds.
+        }
+    });
+}
+
+async function clickNexacro(page: Page, selector: string, timeoutMs = 20_000) {
+    const started = Date.now();
+    while (Date.now() - started < timeoutMs) {
+        const target = await page.evaluate((selector) => {
+            function visible(el: Element | null): el is HTMLElement {
+                if (!el || !(el instanceof HTMLElement) || el.offsetParent === null) return false;
+                const rect = el.getBoundingClientRect();
+                return rect.width > 0 && rect.height > 0;
+            }
+            const el = Array.from(document.querySelectorAll(selector)).find(visible) as HTMLElement | undefined;
+            if (!el) return null;
+            const host = el.id.includes(':icontext')
+                ? document.getElementById(el.id.replace(':icontext', ''))
+                : el;
+            const target = visible(host) ? host : el;
+            const rect = target.getBoundingClientRect();
+            return {
+                x: rect.left + rect.width / 2,
+                y: rect.top + rect.height / 2,
+            };
+        }, selector);
+        if (target) {
+            await page.mouse.move(target.x, target.y);
+            await page.mouse.down();
+            await page.mouse.up();
+            await page.waitForTimeout(300);
+            return;
+        }
+        await page.waitForTimeout(300);
+    }
+    throw new Error(`e-Sales element not found: ${selector}`);
+}
+
+async function focusNexacroWindowTab(page: Page, windowCode: string) {
+    await clickNexacro(page, `div[id*="frameNavi.form.divTab.form.TAB_${windowCode}"]`, 2_000)
+        .catch(() => undefined);
+    await page.waitForTimeout(200);
+}
+
+async function closeVisibleESalesPopups(page: Page) {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+        const clicked = await page.evaluate(() => {
+            function visible(el: Element | null): el is HTMLElement {
+                if (!el || !(el instanceof HTMLElement) || el.offsetParent === null) return false;
+                const rect = el.getBoundingClientRect();
+                return rect.width > 0 && rect.height > 0;
+            }
+            function fireMouse(el: HTMLElement) {
+                for (const type of ['mouseover', 'mousemove', 'mousedown', 'mouseup', 'click']) {
+                    el.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window }));
+                }
+            }
+            function clickElement(el: HTMLElement) {
+                const linked = (el as HTMLElement & { _linked_element?: { linkedcontrol?: { click?: () => void } } })._linked_element;
+                const comp = linked?.linkedcontrol;
+                const click = comp?.click;
+                if (typeof click === 'function') click.call(comp);
+                else fireMouse(el);
+            }
+            function popupRoot(el: Element) {
+                return el.closest('div[id*="POP_"], div[id*="ESD_PARTNER_INFO_V"], div[id*="ESD_SALES_ITEM_V"]') as HTMLElement | null;
+            }
+            const closeButton = Array.from(document.querySelectorAll('div,button,[role="button"]'))
+                .find((el): el is HTMLElement => {
+                    if (!visible(el)) return false;
+                    const root = popupRoot(el);
+                    if (!root || !visible(root)) return false;
+                    const text = (el.textContent || '').replace(/\s+/g, ' ').trim();
+                    const id = el.id.toLowerCase();
+                    return id.includes('closebutton') || id.endsWith('form.btnclose') || text === '닫기';
+                });
+            if (!closeButton) return false;
+            clickElement(closeButton);
+            return true;
+        });
+        if (!clicked) return;
+        await page.waitForTimeout(500);
+    }
+}
+
+async function clickVisibleNexacroOk(page: Page, timeoutMs = 1_500) {
+    const started = Date.now();
+    while (Date.now() - started < timeoutMs) {
+        const target = await page.evaluate(() => {
+            function visible(el: Element | null): el is HTMLElement {
+                if (!el || !(el instanceof HTMLElement)) return false;
+                const rect = el.getBoundingClientRect();
+                const style = getComputedStyle(el);
+                return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
+            }
+            const buttons = Array.from(document.querySelectorAll([
+                'div[id*="comCONFIRM"][id$="form.divBtnConfirm.form.btnOk"]',
+                'div[id*="comALERT"][id$="form.divBtnAlert.form.btnOk"]',
+                'div[id*="comALERT"][id$="form.divBtnConfirm.form.btnOk"]',
+                'div[id$="form.divBtnConfirm.form.btnOk"]',
+                'div[id$="form.divBtnAlert.form.btnOk"]',
+            ].join(',')))
+                .filter((el): el is HTMLElement => visible(el))
+                .map((el) => {
+                    const rect = el.getBoundingClientRect();
+                    return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, left: rect.left };
+                })
+                .sort((a, b) => b.left - a.left);
+            return buttons[0] ?? null;
+        });
+        if (target) {
+            await page.mouse.click(target.x, target.y, { delay: 80 });
+            await page.waitForTimeout(500);
+            return true;
+        }
+        await page.waitForTimeout(200);
+    }
+    return false;
+}
+
+async function closeAllNexacroWorkTabs(page: Page) {
+    await page.bringToFront().catch(() => undefined);
+    await closeVisibleESalesPopups(page);
+
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+        const target = await page.evaluate(() => {
+            function visible(el: Element | null): el is HTMLElement {
+                if (!el || !(el instanceof HTMLElement)) return false;
+                const rect = el.getBoundingClientRect();
+                const style = getComputedStyle(el);
+                return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
+            }
+            const buttons = Array.from(document.querySelectorAll('div[id*="frameNavi.form.divTab.form.EXTRA_TAB_"]'))
+                .filter((el): el is HTMLElement => visible(el) && !el.id.includes(':icontext'))
+                .map((el) => {
+                    const rect = el.getBoundingClientRect();
+                    return {
+                        x: rect.left + rect.width / 2,
+                        y: rect.top + rect.height / 2,
+                        left: rect.left,
+                    };
+                })
+                .sort((a, b) => b.left - a.left);
+            return buttons[0] ?? null;
+        });
+        if (!target) break;
+        await page.mouse.click(target.x, target.y, { delay: 80 });
+        await page.waitForTimeout(500);
+        await clickVisibleNexacroOk(page);
+    }
+
+    await closeVisibleESalesPopups(page);
+}
+
+async function clickByText(page: Page, texts: string[], timeoutMs = 20_000) {
+    const started = Date.now();
+    while (Date.now() - started < timeoutMs) {
+        const clicked = await page.evaluate((texts) => {
+            function visible(el: Element | null): el is HTMLElement {
+                return !!el && el instanceof HTMLElement && el.offsetParent !== null;
+            }
+            function textOf(el: Element | null) {
+                return (el?.textContent || '').replace(/\s+/g, ' ').trim();
+            }
+            function fireMouse(el: HTMLElement) {
+                for (const type of ['mouseover', 'mousemove', 'mousedown', 'mouseup', 'click']) {
+                    el.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window }));
+                }
+            }
+            const candidates = Array.from(document.querySelectorAll('div,button,[role="button"],[role="treeitem"]'))
+                .filter(visible) as HTMLElement[];
+            const el = candidates.find((candidate) => texts.some((text) => textOf(candidate) === text || textOf(candidate).includes(text)));
+            if (!el) return false;
+            const comp = (el as HTMLElement & { _linked_element?: { linkedcontrol?: { click?: () => void } } })._linked_element?.linkedcontrol;
+            if (typeof comp?.click === 'function') {
+                comp.click();
+                return true;
+            }
+            fireMouse(el);
+            return true;
+        }, texts);
+        if (clicked) return;
+        await page.waitForTimeout(300);
+    }
+    throw new Error(`${texts.join(', ')} 메뉴/버튼을 찾지 못했습니다.`);
+}
+
+async function hasVisibleSelector(page: Page, selector: string) {
+    return page.evaluate((selector) => {
+        return Array.from(document.querySelectorAll(selector))
+            .some((el) => el instanceof HTMLElement && el.offsetParent !== null);
+    }, selector).catch(() => false);
+}
+
+async function fillInput(page: Page, selector: string, value: string) {
+    await page.waitForSelector(selector, { state: 'visible', timeout: 20_000 });
+    const locator = page.locator(selector).first();
+    await locator.click({ force: true });
+    await page.keyboard.press('Control+A');
+    await page.keyboard.press('Backspace');
+    await page.keyboard.insertText(value);
+    await page.waitForTimeout(150);
+    if (await locator.inputValue().catch(() => '') !== value) {
+        await locator.fill(value, { force: true }).catch(() => undefined);
+    }
+    if (await locator.inputValue().catch(() => '') !== value) {
+        await page.evaluate(({ selector, value }) => {
+            const input = document.querySelector(selector) as HTMLInputElement | null;
+            if (!input) return;
+            const valueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+            valueSetter?.call(input, value);
+            input.dispatchEvent(new InputEvent('input', { bubbles: true, data: value, inputType: 'insertText' }));
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+        }, { selector, value });
+    }
+}
+
+async function clickLoginButton(page: Page) {
+    await clickNexacro(page, [
+        'div[id$="frameLogin.form.divLogin.form.btnLogin"]',
+        'div[id*="frameLogin"][id*="btnLogin"]',
+        'div[id$="btnLogin"]',
+        'div[id*="btnLogin"]',
+    ].join(','), 5_000).catch(async (error) => {
+        if (await hasLoggedInESalesShell(page)) return;
+        await clickByText(page, ['로그인'], 5_000).catch(() => {
+            throw error;
+        });
+    });
+}
+
+async function loginAndSendOtpIfNeeded(page: Page, username: string, password: string) {
+    if (await hasLoggedInESalesShell(page)) return;
+
+    const userSelectors = [
+        'input[id$="frameLogin.form.divLogin.form.edtId:input"]',
+        'input[id*="frameLogin"][id*="edtId"][id$=":input"]',
+        'input[id*="edtId"][id$=":input"]',
+    ];
+    const passwordSelectors = [
+        'input[id$="frameLogin.form.divLogin.form.edtPw:input"]',
+        'input[id*="frameLogin"][id*="edtPw"][id$=":input"]',
+        'input[id*="edtPw"][id$=":input"]',
+    ];
+    const userSelector = await (async () => {
+        for (const selector of userSelectors) {
+            if (await hasVisibleSelector(page, selector)) return selector;
+        }
+        return null;
+    })();
+    if (!userSelector) return;
+    const passwordSelector = await (async () => {
+        for (const selector of passwordSelectors) {
+            if (await hasVisibleSelector(page, selector)) return selector;
+        }
+        return null;
+    })();
+    if (!passwordSelector) throw new Error('비밀번호 입력란을 찾지 못했습니다.');
+
+    await fillInput(page, userSelector, username);
+    await fillInput(page, passwordSelector, password);
+    await clickLoginButton(page);
+    await page.waitForTimeout(1500);
+    await clickNexacro(page, 'div[id$="POP_LOGIN_OTP_NOTI.form.btnClose"]', 4000).catch(() => undefined);
+    await page.waitForTimeout(800);
+    if (await page.locator('div[id$="frm_LoginOTP.form.btnSendOTP"]').first().isVisible().catch(() => false)) {
+        await clickNexacro(page, 'div[id$="frm_LoginOTP.form.btnSendOTP"]');
+    }
+}
+
+async function waitForDispatchMenu(page: Page) {
+    for (let attempt = 0; attempt < 61; attempt += 1) {
+        const found = await page.evaluate(() => {
+            function visible(el: Element | null): el is HTMLElement {
+                return !!el && el instanceof HTMLElement && el.offsetParent !== null;
+            }
+            return Array.from(document.querySelectorAll('div,button,[role="button"],[role="treeitem"]'))
+                .filter(visible)
+                .some((el) => {
+                    const text = (el.textContent || '').replace(/\s+/g, ' ').trim();
+                    const title = el.getAttribute('title') || '';
+                    const aria = `${el.getAttribute('aria-label') || ''} ${el.getAttribute('aria-description') || ''}`;
+                    return text.includes('주문 진행 조회')
+                        || text.includes('배차 조회')
+                        || title.includes('주문 진행 조회')
+                        || title.includes('배차 조회')
+                        || aria.includes('주문 진행 조회')
+                        || aria.includes('배차 조회');
+                });
+        });
+        if (found) return;
+        await page.waitForTimeout(3000);
+    }
+    throw new Error('OTP 인증 후 주문 진행 조회/배차 조회 메뉴가 나타나지 않았습니다.');
+}
+
+async function openDispatchProgressPage(page: Page) {
+    const alreadyOpen = await page.evaluate(() => {
+        function visible(el: Element | null): el is HTMLElement {
+            return !!el && el instanceof HTMLElement && el.offsetParent !== null;
+        }
+        const visibleText = Array.from(document.querySelectorAll('div,span,button,[role="button"]'))
+            .filter(visible)
+            .map((el) => (el.textContent || '').replace(/\s+/g, ' ').trim())
+            .join(' ');
+        return visibleText.includes('입차예정일')
+            || visibleText.includes('Line 정보')
+            || visibleText.includes('Header 정보')
+            || Array.from(document.querySelectorAll('div[id*="form.divWork.form.grdMainLine"]')).some(visible);
+    }).catch(() => false);
+    if (alreadyOpen) return;
+
+    await waitForDispatchMenu(page);
+    await clickDispatchProgressMenu(page);
+    await page.waitForFunction(() => {
+        function visible(el: Element | null): el is HTMLElement {
+            return !!el && el instanceof HTMLElement && el.offsetParent !== null;
+        }
+        const visibleText = Array.from(document.querySelectorAll('div,span,button,[role="button"]'))
+            .filter(visible)
+            .map((el) => (el.textContent || '').replace(/\s+/g, ' ').trim())
+            .join(' ');
+        return visibleText.includes('입차예정일')
+            || visibleText.includes('Line 정보')
+            || visibleText.includes('Header 정보')
+            || Array.from(document.querySelectorAll('div[id*="form.divWork.form.grdMainLine"]')).some(visible);
+    }, null, { timeout: 20_000 });
+}
+
+async function clickDispatchProgressMenu(page: Page) {
+    const clicked = await page.evaluate(() => {
+        const labels = ['주문 진행 조회', '배차 조회'];
+        function visible(el: Element | null): el is HTMLElement {
+            return !!el && el instanceof HTMLElement && el.offsetParent !== null;
+        }
+        function textOf(el: Element | null) {
+            if (!el) return '';
+            return [
+                el.textContent || '',
+                el.getAttribute('title') || '',
+                el.getAttribute('aria-label') || '',
+                el.getAttribute('aria-description') || '',
+            ].join(' ').replace(/\s+/g, ' ').trim();
+        }
+        function fireMouse(el: HTMLElement) {
+            for (const type of ['mouseover', 'mousemove', 'mousedown', 'mouseup', 'click']) {
+                el.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window }));
+            }
+        }
+        const candidates = Array.from(document.querySelectorAll([
+            'div[id*="frameLeft.form.divLeft.form.grdTree.body.gridrow_9.cell_9_0"]',
+            'div[id*="frameLeft.form.divLeft.form.grdTree"] [role="treeitem"]',
+            'div[id*="frameLeft.form.divLeft.form.grdTree"] .treeitemtext',
+            'div[id*="frameLeft.form.divLeft.form.grdTree.body.gridrow_"]',
+            'div,button,[role="button"],[role="treeitem"],[title],[aria-label],[aria-description]',
+        ].join(',')))
+            .filter(visible) as HTMLElement[];
+        const menu = candidates.find((el) => labels.some((label) => textOf(el) === label))
+            ?? candidates.find((el) => labels.some((label) => textOf(el).includes(label)));
+        if (!menu) return false;
+        const target = menu.closest('div.GridCellControl') as HTMLElement | null
+            ?? menu.closest('div[id*="frameLeft.form.divLeft.form.grdTree.body.gridrow_"]') as HTMLElement | null
+            ?? menu;
+        target.scrollIntoView({ block: 'center', inline: 'nearest' });
+        const comp = (target as HTMLElement & { _linked_element?: { linkedcontrol?: { click?: () => void } } })._linked_element?.linkedcontrol;
+        if (typeof comp?.click === 'function') comp.click();
+        else fireMouse(target);
+        return true;
+    });
+    if (!clicked) throw new Error('주문 진행 조회/배차 조회 메뉴를 클릭하지 못했습니다.');
+}
+
+async function isDispatchProgressPageFast(page: Page) {
+    return page.evaluate(() => {
+        function visible(el: Element | null): el is HTMLElement {
+            return !!el && el instanceof HTMLElement && el.offsetParent !== null;
+        }
+        const text = Array.from(document.querySelectorAll('div,span,button,[role="button"]'))
+            .filter(visible)
+            .map((el) => (el.textContent || '').replace(/\s+/g, ' ').trim())
+            .join(' ');
+        return text.includes('입차예정일')
+            || text.includes('Header 정보')
+            || text.includes('Line 정보')
+            || Array.from(document.querySelectorAll('div[id*="form.divWork.form.grdMainLine"]')).some(visible);
+    }).catch(() => false);
+}
+
+async function hasDispatchProgressMenuFast(page: Page) {
+    return page.evaluate(() => {
+        function visible(el: Element | null): el is HTMLElement {
+            return !!el && el instanceof HTMLElement && el.offsetParent !== null;
+        }
+        return Array.from(document.querySelectorAll([
+            'div[id$="frameLeft.form.divLeft.form.grdTree.body.gridrow_9.cell_9_0"]',
+            'div[id*="frameLeft.form.divLeft.form.grdTree.body.gridrow_9.cell_9_0"]',
+            'div[id$="frameLeft.form.divLeft.form.grdTree.body.gridrow_5.cell_5_0"]',
+            'div[id*="frameLeft.form.divLeft.form.grdTree.body.gridrow_5.cell_5_0"]',
+            'div[id$="celltreeitem.treeitemtext"]',
+            'div[id$="celltreeitem.treeitemtext:text"]',
+            'div',
+            'button',
+            '[role="button"]',
+            '[role="treeitem"]',
+            '[title]',
+            '[aria-label]',
+            '[aria-description]',
+        ].join(','))).some((el) => {
+            if (!visible(el)) return false;
+            const text = (el.textContent || '').replace(/\s+/g, ' ').trim();
+            const title = el.getAttribute('title') || '';
+            const aria = `${el.getAttribute('aria-label') || ''} ${el.getAttribute('aria-description') || ''}`;
+            return text.includes('주문 진행 조회')
+                || text.includes('배차 조회')
+                || title.includes('주문 진행 조회')
+                || title.includes('배차 조회')
+                || aria.includes('주문 진행 조회')
+                || aria.includes('배차 조회');
+        });
+    }).catch(() => false);
+}
+
+async function clickDispatchProgressMenuFast(page: Page) {
+    const clicked = await page.evaluate(() => {
+        const labels = ['주문 진행 조회', '배차 조회'];
+        function visible(el: Element | null): el is HTMLElement {
+            return !!el && el instanceof HTMLElement && el.offsetParent !== null;
+        }
+        function textOf(el: Element | null) {
+            if (!el) return '';
+            return [
+                el.textContent || '',
+                el.getAttribute('title') || '',
+                el.getAttribute('aria-label') || '',
+                el.getAttribute('aria-description') || '',
+            ].join(' ').replace(/\s+/g, ' ').trim();
+        }
+        function fireMouse(el: HTMLElement) {
+            for (const type of ['mouseover', 'mousemove', 'mousedown', 'mouseup', 'click']) {
+                el.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window }));
+            }
+        }
+        function clickElement(el: HTMLElement) {
+            const comp = (el as HTMLElement & { _linked_element?: { linkedcontrol?: { click?: () => void } } })._linked_element?.linkedcontrol;
+            if (typeof comp?.click === 'function') comp.click();
+            else fireMouse(el);
+        }
+
+        const exactSelectors = [
+            'div[id$="frameLeft.form.divLeft.form.grdTree.body.gridrow_9.cell_9_0"]',
+            'div[id*="frameLeft.form.divLeft.form.grdTree.body.gridrow_9.cell_9_0"]',
+            'div[id$="frameLeft.form.divLeft.form.grdTree.body.gridrow_9.cell_9_0.celltreeitem"]',
+            'div[id*="frameLeft.form.divLeft.form.grdTree.body.gridrow_9.cell_9_0.celltreeitem"]',
+            'div[id$="frameLeft.form.divLeft.form.grdTree.body.gridrow_9.cell_9_0.celltreeitem.treeitemtext"]',
+            'div[id*="frameLeft.form.divLeft.form.grdTree.body.gridrow_9.cell_9_0.celltreeitem.treeitemtext"]',
+            'div[id$="frameLeft.form.divLeft.form.grdTree.body.gridrow_5.cell_5_0"]',
+            'div[id*="frameLeft.form.divLeft.form.grdTree.body.gridrow_5.cell_5_0"]',
+            'div[id$="frameLeft.form.divLeft.form.grdTree.body.gridrow_5.cell_5_0.celltreeitem"]',
+            'div[id*="frameLeft.form.divLeft.form.grdTree.body.gridrow_5.cell_5_0.celltreeitem"]',
+            'div[id$="frameLeft.form.divLeft.form.grdTree.body.gridrow_5.cell_5_0.celltreeitem.treeitemtext"]',
+            'div[id*="frameLeft.form.divLeft.form.grdTree.body.gridrow_5.cell_5_0.celltreeitem.treeitemtext"]',
+        ];
+        for (const selector of exactSelectors) {
+            const el = Array.from(document.querySelectorAll(selector)).find(visible) as HTMLElement | undefined;
+            if (el) {
+                clickElement(el);
+                return true;
+            }
+        }
+
+        const candidates = Array.from(document.querySelectorAll('div,button,[role="button"],[role="treeitem"],[title],[aria-label],[aria-description]'))
+            .filter(visible) as HTMLElement[];
+        const menu = candidates.find((el) => labels.some((label) => textOf(el) === label))
+            ?? candidates.find((el) => labels.some((label) => textOf(el).includes(label)));
+        if (!menu) return false;
+        const target = menu.closest('div.GridCellControl') as HTMLElement | null
+            ?? menu.closest('div[id*="frameLeft.form.divLeft.form.grdTree.body.gridrow_"]') as HTMLElement | null
+            ?? menu;
+        target.scrollIntoView({ block: 'center', inline: 'nearest' });
+        clickElement(target);
+        return true;
+    });
+    if (!clicked) throw new Error('주문 진행 조회/배차 조회 메뉴를 클릭하지 못했습니다.');
+}
+
+async function openDispatchProgressPageFast(page: Page) {
+    if (await isDispatchProgressPageFast(page)) return;
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+        if (await hasDispatchProgressMenuFast(page)) break;
+        await page.waitForTimeout(1000);
+        if (attempt === 59) throw new Error('OTP 인증 후 주문 진행 조회/배차 조회 메뉴가 나타나지 않았습니다.');
+    }
+    await clickDispatchProgressMenuFast(page);
+    await page.waitForFunction(() => {
+        function visible(el: Element | null): el is HTMLElement {
+            return !!el && el instanceof HTMLElement && el.offsetParent !== null;
+        }
+        const text = Array.from(document.querySelectorAll('div,span,button,[role="button"]'))
+            .filter(visible)
+            .map((el) => (el.textContent || '').replace(/\s+/g, ' ').trim())
+            .join(' ');
+        return text.includes('입차예정일')
+            || text.includes('Header 정보')
+            || text.includes('Line 정보')
+            || Array.from(document.querySelectorAll('div[id*="form.divWork.form.grdMainLine"]')).some(visible);
+    }, null, { timeout: 20_000 });
+}
+
+async function fillArrivalDateRange(page: Page, ymd: string) {
+    await focusNexacroWindowTab(page, 'winESDMY-10-145');
+    const selectors = [
+        'input[id*="winESDMY-10-145"][id$="form.divWork.form.divSearch.form.calETDAT_FROM.calendaredit:input"]',
+        'input[id*="winESDMY-10-145"][id$="form.divWork.form.divSearch.form.calETDAT_TO.calendaredit:input"]',
+        'input[id*="winESDMY-10-145"][id*="form.divWork.form.divSearch.form.calETDAT_FROM.calendaredit:input"]',
+        'input[id*="winESDMY-10-145"][id*="form.divWork.form.divSearch.form.calETDAT_TO.calendaredit:input"]',
+    ];
+
+    for (const selector of selectors) {
+        const input = page.locator(selector).first();
+        if (!(await input.isVisible().catch(() => false))) continue;
+        await input.click({ force: true });
+        await page.waitForTimeout(150);
+        await input.press('Control+A');
+        await page.waitForTimeout(50);
+        await input.press('Backspace');
+        await page.waitForTimeout(50);
+        await input.fill('');
+        await input.type(ymd, { delay: 20 });
+        await page.waitForTimeout(150);
+    }
+}
+
+type GridData = {
+    headers: string[];
+    rows: Array<{ id: string; cells: string[]; text: string }>;
+};
+
+async function readGrid(page: Page, gridName: string): Promise<GridData> {
+    return page.evaluate((gridName) => {
+        function visible(el: Element | null): el is HTMLElement {
+            return !!el && el instanceof HTMLElement && el.offsetParent !== null;
+        }
+        function isGridCell(el: Element | null): el is HTMLElement {
+            return !!el
+                && el instanceof HTMLElement
+                && el.classList.contains('GridCellControl')
+                && /\.cell_-?\d+_\d+$/.test(el.id);
+        }
+        function isHeaderCell(el: Element | null): el is HTMLElement {
+            return !!el
+                && el instanceof HTMLElement
+                && el.classList.contains('GridCellControl')
+                && /\.cell_-1_\d+$/.test(el.id);
+        }
+        function cellIndex(id: string) {
+            const match = id.match(/\.cell_-?\d+_(\d+)$/);
+            return match ? Number(match[1]) : 0;
+        }
+        function rowIndex(id: string) {
+            const match = id.match(/gridrow_(-?\d+)/);
+            return match ? Number(match[1]) : 0;
+        }
+        function isGridRow(el: Element): el is HTMLElement {
+            if (!visible(el)) return false;
+            return el instanceof HTMLElement
+                && el.classList.contains('GridRowControl')
+                && /\.body\.gridrow_\d+$/.test(el.id);
+        }
+        function cellsOf(row: Element) {
+            return Array.from(row.querySelectorAll('div'))
+                .filter((cell) => visible(cell) && isGridCell(cell))
+                .sort((a, b) => cellIndex(a.id) - cellIndex(b.id))
+                .map((cell) => (cell.textContent || '').replace(/\s+/g, ' ').trim());
+        }
+
+        const headers = Array.from(document.querySelectorAll(`div[id*="${gridName}.head.gridrow_-1.cell_-1_"]`))
+            .filter((cell) => visible(cell) && isHeaderCell(cell))
+            .sort((a, b) => cellIndex(a.id) - cellIndex(b.id))
+            .map((cell) => (cell.textContent || '').replace(/\s+/g, ' ').trim());
+        const rows = Array.from(document.querySelectorAll(`div[id*="${gridName}.body.gridrow_"]`))
+            .filter(isGridRow)
+            .sort((a, b) => rowIndex(a.id) - rowIndex(b.id))
+            .map((row) => ({
+                id: row.id,
+                cells: cellsOf(row),
+                text: (row.textContent || '').replace(/\s+/g, ' ').trim(),
+            }))
+            .filter((row) => row.cells.some(Boolean));
+        return { headers, rows };
+    }, gridName);
+}
+
+async function findLineGridName(page: Page) {
+    const visible = await page.locator('div[id*="form.divWork.form.grdMainLine"]').first().isVisible().catch(() => false);
+    return visible ? 'form.divWork.form.grdMainLine' : null;
+}
+
+async function waitForMainGridSearchResult(page: Page) {
+    const started = Date.now();
+    while (Date.now() - started < 10_000) {
+        const state = await page.evaluate(() => {
+            function visible(el: Element | null): el is HTMLElement {
+                return !!el && el instanceof HTMLElement && el.offsetParent !== null;
+            }
+            function isGridRow(el: Element): el is HTMLElement {
+                return el instanceof HTMLElement
+                    && visible(el)
+                    && el.classList.contains('GridRowControl')
+                    && /\.body\.gridrow_\d+$/.test(el.id);
+            }
+            function rowHasText(row: Element) {
+                return Array.from(row.querySelectorAll('div'))
+                    .some((cell) => visible(cell) && (cell.textContent || '').replace(/\s+/g, ' ').trim());
+            }
+            const gridExists = Array.from(document.querySelectorAll('div[id*="form.divWork.form.grdMain"]')).some(visible);
+            const rowCount = Array.from(document.querySelectorAll('div[id*="form.divWork.form.grdMain.body.gridrow_"]'))
+                .filter(isGridRow)
+                .filter(rowHasText)
+                .length;
+            const visibleText = Array.from(document.querySelectorAll('div,span,[role="alert"]'))
+                .filter(visible)
+                .map((el) => (el.textContent || '').replace(/\s+/g, ' ').trim())
+                .join(' ');
+            const noData = /조회.*(없|0건)|데이터.*없|검색.*없|No Data/i.test(visibleText);
+            return { gridExists, rowCount, noData };
+        });
+
+        if (state.rowCount > 0) return 'ROWS' as const;
+        if (state.noData) return 'EMPTY' as const;
+        if (state.gridExists && Date.now() - started > 5_000) return 'EMPTY' as const;
+        await page.waitForTimeout(250);
+    }
+    return 'EMPTY' as const;
+}
+
+function lineFromCells(headers: string[], cells: string[]): ScrapedLine {
+    const materialIndex = findColumnIndex(headers, [/자재이름/, /품목명/, /제품명/, /자재명/, /아이템/], 3);
+    const quantityIndex = findColumnIndex(headers, [/출고수량/, /수량/], 8);
+    const materialRaw = cells[materialIndex]?.trim() || null;
+    return {
+        materialNameRaw: materialRaw,
+        materialName: materialRaw ? convertMaterialName(materialRaw) : null,
+        quantityKg: parseQuantityKg(cells[quantityIndex]),
+        rawCells: cells,
+    };
 }
 
 export async function scrapeHanwhaDispatch(
@@ -77,160 +847,63 @@ export async function scrapeHanwhaDispatch(
 ): Promise<ScrapeResult> {
     const username = opts.username ?? process.env.HANWHA_USERNAME;
     const password = opts.password ?? process.env.HANWHA_PASSWORD;
-    const loginUrl = process.env.HANWHA_LOGIN_URL ?? 'https://h-crm.my.site.com/order';
-    const headless = process.env.HANWHA_HEADLESS !== 'false';
-
     if (!username || !password) {
+        return { ok: false, rows: [], error: '한화 계정 정보가 설정되지 않았습니다.', errorCode: 'NO_CREDENTIALS' };
+    }
+
+    let page: Page | null = null;
+    try {
+        const acquired = await getDispatchESalesPage();
+        page = acquired.page;
+        await loginAndSendOtpIfNeeded(page, username, password);
+        await closeAllNexacroWorkTabs(page);
+        await openDispatchProgressPageFast(page);
+        await focusNexacroWindowTab(page, 'winESDMY-10-145');
+
+        const ymd = isoToYmd(isoDate);
+        await fillArrivalDateRange(page, ymd);
+        await clickNexacro(page, [
+            'div[id*="winESDMY-10-145"][id$="form.divTitle.form.btnSearch"]',
+            'div[id*="winESDMY-10-145"][id*="form.divTitle.form.btnSearch"]',
+        ].join(','));
+        await page.waitForTimeout(700);
+        const searchResult = await waitForMainGridSearchResult(page);
+        if (searchResult === 'EMPTY') {
+            return { ok: true, rows: [] };
+        }
+        await page.waitForTimeout(1200);
+
+        const mainGrid = await readGrid(page, 'form.divWork.form.grdMain');
+        const indoChiIndex = findColumnIndex(mainGrid.headers, [/인도처/, /납품처/, /도착지/, /거래처/, /고객/], 5);
+        const result: ScrapedIndoChi[] = [];
+
+        for (let idx = 0; idx < mainGrid.rows.length; idx += 1) {
+            const mainRow = mainGrid.rows[idx];
+            await page.locator(`[id="${mainRow.id}"]`).click({ force: true });
+            await page.waitForTimeout(900);
+
+            const lineGridName = await findLineGridName(page);
+            const lineGrid = lineGridName ? await readGrid(page, lineGridName) : { headers: [], rows: [] };
+            const lines = lineGrid.rows.length > 0
+                ? lineGrid.rows.map((row) => lineFromCells(lineGrid.headers, row.cells))
+                : [lineFromCells(mainGrid.headers, mainRow.cells)];
+            const indoChiName = mainRow.cells[indoChiIndex]?.trim()
+                || mainRow.cells.find((cell) => /[가-힣]/.test(cell) && cell.length >= 2)
+                || `행 ${idx + 1}`;
+            result.push({
+                indoChiIndex: idx + 1,
+                indoChiName,
+                lines,
+            });
+        }
+
+        return { ok: true, rows: result };
+    } catch (error) {
         return {
             ok: false,
             rows: [],
-            error: '한화 계정 정보가 설정되지 않았습니다.',
-            errorCode: 'NO_CREDENTIALS',
+            error: error instanceof Error ? error.message : String(error),
+            errorCode: 'UNKNOWN',
         };
-    }
-
-    const hanwhaDate = toHanwhaDate(isoDate);
-    let browser: Browser | null = null;
-
-    try {
-        browser = await chromium.launch({ headless });
-        const ctx = await browser.newContext({ viewport: { width: 1400, height: 900 } });
-        const page: Page = await ctx.newPage();
-
-        // 1) 로그인
-        await page.goto(loginUrl, { waitUntil: 'domcontentloaded', timeout: 60_000 });
-        await page.fill('#username', username);
-        await page.fill('#password', password);
-        await page.click('#Login');
-
-        // 2) 메뉴 → 주문진척현황 (인증 실패 감지)
-        try {
-            await page.waitForSelector('button.comm-navigation__top-level-item-link', { timeout: 25_000 });
-        } catch {
-            // 로그인 페이지 잔존/에러 메시지 노출 여부 확인
-            const stillLoginVisible = await page.locator('#Login').isVisible().catch(() => false);
-            const errorText = await page
-                .locator('div.loginError, .error, [id*="error"], div[role="alert"]')
-                .first()
-                .innerText()
-                .catch(() => '');
-            await browser.close();
-            return {
-                ok: false,
-                rows: [],
-                errorCode: 'AUTH_FAILED',
-                error: stillLoginVisible
-                    ? `한화 H-CRM 로그인에 실패했습니다. 비밀번호가 변경되었을 수 있습니다.${errorText ? ' (' + errorText.trim() + ')' : ''}`
-                    : '한화 사이트 접속/로그인이 실패했거나 메뉴를 찾을 수 없습니다.',
-            };
-        }
-        await page.click('button.comm-navigation__top-level-item-link');
-        await page.waitForSelector("a[href='/order/s/OrderProgressCheck']", { timeout: 30_000 });
-        await page.click("a[href='/order/s/OrderProgressCheck']");
-
-        // 3) 날짜 입력 (시작일/종료일 동일)
-        await page.waitForSelector("input.slds-input[type='text']", { timeout: 30_000 });
-        const dateInputs = page.locator("input.slds-input[type='text']");
-        const inputCount = await dateInputs.count();
-        if (inputCount < 2) {
-            throw new Error(`날짜 입력 필드를 찾지 못했습니다. (count=${inputCount})`);
-        }
-        for (let i = 0; i < 2; i++) {
-            const handle = await dateInputs.nth(i).elementHandle();
-            if (!handle) continue;
-            await page.evaluate(
-                ({ el, val }) => {
-                    const input = el as HTMLInputElement;
-                    input.value = val;
-                    input.dispatchEvent(new Event('change', { bubbles: true }));
-                    input.dispatchEvent(new Event('blur', { bubbles: true }));
-                },
-                { el: handle, val: hanwhaDate },
-            );
-        }
-
-        // 4) 검색
-        await page.click("button.slds-button_brand.header-input[title='검색']");
-        await page.waitForTimeout(2000);
-
-        // 5) 무한 스크롤로 모든 행 로드
-        let lastHeight = (await page.evaluate(() => document.body.scrollHeight)) as number;
-        for (let attempt = 0; attempt < 30; attempt++) {
-            await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-            await page.waitForTimeout(800);
-            const newHeight = (await page.evaluate(() => document.body.scrollHeight)) as number;
-            if (newHeight === lastHeight) break;
-            lastHeight = newHeight;
-        }
-
-        // 6) 인도처별 클릭 → Line 정보 수집
-        const rowCount = await page.locator('tbody tr').count();
-        const result: ScrapedIndoChi[] = [];
-        // 마지막 유령 행 제외 (Python 코드와 동일)
-        const realCount = Math.max(0, rowCount - 1);
-
-        for (let idx = 0; idx < realCount; idx++) {
-            const rowLoc = page.locator('tbody tr').nth(idx);
-            const indoChiCell = rowLoc.locator('td:nth-child(6) div').first();
-            if ((await indoChiCell.count()) === 0) continue;
-            const indoChiName = (await indoChiCell.getAttribute('title')) ?? '';
-
-            // 인도처 클릭
-            await rowLoc.locator('td:nth-child(6)').click();
-            await page.waitForTimeout(1200);
-
-            // Line 정보 테이블의 모든 행
-            const lineRows = page.locator('div.req-wrap tbody tr');
-            const lineCount = await lineRows.count();
-            const lines: ScrapedLine[] = [];
-
-            for (let li = 0; li < lineCount; li++) {
-                const lineRow = lineRows.nth(li);
-                const cells = lineRow.locator('td');
-                const cellCount = await cells.count();
-                const rawCells: string[] = [];
-                for (let ci = 0; ci < cellCount; ci++) {
-                    const cell = cells.nth(ci);
-                    // div의 title 우선, 없으면 텍스트
-                    const div = cell.locator('div').first();
-                    let value = '';
-                    if ((await div.count()) > 0) {
-                        value = (await div.getAttribute('title')) ?? (await div.innerText()) ?? '';
-                    } else {
-                        value = (await cell.innerText()) ?? '';
-                    }
-                    rawCells.push(value.trim());
-                }
-
-                // 알려진 컬럼 위치: 자재명=3번, 수량=7번 (1-based)
-                const materialRaw = rawCells[2] ?? null;
-                const qtyRaw = rawCells[6] ?? '';
-                const qtyNum = qtyRaw && /^[\d.,]+$/.test(qtyRaw)
-                    ? parseFloat(qtyRaw.replace(/,/g, ''))
-                    : null;
-
-                lines.push({
-                    materialNameRaw: materialRaw,
-                    materialName: materialRaw ? convertMaterialName(materialRaw) : null,
-                    quantityKg: Number.isFinite(qtyNum) ? (qtyNum as number) : null,
-                    rawCells,
-                });
-            }
-
-            result.push({ indoChiIndex: idx + 1, indoChiName, lines });
-        }
-
-        await browser.close();
-        return { ok: true, rows: result };
-    } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        if (browser) {
-            try {
-                await browser.close();
-            } catch {
-                /* ignore */
-            }
-        }
-        return { ok: false, rows: [], error: msg, errorCode: 'UNKNOWN' };
     }
 }

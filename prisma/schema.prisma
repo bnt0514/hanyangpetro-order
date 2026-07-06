@@ -130,6 +130,8 @@ model DeliveryAddress {
   postalCode   String?
   contactName  String?
   contactPhone String?
+  defaultDriverCustomerNotice String?
+  defaultOrderExtraRequest    String?
   isDefault    Boolean  @default(false)
   isActive     Boolean  @default(true)
   memo         String?
@@ -158,6 +160,8 @@ model Product {
   productGroup            String?
   /// 한화 H-CRM 주문 입력용 기본 자재명. 예: MF_LD_955_FFS_LD2
   hanwhaMaterialName      String?
+  /// 한화 e-Sales 주문 입력용 품목코드. 예: 311114623010
+  hanwhaItemCode          String?
   ecountItemCode          String?
   click2002ItemCode       String?
   defaultSupplierId       String?
@@ -183,6 +187,19 @@ model Product {
   @@index([defaultSalesEntityId])
   @@index([defaultPurchaseEntityId])
   @@index([brand, productGroup])
+}
+
+model HanwhaItemCode {
+  id          String   @id @default(cuid())
+  itemName    String   @unique
+  itemCode    String
+  salesItemId String?
+  plant       String?
+  plantName   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([itemCode])
 }
 
 /// 거래�??�털 주문 ???�출???�품 ?�이?�리?�트.
@@ -287,6 +304,8 @@ model Order {
   /// Raw text of incoming order (for AI parsing in 2nd MVP)
   rawOrderText              String?
   memo                      String?
+  driverCustomerNotice      String?
+  orderExtraRequest         String?
   /// 소프트 삭제: 직원만 가능, 삭제 내역은 /admin/orders/deleted 에서 조회 가능
   deletedAt                 DateTime?
   deletedById               String?
@@ -761,6 +780,10 @@ model CreditTransaction {
   /// 재무일보 파일명+시트명+행번호 SHA-256 (중복 방지)
   sourceRef   String?  @unique
   memo        String?
+  noteNumber  String?
+  noteMaturityDate DateTime?
+  noteIssuer  String?
+  noteDescription String?
   createdById String?
   createdBy   User?    @relation("CreditTxCreatedBy", fields: [createdById], references: [id])
   createdAt   DateTime @default(now())

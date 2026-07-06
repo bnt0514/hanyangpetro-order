@@ -14,6 +14,7 @@ type Product = {
     brand: string | null;
     productGroup: string | null;
     hanwhaMaterialName: string | null;
+    hanwhaItemCode: string | null;
     isActive: boolean;
 };
 
@@ -48,7 +49,8 @@ export default function ProductsListClient({ products }: { products: Product[] }
                 p.productName.toLowerCase().includes(lower) ||
                 (p.productCode ?? '').toLowerCase().includes(lower) ||
                 (p.manufacturer ?? '').toLowerCase().includes(lower) ||
-                (p.hanwhaMaterialName ?? '').toLowerCase().includes(lower),
+                (p.hanwhaMaterialName ?? '').toLowerCase().includes(lower) ||
+                (p.hanwhaItemCode ?? '').toLowerCase().includes(lower),
         )
         : products;
 
@@ -68,7 +70,7 @@ export default function ProductsListClient({ products }: { products: Product[] }
 
             <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div className="overflow-x-auto">
-                    <table className="min-w-[1200px] w-full text-sm">
+                    <table className="min-w-[1320px] w-full text-sm">
                         <thead className="bg-slate-50 text-left text-xs font-medium uppercase text-slate-500">
                             <tr>
                                 <th className="px-3 py-3">상태</th>
@@ -81,6 +83,7 @@ export default function ProductsListClient({ products }: { products: Product[] }
                                 <th className="px-3 py-3">브랜드</th>
                                 <th className="px-3 py-3">품목군</th>
                                 <th className="px-3 py-3">한화 자재명</th>
+                                <th className="px-3 py-3">한화 품목코드</th>
                                 <th className="px-3 py-3 text-right">관리</th>
                             </tr>
                         </thead>
@@ -126,6 +129,9 @@ export default function ProductsListClient({ products }: { products: Product[] }
                                         <td className="px-3 py-2">
                                             <Field name="hanwhaMaterialName" defaultValue={product.hanwhaMaterialName} className="w-48" />
                                         </td>
+                                        <td className="px-3 py-2">
+                                            <Field name="hanwhaItemCode" defaultValue={product.hanwhaItemCode} className="w-32 font-mono" />
+                                        </td>
                                         <td className="px-3 py-2 text-right">
                                             <div className="flex justify-end gap-1">
                                                 <button className="rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50">
@@ -144,7 +150,7 @@ export default function ProductsListClient({ products }: { products: Product[] }
                             ))}
                             {filtered.length === 0 && (
                                 <tr>
-                                    <td colSpan={11} className="px-5 py-12 text-center text-slate-400">
+                                    <td colSpan={12} className="px-5 py-12 text-center text-slate-400">
                                         {q ? '검색 결과가 없습니다.' : '품목이 없습니다.'}
                                     </td>
                                 </tr>

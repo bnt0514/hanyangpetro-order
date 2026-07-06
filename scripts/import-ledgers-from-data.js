@@ -53,6 +53,11 @@ function sourceHash(file, sheet, rowNumber, ledgerType) {
     return crypto.createHash('sha256').update(`${SOURCE_TYPE}|${path.basename(file)}|${sheet}|${rowNumber}|${ledgerType}`).digest('hex');
 }
 
+function isTotalLabel(value) {
+    const text = String(value || '').replace(/\s+/g, ' ').trim();
+    return text === '계' || text === '합계' || text.includes('합계') || /\s계$/.test(text);
+}
+
 function matchByName(list, key, rawName) {
     const norm = normalizeCompanyName(rawName);
     if (!norm) return null;
@@ -129,7 +134,7 @@ function parseLedgerRows(filePath, ledgerType, minDate, maxDate) {
         const counterpartyName = String(row[1] || '').trim();
         const productName = String(row[2] || '').trim();
         if (!counterpartyName || !productName) continue;
-        if (counterpartyName.includes('계') || productName.includes('계')) continue;
+        if (isTotalLabel(counterpartyName) || isTotalLabel(productName)) continue;
         const quantity = parseAmount(row[3]) ?? 0;
         const supplyAmount = parseAmount(row[4]);
         const vatAmount = parseAmount(row[5]);

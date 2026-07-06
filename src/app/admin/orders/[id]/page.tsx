@@ -17,6 +17,11 @@ import ManualDispatchForm from './ManualDispatchForm';
 import OrderMemoEditor from './OrderMemoEditor';
 import MissingDispatchBackorderForm from './MissingDispatchBackorderForm';
 import DeliveryDateRequestReview from './DeliveryDateRequestReview';
+import HomepageArchiveLink from '@/components/HomepageArchiveLink';
+import OrderCustomerAddressEditor from './OrderCustomerAddressEditor';
+import PurchaseLedgerDateEditor from './PurchaseLedgerDateEditor';
+import SalesLedgerDateModeToggle from './SalesLedgerDateModeToggle';
+import { purchaseRequestDateFromOrderNo } from '@/lib/ledger-policy';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,6 +37,10 @@ function ledgerMonthQuery(date: Date | null | undefined) {
     const from = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-01`;
     const to = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()).padStart(2, '0')}`;
     return `?from=${from}&to=${to}`;
+}
+
+function nextMonthFirst(date: Date) {
+    return new Date(date.getFullYear(), date.getMonth() + 1, 1);
 }
 
 export default async function AdminOrderDetail({
@@ -87,6 +96,25 @@ export default async function AdminOrderDetail({
         orderBy: { supplierName: 'asc' },
     });
 
+    const customers = await prisma.customer.findMany({
+        where: { isActive: true },
+        select: { id: true, companyName: true, customerCode: true },
+        orderBy: { companyName: 'asc' },
+    });
+
+    const deliveryAddresses = await prisma.deliveryAddress.findMany({
+        where: { isActive: true, customer: { isActive: true } },
+        select: {
+            id: true,
+            customerId: true,
+            label: true,
+            addressLine1: true,
+            addressLine2: true,
+            contactPhone: true,
+        },
+        orderBy: [{ customer: { companyName: 'asc' } }, { isDefault: 'desc' }, { label: 'asc' }],
+    });
+
     const hanwhaRows = await prisma.hanwhaDispatchRow.findMany({
         where: { matchedOrderId: order.id },
         orderBy: [{ createdAt: 'asc' }],
@@ -104,6 +132,7 @@ export default async function AdminOrderDetail({
     const dispatchDetails: HanwhaDispatchDetailRow[] = hanwhaRows.length > 0
         ? hanwhaRows.map((row) => ({
             id: row.id,
+            indoChiName: row.indoChiName,
             materialNameRaw: row.materialNameRaw,
             materialName: row.materialName,
             quantityTon: row.quantityKg,
@@ -111,6 +140,7 @@ export default async function AdminOrderDetail({
         }))
         : hanwhaDispatches.map((dispatch) => ({
             id: dispatch.id,
+            indoChiName: order.deliveryAddress.label,
             materialNameRaw: dispatch.hanwhaMaterialNameRaw ?? parseHanwhaMaterialFromMemo(dispatch.memo),
             materialName: dispatch.hanwhaMaterialName ?? parseHanwhaMaterialFromMemo(dispatch.memo),
             quantityTon: dispatch.hanwhaQuantityTon,
@@ -118,6 +148,7 @@ export default async function AdminOrderDetail({
         }));
     const manualDispatchDetails: HanwhaDispatchDetailRow[] = manualDispatches.map((dispatch) => ({
         id: dispatch.id,
+        indoChiName: order.deliveryAddress.label,
         materialNameRaw: dispatch.hanwhaMaterialNameRaw ?? parseHanwhaMaterialFromMemo(dispatch.memo),
         materialName: dispatch.hanwhaMaterialName ?? parseHanwhaMaterialFromMemo(dispatch.memo),
         quantityTon: dispatch.hanwhaQuantityTon,
@@ -243,6 +274,16 @@ export default async function AdminOrderDetail({
     const requestedDeliveryDateValue = order.requestedDeliveryDate
         ? toLocalDateStr(order.requestedDeliveryDate)
         : toLocalDateStr(new Date());
+    const basePurchaseDate = purchaseRequestDateFromOrderNo(order.orderNo) ?? order.createdAt;
+    const purchaseCarryoverDate = nextMonthFirst(basePurchaseDate);
+    const shipAheadDate = order.requestedDeliveryDate ? nextMonthFirst(order.requestedDeliveryDate) : nextMonthFirst(new Date());
+    const salesLedgerDates = Array.from(new Set(order.items.map((item) => toLocalDateStr(item.salesLedgerDate ?? order.requestedDeliveryDate ?? new Date()))));
+    const purchaseLedgerDates = Array.from(new Set(order.items.map((item) => toLocalDateStr(item.purchaseLedgerDate ?? basePurchaseDate))));
+    const currentSalesDateLabel = salesLedgerDates.length === 1 ? salesLedgerDates[0] : salesLedgerDates.join(', ');
+    const currentPurchaseDateLabel = purchaseLedgerDates.length === 1 ? purchaseLedgerDates[0] : purchaseLedgerDates.join(', ');
+    const currentPurchaseDateValue = purchaseLedgerDates[0] ?? toLocalDateStr(basePurchaseDate);
+    const isShipAhead = order.items.length > 0 && order.items.every((item) => item.salesLedgerDate && toLocalDateStr(item.salesLedgerDate) === toLocalDateStr(shipAheadDate));
+    const isPurchaseCarryover = order.items.length > 0 && order.items.every((item) => toLocalDateStr(item.purchaseLedgerDate ?? basePurchaseDate) === toLocalDateStr(purchaseCarryoverDate));
     const nextDeliveryDateValue = (() => {
         const baseDate = order.requestedDeliveryDate ? new Date(order.requestedDeliveryDate) : new Date();
         baseDate.setDate(baseDate.getDate() + 1);
@@ -261,10 +302,13 @@ export default async function AdminOrderDetail({
         <div className="min-h-screen">
             <header className="bg-white border-b border-slate-200">
                 <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
-                    <Link href="/admin" className="flex items-center gap-2">
-                        <Image src="/hanyanglogo.png" alt="logo" width={32} height={32} className="h-8 w-auto" />
-                        <span className="font-bold text-slate-800">한양유화 e-Business OS</span>
-                    </Link>
+                    <div className="flex items-center gap-2">
+                        <Link href="/admin" className="flex items-center gap-2">
+                            <Image src="/hanyanglogo.png" alt="logo" width={32} height={32} className="h-8 w-auto" />
+                            <span className="font-bold text-slate-800">한양유화 e-Business OS</span>
+                        </Link>
+                        <HomepageArchiveLink />
+                    </div>
                     <div className="flex items-center gap-4 text-sm">
                         <span className="text-slate-600">
                             {session.user.name}{' '}
@@ -342,19 +386,56 @@ export default async function AdminOrderDetail({
                                 </span>
                             )}
                         </Info>
+                        <div className="md:col-span-2">
+                            <OrderCustomerAddressEditor
+                                orderId={order.id}
+                                currentCustomerId={order.customerId}
+                                currentDeliveryAddressId={order.deliveryAddressId}
+                                customers={customers}
+                                addresses={deliveryAddresses.map((address) => ({
+                                    id: address.id,
+                                    customerId: address.customerId,
+                                    label: address.label,
+                                    addressLine1: address.addressLine1 ?? '',
+                                    addressLine2: address.addressLine2,
+                                    contactPhone: address.contactPhone,
+                                }))}
+                            />
+                        </div>
                         <Info icon={<Calendar size={14} />} label="요청 도착일">
                             <div className="space-y-1">
                                 <span className="block text-xs text-slate-500">현재 {fmtDate(order.requestedDeliveryDate)}</span>
                                 <DeliveryDateEditor orderId={order.id} currentDate={requestedDeliveryDateValue} />
                             </div>
                         </Info>
+                        <Info icon={<Calendar size={14} />} label="요청 매입일">
+                            <div className="space-y-1">
+                                <span className="block text-xs text-slate-500">현재 {currentPurchaseDateLabel}</span>
+                                <PurchaseLedgerDateEditor orderId={order.id} currentDate={currentPurchaseDateValue} />
+                            </div>
+                        </Info>
                         <Info icon={<FileText size={14} />} label="메모">
                             <span className="whitespace-pre-wrap">{order.memo || '미입력'}</span>
                         </Info>
                     </div>
+                    <div className="mt-4">
+                        <SalesLedgerDateModeToggle
+                            orderId={order.id}
+                            shipAhead={isShipAhead}
+                            shipAheadDate={toLocalDateStr(shipAheadDate)}
+                            currentSalesDateLabel={currentSalesDateLabel}
+                            purchaseCarryover={isPurchaseCarryover}
+                            purchaseCarryoverDate={toLocalDateStr(purchaseCarryoverDate)}
+                            currentPurchaseDateLabel={currentPurchaseDateLabel}
+                        />
+                    </div>
                 </section>
 
-                <OrderMemoEditor orderId={order.id} initialMemo={order.memo ?? ''} />
+                <OrderMemoEditor
+                    orderId={order.id}
+                    initialDriverCustomerNotice={order.driverCustomerNotice ?? ''}
+                    initialOrderExtraRequest={order.orderExtraRequest ?? order.memo ?? ''}
+                />
 
                 <DeliveryDateRequestReview
                     requests={order.deliveryDateChangeRequests.map((request) => ({
@@ -369,7 +450,16 @@ export default async function AdminOrderDetail({
 
                 <HanwhaDispatchDetails title="한화 배차내역" rows={dispatchDetails} orderQuantityTon={orderQuantityTon} showDeleteAction noticeContext={dispatchNoticeContext} />
                 <HanwhaDispatchDetails title="수기 배차내역" rows={manualDispatchDetails} orderQuantityTon={orderQuantityTon} showDeleteAction noticeContext={dispatchNoticeContext} />
-                {hasNonHanwhaSupplier && <ManualDispatchForm orderId={order.id} />}
+                {hasNonHanwhaSupplier && (
+                    <ManualDispatchForm
+                        orderId={order.id}
+                        items={order.items.map((item) => ({
+                            productName: item.product.productName,
+                            quantity: item.requestedQuantity,
+                            unit: item.unit,
+                        }))}
+                    />
+                )}
                 {isDispatchWaiting && <MissingDispatchBackorderForm
                     orderId={order.id}
                     defaultDeliveryDate={nextDeliveryDateValue}

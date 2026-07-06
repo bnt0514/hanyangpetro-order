@@ -1,6 +1,6 @@
 ﻿import { prisma } from '@/lib/db';
 
-export const CREDIT_LIMIT_MANAGER_NAME = '양희철';
+export const CREDIT_LIMIT_MANAGER_NAME = '\uC591\uD76C\uCCA0';
 export const CREDIT_LIMIT_MANAGER_ID = 'cmojpskkh0000994c99z7ro6d';
 
 export type CreditLimitSortKey =
@@ -93,7 +93,7 @@ export function defaultAsOf() {
 }
 
 export function canManageCreditLimits(user?: { id?: string; name?: string | null; userKind?: string }) {
-    return user?.userKind === 'staff' && (user.id === CREDIT_LIMIT_MANAGER_ID || user.name === CREDIT_LIMIT_MANAGER_NAME);
+    return user?.userKind === 'staff' && (user.id === CREDIT_LIMIT_MANAGER_ID || String(user.name || '').replace(/\s/g, '') === CREDIT_LIMIT_MANAGER_NAME);
 }
 
 export async function getCreditLimitReport(options: {

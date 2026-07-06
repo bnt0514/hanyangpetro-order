@@ -1,11 +1,13 @@
-﻿import { prisma } from '@/lib/db';
+import { prisma } from '@/lib/db';
+import { LEDGER_DISPATCH_COMPLETED_WHERE, ledgerPurchaseDate } from '@/lib/ledger-policy';
 
 export type SupplierLedgerRow = {
     id: string;
-    rowSource: 'ORDER' | 'IMPORT';
+    rowSource: 'ORDER' | 'IMPORT' | 'MANUAL' | 'PAYMENT';
     orderId: string | null;
     orderNo: string;
     purchaseDate: Date | null;
+    productId: string | null;
     productName: string;
     productCode: string;
     quantity: number;
@@ -15,14 +17,25 @@ export type SupplierLedgerRow = {
     vatAmount: number | null;
     totalAmount: number | null;
     memo: string | null;
+    paymentId?: string | null;
+    paymentType?: string | null;
+    noteNumber?: string | null;
+    noteMaturityDate?: Date | null;
+    noteIssuer?: string | null;
+    noteDescription?: string | null;
 };
 
 export type PaymentRow = {
     id: string;
     txDate: Date;
+    txType: string;
     amount: number;
     memo: string | null;
     source: string;
+    noteNumber: string | null;
+    noteMaturityDate: Date | null;
+    noteIssuer: string | null;
+    noteDescription: string | null;
 };
 
 export type SupplierLedgerResult = {
@@ -74,12 +87,6 @@ function nearlyEqual(a: number | null | undefined, b: number | null | undefined,
     return Math.abs(a - b) <= tolerance;
 }
 
-/** 배차완료 날짜(Date-only)를 반환. 없으면 null. */
-function dispatchCompletedDate(statusHistory: { createdAt: Date }[]): Date | null {
-    if (statusHistory.length === 0) return null;
-    const dt = statusHistory[0].createdAt; // take:1 + desc → 가장 최근 배차완료
-    return toDateOnly(dateToIso(dt));
-}
 
 export function defaultSupplierLedgerRange(today = new Date()) {
     return { from: dateToIso(new Date(today.getFullYear(), today.getMonth(), 1)), to: dateToIso(today) };
@@ -104,13 +111,10 @@ export async function getSupplierLedger(supplierId: string, fromIso?: string, to
         prisma.orderItem.findMany({
             where: {
                 purchaseSupplierId: supplierId,
-                OR: [
-                    { purchaseLedgerDate: { gte: from, lt: toExclusive } },
-                    { purchaseLedgerDate: null, order: { statusHistory: { some: { newStatus: 'DISPATCH_COMPLETED' } } } },
-                ],
+                purchaseLedgerDate: { gte: from, lt: toExclusive },
                 order: {
                     deletedAt: null,
-                    status: { notIn: ['CANCELLED', 'REJECTED'] },
+                    ...LEDGER_DISPATCH_COMPLETED_WHERE,
                 },
             },
             include: {
@@ -119,13 +123,14 @@ export async function getSupplierLedger(supplierId: string, fromIso?: string, to
                     select: {
                         id: true,
                         orderNo: true,
+                        status: true,
                         requestedDeliveryDate: true,
                         memo: true,
-                        // 가장 최근 DISPATCH_COMPLETED 기록만 가져옴
-                        statusHistory: {
-                            where: { newStatus: 'DISPATCH_COMPLETED' },
-                            orderBy: { createdAt: 'desc' },
+                        dispatches: {
+                            where: { dispatchStatus: 'DISPATCH_COMPLETED' },
+                            orderBy: { plannedDispatchDate: 'asc' },
                             take: 1,
+                            select: { plannedDispatchDate: true },
                         },
                     },
                 },
@@ -147,7 +152,7 @@ export async function getSupplierLedger(supplierId: string, fromIso?: string, to
         }),
         // 기간 내 지급
         prisma.creditTransaction.findMany({
-            where: { supplierId, txType: 'PAYMENT', txDate: { gte: from, lt: toExclusive } },
+            where: { supplierId, txType: { in: ['PAYMENT', 'NOTE_TRANSFER'] }, txDate: { gte: from, lt: toExclusive } },
             orderBy: { txDate: 'asc' },
         }),
         // 기준일 이후 전체 매입 (미지급금 잔액 계산용)
@@ -155,17 +160,14 @@ export async function getSupplierLedger(supplierId: string, fromIso?: string, to
             ? prisma.orderItem.findMany({
                 where: {
                     purchaseSupplierId: supplierId,
-                    OR: [
-                        { purchaseLedgerDate: { gte: openingDate } },
-                        { purchaseLedgerDate: null, order: { statusHistory: { some: { newStatus: 'DISPATCH_COMPLETED' } } } },
-                    ],
+                    purchaseLedgerDate: { gte: openingDate },
                     order: {
                         deletedAt: null,
-                        status: { notIn: ['CANCELLED', 'REJECTED'] },
+                        ...LEDGER_DISPATCH_COMPLETED_WHERE,
                     },
                     purchaseUnitPrice: { not: null },
                 },
-                select: { requestedQuantity: true, purchaseUnitPrice: true, purchaseLedgerDate: true, order: { select: { requestedDeliveryDate: true, statusHistory: { where: { newStatus: 'DISPATCH_COMPLETED' }, orderBy: { createdAt: 'desc' }, take: 1 } } } },
+                select: { requestedQuantity: true, purchaseUnitPrice: true, purchaseLedgerDate: true },
             })
             : Promise.resolve([]),
         openingDate
@@ -182,7 +184,7 @@ export async function getSupplierLedger(supplierId: string, fromIso?: string, to
         // 기준일 이후 전체 지급
         openingDate
             ? prisma.creditTransaction.aggregate({
-                where: { supplierId, txType: 'PAYMENT', txDate: { gte: openingDate } },
+                where: { supplierId, txType: { in: ['PAYMENT', 'NOTE_TRANSFER'] }, txDate: { gte: openingDate } },
                 _sum: { amount: true },
             })
             : Promise.resolve({ _sum: { amount: 0 } }),
@@ -193,14 +195,14 @@ export async function getSupplierLedger(supplierId: string, fromIso?: string, to
             const supplyAmount = item.purchaseUnitPrice == null ? null : item.requestedQuantity * item.purchaseUnitPrice;
             const vatAmount = supplyAmount == null ? null : Math.round(supplyAmount * 0.1);
             const totalAmount = supplyAmount == null ? null : supplyAmount + (vatAmount ?? 0);
-            // 최종 배차완료 날짜를 매입일로 사용, 없으면 requestedDeliveryDate로 fallback
-            const purchaseDate = item.purchaseLedgerDate ?? dispatchCompletedDate(item.order.statusHistory) ?? item.order.requestedDeliveryDate;
+            const purchaseDate = ledgerPurchaseDate(item);
             return {
                 id: item.id,
                 rowSource: 'ORDER' as const,
                 orderId: item.order.id,
                 orderNo: item.order.orderNo,
                 purchaseDate,
+                productId: item.productId,
                 productName: item.product.productName,
                 productCode: item.product.productCode,
                 quantity: item.requestedQuantity,
@@ -215,7 +217,7 @@ export async function getSupplierLedger(supplierId: string, fromIso?: string, to
         ...imports.filter((entry) => !orderItems.some((item) => {
             const entrySupplyAmount = entry.supplyAmount ?? (entry.unitPrice == null ? null : entry.quantity * entry.unitPrice);
             const itemSupplyAmount = item.purchaseUnitPrice == null ? null : item.requestedQuantity * item.purchaseUnitPrice;
-            const itemPurchaseDate = item.purchaseLedgerDate ?? dispatchCompletedDate(item.order.statusHistory) ?? item.order.requestedDeliveryDate;
+            const itemPurchaseDate = ledgerPurchaseDate(item);
             return sameDateOnly(entry.transactionDate, itemPurchaseDate)
                 && normalizeMatchText(entry.productName) === normalizeMatchText(item.product.productName)
                 && nearlyEqual(entry.quantity, item.requestedQuantity, 0.0001)
@@ -226,10 +228,11 @@ export async function getSupplierLedger(supplierId: string, fromIso?: string, to
             const totalAmount = entry.totalAmount ?? (supplyAmount == null ? null : supplyAmount + (vatAmount ?? 0));
             return {
                 id: `ledger:${entry.id}`,
-                rowSource: 'IMPORT' as const,
+                rowSource: (entry.sourceType === 'MANUAL' ? 'MANUAL' : 'IMPORT') as 'IMPORT' | 'MANUAL',
                 orderId: entry.order?.id ?? null,
                 orderNo: entry.order?.orderNo ?? '',
                 purchaseDate: entry.transactionDate,
+                productId: entry.productId,
                 productName: entry.product?.productName ?? entry.productName,
                 productCode: entry.product?.productCode ?? entry.productCode ?? '-',
                 quantity: entry.quantity,
@@ -241,11 +244,37 @@ export async function getSupplierLedger(supplierId: string, fromIso?: string, to
                 memo: entry.memo ?? entry.sourceFile,
             };
         }),
+        ...periodPayments.map((payment) => {
+            const isNote = payment.txType === 'NOTE_TRANSFER';
+            return {
+                id: `payment:${payment.id}`,
+                rowSource: 'PAYMENT' as const,
+                orderId: null,
+                orderNo: isNote ? '어음지급' : '지급',
+                purchaseDate: payment.txDate,
+                productId: null,
+                productName: isNote ? '어음지급' : '출금/송금',
+                productCode: '-',
+                quantity: 0,
+                unit: '',
+                unitPrice: null,
+                supplyAmount: -payment.amount,
+                vatAmount: null,
+                totalAmount: -payment.amount,
+                memo: payment.memo,
+                paymentId: payment.id,
+                paymentType: payment.txType,
+                noteNumber: payment.noteNumber,
+                noteMaturityDate: payment.noteMaturityDate,
+                noteIssuer: payment.noteIssuer,
+                noteDescription: payment.noteDescription,
+            };
+        }),
     ].sort((a, b) => (a.purchaseDate?.getTime() ?? 0) - (b.purchaseDate?.getTime() ?? 0) || a.orderNo.localeCompare(b.orderNo, 'ko') || a.productName.localeCompare(b.productName, 'ko'));
 
     const periodPaymentTotal = periodPayments.reduce((s, r) => s + r.amount, 0);
     const orderPurchasesSinceOpening = allPurchaseItemsSinceOpening.reduce((sum, item) => {
-        const purchaseDate = item.purchaseLedgerDate ?? dispatchCompletedDate(item.order.statusHistory) ?? item.order.requestedDeliveryDate;
+        const purchaseDate = ledgerPurchaseDate(item);
         if (!openingDate || !purchaseDate || purchaseDate < openingDate) return sum;
         return sum + item.requestedQuantity * (item.purchaseUnitPrice ?? 0);
     }, 0);
@@ -267,9 +296,14 @@ export async function getSupplierLedger(supplierId: string, fromIso?: string, to
         payments: periodPayments.map(p => ({
             id: p.id,
             txDate: p.txDate,
+            txType: p.txType,
             amount: p.amount,
             memo: p.memo,
             source: p.source,
+            noteNumber: p.noteNumber,
+            noteMaturityDate: p.noteMaturityDate,
+            noteIssuer: p.noteIssuer,
+            noteDescription: p.noteDescription,
         })),
         periodPaymentTotal,
         openingPayable,
@@ -277,3 +311,4 @@ export async function getSupplierLedger(supplierId: string, fromIso?: string, to
         netPayable,
     };
 }
+

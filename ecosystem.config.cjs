@@ -15,5 +15,19 @@ module.exports = {
                 PORT: '3000',
             },
         },
+        {
+            name: 'hanwha-esales-keepalive',
+            cwd: __dirname,
+            script: './scripts/hanwha-esales-keepalive.cjs',
+            exec_mode: 'fork',
+            instances: 1,
+            autorestart: true,
+            watch: false,
+            max_memory_restart: '256M',
+            env: {
+                NODE_ENV: 'production',
+                HANWHA_ESALES_KEEPALIVE_MS: String(25 * 60 * 1000),
+            },
+        },
     ],
 };

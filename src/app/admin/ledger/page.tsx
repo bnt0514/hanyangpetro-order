@@ -7,6 +7,9 @@ import { fmtDate, fmtNumber } from '@/lib/orders';
 import { defaultLedgerRange, getCustomerLedger, type CustomerLedgerResult } from '@/lib/ledger';
 import { getSupplierLedger, type SupplierLedgerResult } from '@/lib/supplier-ledger';
 import LedgerPopupButtons from './LedgerPopupButtons';
+import FinanceImportButton from './FinanceImportButton';
+import LedgerRowEditButton, { type LedgerProductOption } from './LedgerRowEditButton';
+import { canEditCustomerLedger, canViewAllStaffData } from '@/lib/staff-permissions';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,10 +45,19 @@ type CompanyResult = {
     };
 };
 
-async function findCustomers(q: string) {
+async function findCustomers(q: string, salesRepId?: string) {
     if (!q) return [];
     return prisma.customer.findMany({
-        where: { isActive: true, companyName: { contains: q } },
+        where: {
+            isActive: true,
+            ...(salesRepId ? { defaultSalesRepId: salesRepId } : {}),
+            OR: [
+                { companyName: { contains: q } },
+                { customerCode: { contains: q } },
+                { businessNumber: { contains: q } },
+                { ledgerEntries: { some: { counterpartyName: { contains: q } } } },
+            ],
+        },
         select: {
             id: true,
             companyName: true,
@@ -61,7 +73,15 @@ async function findCustomers(q: string) {
 async function findSuppliers(q: string) {
     if (!q) return [];
     return prisma.supplier.findMany({
-        where: { isActive: true, supplierName: { contains: q } },
+        where: {
+            isActive: true,
+            OR: [
+                { supplierName: { contains: q } },
+                { contactPerson: { contains: q } },
+                { phone: { contains: q } },
+                { ledgerEntries: { some: { counterpartyName: { contains: q } } } },
+            ],
+        },
         select: {
             id: true,
             supplierName: true,
@@ -85,22 +105,47 @@ function dateToIso(date: Date) {
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
-function calcRanges(today = new Date()) {
+function dateToInput(value: Date | null | undefined) {
+    if (!value) return '';
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, '0');
+    const day = String(value.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+function parseIsoMonth(value: string | undefined, fallback: Date) {
+    if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        return new Date(fallback.getFullYear(), fallback.getMonth(), 1);
+    }
+    const [year, month] = value.split('-').map(Number);
+    return new Date(year, month - 1, 1);
+}
+
+function monthRangeFrom(base: Date, offset: number) {
+    const first = new Date(base.getFullYear(), base.getMonth() + offset, 1);
+    const last = new Date(first.getFullYear(), first.getMonth() + 1, 0);
+    return {
+        from: dateToIso(first),
+        to: dateToIso(last),
+    };
+}
+
+function calcRanges(selectedFrom?: string, today = new Date()) {
     const y = today.getFullYear();
     const m = today.getMonth() + 1;
     const todayStr = dateToIso(today);
     const thisFrom = `${y}-${pad(m)}-01`;
-    const prevY = m === 1 ? y - 1 : y;
-    const prevM = m === 1 ? 12 : m - 1;
-    const prevFrom = `${prevY}-${pad(prevM)}-01`;
-    const prevTo = `${prevY}-${pad(prevM)}-${pad(new Date(prevY, prevM, 0).getDate())}`;
+    const selectedMonth = parseIsoMonth(selectedFrom, today);
+    const prev = monthRangeFrom(selectedMonth, -1);
+    const next = monthRangeFrom(selectedMonth, 1);
     const r3M = m - 2;
     const r3Y = r3M <= 0 ? y - 1 : y;
     const r3MAdj = r3M <= 0 ? 12 + r3M : r3M;
     return {
         recent3: { label: '최근 3개월', from: `${r3Y}-${pad(r3MAdj)}-01`, to: todayStr },
-        prev: { label: '전월', from: prevFrom, to: prevTo },
+        prev: { label: '1개월 전', from: prev.from, to: prev.to },
         current: { label: '당월', from: thisFrom, to: todayStr },
+        next: { label: '1개월 후', from: next.from, to: next.to },
     };
 }
 
@@ -176,8 +221,8 @@ function resultLinks(result: CompanyResult, q: string, from: string, to: string)
     };
 }
 
-function SearchBox({ q, from, to, customerId, supplierId, view }: { q: string; from: string; to: string; customerId?: string; supplierId?: string; view: string }) {
-    const ranges = calcRanges();
+function SearchBox({ q, from, to, customerId, supplierId, view, canImportFinance }: { q: string; from: string; to: string; customerId?: string; supplierId?: string; view: string; canImportFinance: boolean }) {
+    const ranges = calcRanges(from);
     const rangeHref = (range: { from: string; to: string }) => buildLedgerHref({ q, from: range.from, to: range.to, customerId, supplierId, view });
     const isActive = (range: { from: string; to: string }) => from === range.from && to === range.to;
 
@@ -198,7 +243,7 @@ function SearchBox({ q, from, to, customerId, supplierId, view }: { q: string; f
                 </div>
                 <button className="rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-800">조회</button>
                 <div className="flex flex-wrap gap-1.5 pl-0 md:pl-2">
-                    {[ranges.recent3, ranges.prev, ranges.current].map((range) => (
+                    {[ranges.recent3, ranges.prev, ranges.current, ranges.next].map((range) => (
                         <Link
                             key={range.label}
                             href={rangeHref(range)}
@@ -207,6 +252,7 @@ function SearchBox({ q, from, to, customerId, supplierId, view }: { q: string; f
                             {range.label}
                         </Link>
                     ))}
+                    <FinanceImportButton enabled={canImportFinance} />
                 </div>
             </div>
         </form>
@@ -266,7 +312,7 @@ function CompanyResultList({ results, q, from, to }: { results: CompanyResult[];
     );
 }
 
-function CustomerLedgerPanel({ ledger }: { ledger: CustomerLedgerResult }) {
+function CustomerLedgerPanel({ ledger, products, canEdit }: { ledger: CustomerLedgerResult; products: LedgerProductOption[]; canEdit: boolean }) {
     const salesTotal = ledger.ledgers.reduce((sum, item) => sum + item.totalAmount, 0);
     return (
         <section className="overflow-hidden rounded-2xl border border-teal-100 bg-white shadow-sm">
@@ -287,22 +333,38 @@ function CustomerLedgerPanel({ ledger }: { ledger: CustomerLedgerResult }) {
                 {ledger.ledgers.length === 0 ? <div className="p-10 text-center text-sm text-slate-400">조회 기간 내 매출 원장 항목이 없습니다.</div> : ledger.ledgers.map((companyLedger) => (
                     <table key={companyLedger.companyEntityId} className="w-full min-w-[980px] text-sm">
                         <caption className="bg-white px-4 py-2 text-left text-sm font-semibold text-slate-700">{companyLedger.companyName}</caption>
-                        <thead className="sticky top-0 bg-slate-50 text-left text-xs font-medium uppercase text-slate-500"><tr><th className="px-4 py-2">매출일자</th><th className="px-4 py-2">오더</th><th className="px-4 py-2">품목</th><th className="px-4 py-2 text-right">수량(TON)</th><th className="px-4 py-2 text-right">단가</th><th className="px-4 py-2 text-right">공급가액</th><th className="px-4 py-2 text-right">부가세</th><th className="px-4 py-2 text-right">합계</th></tr></thead>
+                        <thead className="sticky top-0 bg-slate-50 text-left text-xs font-medium uppercase text-slate-500"><tr><th className="px-4 py-2">매출일자</th><th className="px-4 py-2">오더</th><th className="px-4 py-2">품목</th><th className="px-4 py-2 text-right">수량(TON)</th><th className="px-4 py-2 text-right">단가</th><th className="px-4 py-2 text-right">공급가액</th><th className="px-4 py-2 text-right">부가세</th><th className="px-4 py-2 text-right">합계</th><th className="px-4 py-2 text-right">관리</th></tr></thead>
                         <tbody className="divide-y divide-slate-100">
-                            {companyLedger.rows.map((row) => (
-                                <tr key={row.itemId}><td className="px-4 py-2 text-slate-600">{fmtDate(row.salesDate)}</td><td className="px-4 py-2 font-mono text-xs text-blue-700">{row.orderNo || '-'}</td><td className="px-4 py-2 text-slate-700">{row.productName}</td><td className="px-4 py-2 text-right text-slate-600">{fmtNumber(row.quantity)}</td><td className="px-4 py-2 text-right text-slate-600">{fmtMoney(row.unitPrice)}</td><td className="px-4 py-2 text-right font-medium text-slate-800">{fmtMoney(row.amount)}</td><td className="px-4 py-2 text-right text-slate-600">{fmtMoney(row.vatAmount)}</td><td className="px-4 py-2 text-right font-semibold text-slate-900">{fmtMoney(row.totalAmount)}</td></tr>
-                            ))}
+                            {companyLedger.rows.map((row) => {
+                                const financeHref = row.noteNumber
+                                    ? `/admin/finance-transactions?txType=NOTE_IN&q=${encodeURIComponent(row.noteNumber)}`
+                                    : row.receiptId
+                                        ? `/admin/finance-transactions?q=${encodeURIComponent(row.memo ?? row.receiptId)}`
+                                        : null;
+                                return (
+                                    <tr key={row.itemId}>
+                                        <td className="px-4 py-2 text-slate-600">{fmtDate(row.salesDate)}</td>
+                                        <td className="px-4 py-2 font-mono text-xs">{row.rowSource === 'RECEIPT' && financeHref ? <Link href={financeHref} className="inline-flex rounded-full bg-green-50 px-2.5 py-1 font-semibold text-green-700 hover:bg-green-100 hover:text-green-900">{row.orderNo}</Link> : row.orderId ? <Link href={`/admin/orders/${row.orderId}`} className="inline-flex rounded-full bg-blue-50 px-2.5 py-1 font-semibold text-blue-700 hover:bg-blue-100 hover:text-blue-900">{row.orderNo || '오더'}</Link> : <span className="text-slate-300">{row.orderNo || '-'}</span>}</td>
+                                        <td className="px-4 py-2 text-slate-700">{row.productName}</td>
+                                        <td className="px-4 py-2 text-right text-slate-600">{row.rowSource === 'RECEIPT' ? '-' : fmtNumber(row.quantity)}</td>
+                                        <td className="px-4 py-2 text-right text-slate-600">{fmtMoney(row.unitPrice)}</td>
+                                        <td className={`px-4 py-2 text-right font-medium ${row.rowSource === 'RECEIPT' ? 'text-green-700' : 'text-slate-800'}`}>{fmtMoney(row.amount)}</td>
+                                        <td className="px-4 py-2 text-right text-slate-600">{fmtMoney(row.vatAmount)}</td>
+                                        <td className={`px-4 py-2 text-right font-semibold ${row.rowSource === 'RECEIPT' ? 'text-green-700' : 'text-slate-900'}`}>{fmtMoney(row.totalAmount)}</td>
+                                        <td className="px-4 py-2 text-right">{row.rowSource !== 'RECEIPT' && <LedgerRowEditButton canEdit={canEdit} mode="SALES" rowId={row.itemId} transactionDate={dateToInput(row.salesDate)} productId={row.productId && !row.productId.startsWith('IMPORTED:') ? row.productId : null} productName={row.productName} quantity={row.quantity} unit={row.unit} unitPrice={row.unitPrice} memo={row.memo} products={products} />}</td>
+                                    </tr>
+                                );
+                            })}
                         </tbody>
-                        <tfoot className="bg-slate-50 font-semibold text-slate-800"><tr><td className="px-4 py-2" colSpan={3}>합계</td><td className="px-4 py-2 text-right">{fmtNumber(companyLedger.totalQuantity)}</td><td className="px-4 py-2 text-right text-slate-400">-</td><td className="px-4 py-2 text-right">{fmtMoney(companyLedger.totalAmount)}</td><td className="px-4 py-2 text-right">{fmtMoney(companyLedger.totalVatAmount)}</td><td className="px-4 py-2 text-right">{fmtMoney(companyLedger.totalWithVat)}</td></tr></tfoot>
+                        <tfoot className="bg-slate-50 font-semibold text-slate-800"><tr><td className="px-4 py-2" colSpan={3}>합계</td><td className="px-4 py-2 text-right">{fmtNumber(companyLedger.totalQuantity)}</td><td className="px-4 py-2 text-right text-slate-400">-</td><td className="px-4 py-2 text-right">{fmtMoney(companyLedger.totalAmount)}</td><td className="px-4 py-2 text-right">{fmtMoney(companyLedger.totalVatAmount)}</td><td className="px-4 py-2 text-right">{fmtMoney(companyLedger.totalWithVat)}</td><td className="px-4 py-2" /></tr></tfoot>
                     </table>
                 ))}
             </div>
-            {ledger.receipts.length > 0 && <div className="border-t border-teal-50 p-4 text-xs text-slate-600">수금 내역 {ledger.receipts.length}건 · 기간 수금 합계 {fmtMoney(ledger.periodReceiptTotal)}</div>}
         </section>
     );
 }
 
-function SupplierLedgerPanel({ ledger }: { ledger: SupplierLedgerResult }) {
+function SupplierLedgerPanel({ ledger, products, canEdit }: { ledger: SupplierLedgerResult; products: LedgerProductOption[]; canEdit: boolean }) {
     return (
         <section className="overflow-hidden rounded-2xl border border-violet-100 bg-white shadow-sm">
             <div className="flex items-center justify-between gap-3 border-b border-violet-50 px-5 py-3">
@@ -321,17 +383,33 @@ function SupplierLedgerPanel({ ledger }: { ledger: SupplierLedgerResult }) {
             <div className="max-h-[520px] overflow-auto">
                 {ledger.rows.length === 0 ? <div className="p-10 text-center text-sm text-slate-400">조회 기간 내 매입 원장 항목이 없습니다.</div> : (
                     <table className="w-full min-w-[980px] text-sm">
-                        <thead className="sticky top-0 bg-slate-50 text-left text-xs font-medium uppercase text-slate-500"><tr><th className="px-4 py-2">매입일자</th><th className="px-4 py-2">오더</th><th className="px-4 py-2">품목</th><th className="px-4 py-2 text-right">수량(TON)</th><th className="px-4 py-2 text-right">단가</th><th className="px-4 py-2 text-right">공급가액</th><th className="px-4 py-2 text-right">부가세</th><th className="px-4 py-2 text-right">합계</th></tr></thead>
+                        <thead className="sticky top-0 bg-slate-50 text-left text-xs font-medium uppercase text-slate-500"><tr><th className="px-4 py-2">매입일자</th><th className="px-4 py-2">오더</th><th className="px-4 py-2">품목</th><th className="px-4 py-2 text-right">수량(TON)</th><th className="px-4 py-2 text-right">단가</th><th className="px-4 py-2 text-right">공급가액</th><th className="px-4 py-2 text-right">부가세</th><th className="px-4 py-2 text-right">합계</th><th className="px-4 py-2 text-right">관리</th></tr></thead>
                         <tbody className="divide-y divide-slate-100">
-                            {ledger.rows.map((row) => (
-                                <tr key={row.id}><td className="px-4 py-2 text-slate-600">{fmtDate(row.purchaseDate)}</td><td className="px-4 py-2 font-mono text-xs text-blue-700">{row.orderNo || '-'}</td><td className="px-4 py-2 text-slate-700">{row.productName}</td><td className="px-4 py-2 text-right text-slate-600">{fmtNumber(row.quantity)}</td><td className="px-4 py-2 text-right text-slate-600">{fmtMoney(row.unitPrice)}</td><td className="px-4 py-2 text-right font-medium text-slate-800">{fmtMoney(row.supplyAmount)}</td><td className="px-4 py-2 text-right text-slate-600">{fmtMoney(row.vatAmount)}</td><td className="px-4 py-2 text-right font-semibold text-slate-900">{fmtMoney(row.totalAmount)}</td></tr>
-                            ))}
+                            {ledger.rows.map((row) => {
+                                const financeHref = row.noteNumber
+                                    ? `/admin/finance-transactions?txType=NOTE_TRANSFER&q=${encodeURIComponent(row.noteNumber)}`
+                                    : row.paymentId
+                                        ? `/admin/finance-transactions?q=${encodeURIComponent(row.memo ?? row.paymentId)}`
+                                        : null;
+                                return (
+                                    <tr key={row.id}>
+                                        <td className="px-4 py-2 text-slate-600">{fmtDate(row.purchaseDate)}</td>
+                                        <td className="px-4 py-2 font-mono text-xs">{row.rowSource === 'PAYMENT' && financeHref ? <Link href={financeHref} className="inline-flex rounded-full bg-green-50 px-2.5 py-1 font-semibold text-green-700 hover:bg-green-100 hover:text-green-900">{row.orderNo}</Link> : row.orderId ? <Link href={`/admin/orders/${row.orderId}`} className="inline-flex rounded-full bg-blue-50 px-2.5 py-1 font-semibold text-blue-700 hover:bg-blue-100 hover:text-blue-900">{row.orderNo || '오더'}</Link> : <span className="text-slate-300">{row.orderNo || '-'}</span>}</td>
+                                        <td className="px-4 py-2 text-slate-700">{row.productName}</td>
+                                        <td className="px-4 py-2 text-right text-slate-600">{row.rowSource === 'PAYMENT' ? '-' : fmtNumber(row.quantity)}</td>
+                                        <td className="px-4 py-2 text-right text-slate-600">{fmtMoney(row.unitPrice)}</td>
+                                        <td className={`px-4 py-2 text-right font-medium ${row.rowSource === 'PAYMENT' ? 'text-green-700' : 'text-slate-800'}`}>{fmtMoney(row.supplyAmount)}</td>
+                                        <td className="px-4 py-2 text-right text-slate-600">{fmtMoney(row.vatAmount)}</td>
+                                        <td className={`px-4 py-2 text-right font-semibold ${row.rowSource === 'PAYMENT' ? 'text-green-700' : 'text-slate-900'}`}>{fmtMoney(row.totalAmount)}</td>
+                                        <td className="px-4 py-2 text-right">{row.rowSource !== 'PAYMENT' && <LedgerRowEditButton canEdit={canEdit} mode="PURCHASE" rowId={row.id} transactionDate={dateToInput(row.purchaseDate)} productId={row.productId} productName={row.productName} quantity={row.quantity} unit={row.unit} unitPrice={row.unitPrice} memo={row.memo} products={products} />}</td>
+                                    </tr>
+                                );
+                            })}
                         </tbody>
-                        <tfoot className="bg-slate-50 font-semibold text-slate-800"><tr><td className="px-4 py-2" colSpan={3}>합계</td><td className="px-4 py-2 text-right">{fmtNumber(ledger.totalQuantity)}</td><td className="px-4 py-2 text-right text-slate-400">-</td><td className="px-4 py-2 text-right">{fmtMoney(ledger.totalSupplyAmount)}</td><td className="px-4 py-2 text-right">{fmtMoney(ledger.totalVatAmount)}</td><td className="px-4 py-2 text-right">{fmtMoney(ledger.totalAmount)}</td></tr></tfoot>
+                        <tfoot className="bg-slate-50 font-semibold text-slate-800"><tr><td className="px-4 py-2" colSpan={3}>합계</td><td className="px-4 py-2 text-right">{fmtNumber(ledger.totalQuantity)}</td><td className="px-4 py-2 text-right text-slate-400">-</td><td className="px-4 py-2 text-right">{fmtMoney(ledger.totalSupplyAmount)}</td><td className="px-4 py-2 text-right">{fmtMoney(ledger.totalVatAmount)}</td><td className="px-4 py-2 text-right">{fmtMoney(ledger.totalAmount)}</td><td className="px-4 py-2" /></tr></tfoot>
                     </table>
                 )}
             </div>
-            {ledger.payments.length > 0 && <div className="border-t border-violet-50 p-4 text-xs text-slate-600">지급 내역 {ledger.payments.length}건 · 기간 지급 합계 {fmtMoney(ledger.periodPaymentTotal)}</div>}
         </section>
     );
 }
@@ -347,17 +425,35 @@ export default async function AdminLedgerPage({ searchParams }: { searchParams: 
     const from = sp.from || range.from;
     const to = sp.to || range.to;
     const view = sp.view === 'sales' || sp.view === 'purchase' || sp.view === 'compare' ? sp.view : 'all';
+    const canViewAll = canViewAllStaffData(session.user);
+    const canImportFinance = canViewAll;
+    const staffSalesRepId = canViewAll ? undefined : session.user.id;
 
-    const [customers, suppliers] = await Promise.all([findCustomers(q), findSuppliers(q)]);
+    const [customers, suppliers, products, currentUser] = await Promise.all([
+        findCustomers(q, staffSalesRepId),
+        canViewAll ? findSuppliers(q) : Promise.resolve([]),
+        prisma.product.findMany({
+            where: { isActive: true },
+            select: { id: true, productName: true, productCode: true },
+            orderBy: [{ productName: 'asc' }],
+        }),
+        prisma.user.findUnique({ where: { id: session.user.id }, select: { name: true, isActive: true } }),
+    ]);
     const results = mergeCompanyResults(customers, suppliers);
+    const canEditLedger = !!currentUser?.isActive && canEditCustomerLedger(currentUser);
 
     if (q && !sp.customerId && !sp.supplierId && results.length === 1) {
         redirect(resultLinks(results[0], q, from, to).all);
     }
 
+    const selectedCustomer = sp.customerId
+        ? await prisma.customer.findUnique({ where: { id: sp.customerId }, select: { defaultSalesRepId: true } })
+        : null;
+    const canOpenCustomerLedger = !sp.customerId || canViewAll || selectedCustomer?.defaultSalesRepId === session.user.id;
+
     const [customerLedger, supplierLedger] = await Promise.all([
-        sp.customerId && view !== 'purchase' ? getCustomerLedger(sp.customerId, from, to) : Promise.resolve(null),
-        sp.supplierId && view !== 'sales' ? getSupplierLedger(sp.supplierId, from, to) : Promise.resolve(null),
+        sp.customerId && view !== 'purchase' && canOpenCustomerLedger ? getCustomerLedger(sp.customerId, from, to) : Promise.resolve(null),
+        canViewAll && sp.supplierId && view !== 'sales' ? getSupplierLedger(sp.supplierId, from, to) : Promise.resolve(null),
     ]);
 
     const showLedger = customerLedger || supplierLedger;
@@ -388,12 +484,12 @@ export default async function AdminLedgerPage({ searchParams }: { searchParams: 
                     </div>
                 </div>
 
-                <SearchBox q={q} from={from} to={to} customerId={sp.customerId} supplierId={sp.supplierId} view={view} />
+                <SearchBox q={q} from={from} to={to} customerId={sp.customerId} supplierId={sp.supplierId} view={view} canImportFinance={canImportFinance} />
 
                 {showLedger ? (
                     <div className={split ? 'grid items-start gap-4 xl:grid-cols-2' : 'space-y-4'}>
-                        {customerLedger && <CustomerLedgerPanel ledger={customerLedger} />}
-                        {supplierLedger && <SupplierLedgerPanel ledger={supplierLedger} />}
+                        {customerLedger && <CustomerLedgerPanel ledger={customerLedger} products={products} canEdit={canEditLedger} />}
+                        {supplierLedger && <SupplierLedgerPanel ledger={supplierLedger} products={products} canEdit={canEditLedger} />}
                     </div>
                 ) : <CompanyResultList results={results} q={q} from={from} to={to} />}
             </main>

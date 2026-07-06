@@ -30,6 +30,11 @@ export function extractHanwhaDriverFields(rawCells: string[] | string | null | u
     return { vehicleNumber, driverName, driverPhone };
 }
 
+export function hasHanwhaDriverInfo(rawCells: string[] | string | null | undefined): boolean {
+    const fields = extractHanwhaDriverFields(rawCells);
+    return Boolean(fields.vehicleNumber || fields.driverName || fields.driverPhone);
+}
+
 export function joinHanwhaDriverInfo(
     vehicleNumber?: string | null,
     driverName?: string | null,
@@ -43,6 +48,15 @@ export function joinHanwhaDriverInfo(
 
 export function parseHanwhaMaterialFromMemo(memo?: string | null): string | null {
     const value = memo?.split(' / ').pop()?.trim();
+    return value && value !== memo ? value : null;
+}
+
+export function parseHanwhaIndoChiFromMemo(memo?: string | null): string | null {
+    if (!memo) return null;
+    const prefix = '한화 배차 라인 매칭:';
+    if (!memo.includes(prefix)) return null;
+    const body = memo.split(prefix)[1]?.trim();
+    const value = body?.split(' / ')[0]?.trim();
     return value && value !== memo ? value : null;
 }
 

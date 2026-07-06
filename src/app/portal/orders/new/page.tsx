@@ -4,6 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowLeft } from 'lucide-react';
 import OrderForm from '@/components/OrderForm';
+import HomepageArchiveLink from '@/components/HomepageArchiveLink';
 
 export default async function CustomerNewOrderPage() {
     const session = await auth();
@@ -15,10 +16,13 @@ export default async function CustomerNewOrderPage() {
         <div className="min-h-screen">
             <header className="bg-white border-b border-slate-200">
                 <div className="max-w-3xl mx-auto px-6 h-16 flex items-center justify-between">
-                    <Link href="/portal" className="flex items-center gap-2">
-                        <Image src="/hanyanglogo.png" alt="logo" width={32} height={32} className="h-8 w-auto" />
-                        <span className="font-bold text-slate-800">한양유화 거래처 포털</span>
-                    </Link>
+                    <div className="flex items-center gap-2">
+                        <Link href="/portal" className="flex items-center gap-2">
+                            <Image src="/hanyanglogo.png" alt="logo" width={32} height={32} className="h-8 w-auto" />
+                            <span className="font-bold text-slate-800">한양유화 거래처 포털</span>
+                        </Link>
+                        <HomepageArchiveLink />
+                    </div>
                     <Link
                         href="/portal"
                         className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700"
