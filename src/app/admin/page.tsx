@@ -182,28 +182,27 @@ export default async function AdminHome({
         },
     ];
     const quickActionCards = [
-        { href: '/admin/orders/new', label: '오더등록(F5)', mobileLabel: '오더등록', subLabel: '신규 주문 입력', Icon: PlusCircle, className: 'border-orange-200 bg-white text-orange-900', iconClassName: 'bg-orange-500 text-white' },
-        { href: '/admin/dispatch', label: '배차조회', mobileLabel: '배차조회', subLabel: '한화 배차내역 확인', Icon: Truck, className: 'border-red-200 bg-white text-red-900', iconClassName: 'bg-red-500 text-white' },
-        { href: '/admin/customers', label: '거래처 관리', subLabel: '거래처/인도처 확인', Icon: Building2, className: 'border-amber-200 bg-white text-amber-900', iconClassName: 'bg-amber-500 text-white', mobileHidden: true },
+        { href: '/admin/orders/new', label: '오더 등록', subLabel: 'F5 · 신규 주문 입력', Icon: PlusCircle, className: 'border-orange-200 bg-white text-orange-900', iconClassName: 'bg-orange-500 text-white' },
+        { href: '/admin/dispatch', label: '배차 조회', subLabel: '한화 배차내역 확인', Icon: Truck, className: 'border-red-200 bg-white text-red-900', iconClassName: 'bg-red-500 text-white' },
+        { href: '/admin/customers', label: '거래처 관리', subLabel: '거래처/인도처 확인', Icon: Building2, className: 'border-amber-200 bg-white text-amber-900', iconClassName: 'bg-amber-500 text-white' },
     ];
 
     return (
         <div className="min-h-full bg-[#fff7ed] p-3 md:p-6">
             <div className="mx-auto max-w-5xl">
-                        <div className="mb-5 grid grid-cols-2 gap-2 md:grid-cols-3 md:gap-3">
-                            {quickActionCards.map(({ href, label, mobileLabel, subLabel, Icon, className, iconClassName, mobileHidden }) => (
+                        <div className="mb-5 grid grid-cols-3 gap-2 md:gap-3">
+                            {quickActionCards.map(({ href, label, subLabel, Icon, className, iconClassName }) => (
                                 <Link
                                     key={href}
                                     href={href}
-                                    className={`group min-h-16 items-center gap-2 rounded-lg border p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md md:min-h-24 md:gap-4 md:p-4 ${mobileHidden ? 'hidden md:flex' : 'flex'} ${className}`}
+                                    className={`group flex min-h-20 flex-col items-center justify-center gap-1 rounded-lg border p-2 text-center shadow-sm transition hover:-translate-y-0.5 hover:shadow-md md:min-h-24 md:flex-row md:justify-start md:gap-4 md:p-4 md:text-left ${className}`}
                                 >
-                                    <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg shadow-sm md:h-12 md:w-12 ${iconClassName}`}>
-                                        <Icon size={22} />
+                                    <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg shadow-sm md:h-12 md:w-12 ${iconClassName}`}>
+                                        <Icon size={20} />
                                     </span>
-                                    <span className="min-w-0 flex-1">
-                                        <span className="block text-sm font-black leading-tight md:hidden">{mobileLabel ?? label}</span>
-                                        <span className="hidden text-lg font-black leading-tight md:block">{label}</span>
-                                        <span className="mt-1 hidden text-xs font-semibold text-slate-500 md:block">{subLabel}</span>
+                                    <span className="min-w-0 md:flex-1">
+                                        <span className="block text-xs font-black leading-tight md:text-lg">{label}</span>
+                                        <span className="mt-0.5 block text-[10px] font-semibold leading-tight text-slate-500 md:mt-1 md:text-xs">{subLabel}</span>
                                     </span>
                                 </Link>
                             ))}
