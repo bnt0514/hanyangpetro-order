@@ -5,6 +5,7 @@ import InternalWorkspaceShell from './InternalWorkspaceShell';
 import AdminNav from './AdminNav';
 import MobileDrawerNav from './MobileDrawerNav';
 import StaffViewModeToggle from './StaffViewModeToggle';
+import AdminShellLayoutFrame from './AdminShellLayoutFrame';
 import { canViewAllStaffData, isYangHeeCheol } from '@/lib/staff-permissions';
 import HomepageArchiveLink from '@/components/HomepageArchiveLink';
 
@@ -53,46 +54,17 @@ export default async function AdminLayout({
                     canViewAllStaffData={canViewAll}
                 />
             </div>
-            <div
-                className="admin-shell-layout bg-[#fff7ed]"
-                style={{
-                    display: 'grid',
-                    gridTemplateColumns: '300px minmax(0, 1fr)',
-                    height: 'calc(100vh - 3rem)',
-                    minHeight: 'calc(100vh - 3rem)',
-                    overflow: 'hidden',
-                }}
-            >
-                <aside
-                    className="admin-shell-sidebar staff-desktop-view border-r border-orange-100 bg-orange-50 px-5 py-5"
-                    style={{
-                        height: 'calc(100vh - 3rem)',
-                        minHeight: 0,
-                        width: 300,
-                        minWidth: 300,
-                        overflowY: 'auto',
-                        overscrollBehavior: 'contain',
-                    }}
-                >
+            <AdminShellLayoutFrame
+                sidebar={(
                     <AdminNav
                         isHanwhaManager={isHanwhaManager}
                         canManageCreditLimits={canManageCreditLimits}
                         canViewAllStaffData={canViewAll}
                     />
-                </aside>
-                <main
-                    className="admin-shell-main"
-                    style={{
-                        height: 'calc(100vh - 3rem)',
-                        minHeight: 'calc(100vh - 3rem)',
-                        minWidth: 0,
-                        overflowY: 'auto',
-                        overscrollBehavior: 'contain',
-                    }}
-                >
-                    {children}
-                </main>
-            </div>
+                )}
+            >
+                {children}
+            </AdminShellLayoutFrame>
         </InternalWorkspaceShell>
     );
 }
