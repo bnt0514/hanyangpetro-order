@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db';
 import { LEDGER_DISPATCH_COMPLETED_WHERE, ledgerPurchaseDate, ledgerSalesDate } from '@/lib/ledger-policy';
+import { reportProductGroupKey, reportProductGroupLabel } from '@/lib/report-product-identity';
 
 export type ProfitSortKey = 'name' | 'quantity' | 'sales' | 'purchase' | 'profit' | 'receivable';
 export type ProfitSortDir = 'asc' | 'desc';
@@ -95,10 +96,12 @@ function productLookupKeys(
     const productName = product?.productName || fallbackName || '';
     const normalizedName = normalizeProductKey(productName);
     const normalizedCode = normalizeProductKey(product?.productCode);
+    const fallbackKey = normalizedName ? `name:${normalizedName}` : normalizedCode ? `code:${normalizedCode}` : product?.id ? `id:${product.id}` : null;
     return uniqueKeys([
         product?.id ? `id:${product.id}` : null,
         normalizedName ? `name:${normalizedName}` : null,
         normalizedCode ? `code:${normalizedCode}` : null,
+        fallbackKey ? reportProductGroupKey(productName, fallbackKey) : null,
     ]);
 }
 
@@ -301,8 +304,9 @@ export async function getProfitReport(options: {
     }
 
     for (const entry of ledgerEntries) {
-        const productKey = entry.productId || `name:${normalizeProductKey(entry.productName)}`;
-        const productLabel = entry.product?.productName || entry.productName || '미지정 품목';
+        const rawProductLabel = entry.product?.productName || entry.productName || '미지정 품목';
+        const productKey = reportProductGroupKey(rawProductLabel, entry.productId || `name:${normalizeProductKey(entry.productName)}`);
+        const productLabel = reportProductGroupLabel(rawProductLabel);
         const productKeys = productLookupKeys(entry.product, entry.productName);
         const quantity = entry.quantity || 0;
         const supply = entry.supplyAmount ?? 0;
@@ -346,8 +350,8 @@ export async function getProfitReport(options: {
         const quantity = item.requestedQuantity || 0;
         const isWarehouse = item.fulfillmentType === 'WAREHOUSE';
         const isInbound = isWarehouse && isWarehouseInboundCustomer(item.order.customer.companyName);
-        const productKey = item.productId;
-        const productLabel = item.product.productName;
+        const productKey = reportProductGroupKey(item.product.productName, item.productId);
+        const productLabel = reportProductGroupLabel(item.product.productName);
         const productKeys = productLookupKeys(item.product, item.product.productName);
         const customer = item.order.customer;
         if (isInbound) {
@@ -370,8 +374,9 @@ export async function getProfitReport(options: {
     }
     if (selectedRepId === 'all') {
         for (const entry of purchaseLedgerEntries) {
-            const productKey = entry.productId || `name:${normalizeProductKey(entry.productName)}`;
-            const productLabel = entry.product?.productName || entry.productName || '미지정 품목';
+            const rawProductLabel = entry.product?.productName || entry.productName || '미지정 품목';
+            const productKey = reportProductGroupKey(rawProductLabel, entry.productId || `name:${normalizeProductKey(entry.productName)}`);
+            const productLabel = reportProductGroupLabel(rawProductLabel);
             const month = addToMap(monthly, monthKey(entry.transactionDate), monthKey(entry.transactionDate));
             const product = addToMap(byProduct, productKey, productLabel);
             const supply = entry.supplyAmount ?? 0;

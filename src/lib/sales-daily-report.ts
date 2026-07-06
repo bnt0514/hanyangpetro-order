@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db';
 
 import { LEDGER_DISPATCH_COMPLETED_WHERE, ledgerPurchaseDate, ledgerSalesDate } from '@/lib/ledger-policy';
+import { reportProductGroupLabel, reportProductMatchesQuery } from '@/lib/report-product-identity';
 
 export type DailyReportGroupBy = 'total' | 'product' | 'customer';
 export type DailyReportMode = 'daily' | 'monthly';
@@ -235,12 +236,12 @@ export async function getSalesDailyReport(options: {
 
         let groupLabel: string;
         if (groupBy === 'total') groupLabel = period;
-        else if (groupBy === 'product') groupLabel = productLabel;
+        else if (groupBy === 'product') groupLabel = reportProductGroupLabel(productLabel);
         else groupLabel = counterLabel;
 
         // ?꾪꽣 ?곸슜
         if (fq) {
-            if (groupBy === 'product' && !productLabel.toLowerCase().includes(fq)) continue;
+            if (groupBy === 'product' && !reportProductMatchesQuery(productLabel, fq)) continue;
             if (groupBy === 'customer' && !counterLabel.toLowerCase().includes(fq)) continue;
         }
 
@@ -331,13 +332,13 @@ export async function getSalesDailyReport(options: {
         const purchaseVat = purchaseSupply > 0 ? Math.round(purchaseSupply * 0.1) : 0;
         const purchaseTotal = purchaseSupply + purchaseVat;
 
-        const productMatches = !fq || groupBy !== 'product' || productLabel.toLowerCase().includes(fq);
+        const productMatches = !fq || groupBy !== 'product' || reportProductMatchesQuery(productLabel, fq);
         const salesCounterMatches = !fq || groupBy !== 'customer' || customerLabel.toLowerCase().includes(fq);
         const purchaseCounterMatches = !fq || groupBy !== 'customer' || supplierLabel.toLowerCase().includes(fq);
 
         let salesGroupLabel: string;
         if (groupBy === 'total') salesGroupLabel = period;
-        else if (groupBy === 'product') salesGroupLabel = productLabel;
+        else if (groupBy === 'product') salesGroupLabel = reportProductGroupLabel(productLabel);
         else salesGroupLabel = customerLabel;
 
         // 매출 집계: 창고 입고가 아니면서 수량이 있을 때 (단가 없어도 수량은 집계)
@@ -368,7 +369,7 @@ export async function getSalesDailyReport(options: {
         if (!alreadyInPurchaseLedger.has(item.id) && matchingPurchaseLedgerIndex < 0 && inRange(purchaseDate) && productMatches && purchaseCounterMatches && shouldCountPurchase) {
             let purchaseGroupLabel: string;
             if (groupBy === 'total') purchaseGroupLabel = purchasePeriod;
-            else if (groupBy === 'product') purchaseGroupLabel = productLabel;
+            else if (groupBy === 'product') purchaseGroupLabel = reportProductGroupLabel(productLabel);
             else purchaseGroupLabel = supplierLabel;
             upsert(purchasePeriod, purchaseGroupLabel, (r) => {
                 pushOrderRef(r.orderRefs, item.order);

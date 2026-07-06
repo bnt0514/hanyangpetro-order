@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/db';
 import { LEDGER_DISPATCH_COMPLETED_WHERE, ledgerPurchaseDate, ledgerSalesDate } from '@/lib/ledger-policy';
-import { productIdentityKey } from '@/lib/product-identity';
+import { reportProductGroupLabel, reportProductIdentityKey } from '@/lib/report-product-identity';
 
 export type PerformanceView =
     | 'sales_product'
@@ -270,8 +270,8 @@ async function fetchSalesFacts(from: Date, toInclusive: Date, salesRepId?: strin
         const quantity = item.requestedQuantity ?? 0;
         facts.push({
             date: ledgerSalesDate(item) ?? item.createdAt,
-            productKey: productIdentityKey(item.product.productName, item.product.productCode),
-            productName: item.product.productName,
+            productKey: reportProductIdentityKey(item.product.productName, item.product.productCode),
+            productName: reportProductGroupLabel(item.product.productName),
             customerKey: item.order.customer.id,
             customerId: item.order.customer.id,
             customerName,
@@ -289,8 +289,8 @@ async function fetchSalesFacts(from: Date, toInclusive: Date, salesRepId?: strin
         const productName = entry.product?.productName || entry.productName || '미지정 품목';
         facts.push({
             date: entry.transactionDate,
-            productKey: productIdentityKey(productName, entry.product?.productCode),
-            productName,
+            productKey: reportProductIdentityKey(productName, entry.product?.productCode),
+            productName: reportProductGroupLabel(productName),
             customerKey: entry.customer?.id || `name:${normalizeKey(customerName)}`,
             customerId: entry.customer?.id ?? undefined,
             customerName,
@@ -359,8 +359,8 @@ async function fetchPurchaseFacts(from: Date, toInclusive: Date, salesRepId?: st
         const quantity = item.requestedQuantity ?? 0;
         facts.push({
             date: ledgerPurchaseDate(item) ?? item.order.createdAt,
-            productKey: productIdentityKey(item.product.productName, item.product.productCode),
-            productName: item.product.productName,
+            productKey: reportProductIdentityKey(item.product.productName, item.product.productCode),
+            productName: reportProductGroupLabel(item.product.productName),
             supplierKey,
             supplierId: item.purchaseSupplierId ?? undefined,
             supplierName,
@@ -376,8 +376,8 @@ async function fetchPurchaseFacts(from: Date, toInclusive: Date, salesRepId?: st
         const productName = entry.product?.productName ?? entry.productName ?? '미지정 품목';
         facts.push({
             date: entry.transactionDate,
-            productKey: productIdentityKey(productName, entry.product?.productCode),
-            productName,
+            productKey: reportProductIdentityKey(productName, entry.product?.productCode),
+            productName: reportProductGroupLabel(productName),
             supplierKey,
             supplierId: entry.supplierId ?? undefined,
             supplierName,
