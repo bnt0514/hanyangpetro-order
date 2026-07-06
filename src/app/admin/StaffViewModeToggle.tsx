@@ -12,9 +12,12 @@ export default function StaffViewModeToggle({ short = false }: { short?: boolean
 
     useEffect(() => {
         const stored = window.localStorage.getItem(STORAGE_KEY) as StaffViewMode | null;
-        const initialMode = stored === 'desktop' || stored === 'mobile'
-            ? stored
-            : window.matchMedia('(max-width: 767px)').matches ? 'mobile' : 'desktop';
+        const canUseMobileView = window.matchMedia('(max-width: 767px) and (pointer: coarse)').matches;
+        const initialMode = stored === 'desktop'
+            ? 'desktop'
+            : stored === 'mobile' && canUseMobileView
+                ? 'mobile'
+                : canUseMobileView ? 'mobile' : 'desktop';
         setMode(initialMode);
         document.documentElement.dataset.staffView = initialMode;
 

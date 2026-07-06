@@ -195,15 +195,15 @@ export default async function AdminHome({
                                 <Link
                                     key={href}
                                     href={href}
-                                    className={`admin-quick-card group border shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${mobileHidden ? 'admin-mobile-hidden' : ''} ${className}`}
+                                    className={`admin-quick-card group flex min-h-24 items-center gap-4 rounded-lg border p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${mobileHidden ? 'admin-mobile-hidden' : ''} ${className}`}
                                 >
-                                    <span className={`admin-quick-icon shadow-sm ${iconClassName}`}>
+                                    <span className={`admin-quick-icon flex h-12 w-12 shrink-0 items-center justify-center rounded-lg shadow-sm ${iconClassName}`}>
                                         <Icon />
                                     </span>
                                     <span className="min-w-0 flex-1">
-                                        <span className="admin-quick-label-mobile">{mobileLabel ?? label}</span>
-                                        <span className="admin-quick-label-desktop">{label}</span>
-                                        <span className="admin-quick-sub">{subLabel}</span>
+                                        <span className="admin-quick-label-mobile text-sm font-black leading-tight">{mobileLabel ?? label}</span>
+                                        <span className="admin-quick-label-desktop block text-lg font-black leading-tight">{label}</span>
+                                        <span className="admin-quick-sub mt-1 block text-xs font-semibold text-slate-500">{subLabel}</span>
                                     </span>
                                 </Link>
                             ))}

@@ -14,9 +14,12 @@ const staffViewInitScript = `
 try {
   var key = 'hanyang-staff-view-mode';
   var stored = window.localStorage.getItem(key);
-  var mode = stored === 'desktop' || stored === 'mobile'
-    ? stored
-    : (window.matchMedia('(max-width: 767px)').matches ? 'mobile' : 'desktop');
+  var canUseMobileView = window.matchMedia('(max-width: 767px) and (pointer: coarse)').matches;
+  var mode = stored === 'desktop'
+    ? 'desktop'
+    : (stored === 'mobile' && canUseMobileView)
+      ? 'mobile'
+      : canUseMobileView ? 'mobile' : 'desktop';
   document.documentElement.dataset.staffView = mode;
 } catch (e) {}
 `;
