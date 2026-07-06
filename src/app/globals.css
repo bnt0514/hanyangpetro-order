@@ -25,6 +25,51 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+.admin-shell-layout {
+  min-height: calc(100vh - 3rem);
+}
+
+.admin-shell-main {
+  min-height: calc(100vh - 3rem);
+  min-width: 0;
+}
+
+@media (min-width: 768px) {
+  .admin-shell-layout {
+    height: calc(100vh - 3rem);
+    overflow: hidden;
+  }
+
+  .admin-shell-sidebar {
+    position: fixed;
+    left: 0;
+    top: 3rem;
+    bottom: 0;
+    z-index: 30;
+    width: 300px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .admin-shell-main {
+    height: calc(100vh - 3rem);
+    margin-left: 300px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+
+@media (max-width: 767px) {
+  .admin-shell-layout {
+    overflow: visible;
+  }
+
+  .admin-shell-main {
+    margin-left: 0;
+    overflow: visible;
+  }
+}
+
 .staff-mobile-view,
 .staff-mobile-toggle {
   display: none;

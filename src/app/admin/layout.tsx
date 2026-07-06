@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { auth, signOut } from '@/lib/auth';
 import InternalWorkspaceShell from './InternalWorkspaceShell';
 import AdminNav from './AdminNav';
+import MobileDrawerNav from './MobileDrawerNav';
 import { canViewAllStaffData, isYangHeeCheol } from '@/lib/staff-permissions';
 import HomepageArchiveLink from '@/components/HomepageArchiveLink';
 
@@ -41,22 +42,16 @@ export default async function AdminLayout({
                 </div>
             )}
         >
-            <div
-                className="bg-[#fff7ed]"
-                style={{ height: 'calc(100vh - 3rem)', overflow: 'hidden' }}
-            >
+            <div className="admin-shell-layout bg-[#fff7ed]">
+                <div className="md:hidden">
+                    <MobileDrawerNav
+                        isHanwhaManager={isHanwhaManager}
+                        canManageCreditLimits={canManageCreditLimits}
+                        canViewAllStaffData={canViewAll}
+                    />
+                </div>
                 <aside
-                    className="border-r border-orange-100 bg-orange-50 px-5 py-5"
-                    style={{
-                        position: 'fixed',
-                        left: 0,
-                        top: '3rem',
-                        bottom: 0,
-                        zIndex: 30,
-                        width: 300,
-                        overflowY: 'auto',
-                        overscrollBehavior: 'contain',
-                    }}
+                    className="admin-shell-sidebar hidden border-r border-orange-100 bg-orange-50 px-5 py-5 md:block"
                 >
                     <AdminNav
                         isHanwhaManager={isHanwhaManager}
@@ -64,14 +59,7 @@ export default async function AdminLayout({
                         canViewAllStaffData={canViewAll}
                     />
                 </aside>
-                <main
-                    style={{
-                        marginLeft: 300,
-                        height: 'calc(100vh - 3rem)',
-                        overflowY: 'auto',
-                        overscrollBehavior: 'contain',
-                    }}
-                >
+                <main className="admin-shell-main">
                     {children}
                 </main>
             </div>
