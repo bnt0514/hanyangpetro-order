@@ -2481,9 +2481,9 @@ export async function startHanwhaNewOrderWithApproval(orderId: string) {
 
 export async function checkHanwhaOrderStatus(orderId: string) {
     const session = await auth();
-    if (!session?.user) return { ok: false as const, error: '濡쒓렇?몄씠 ?꾩슂?⑸땲??' };
+    if (!session?.user) return { ok: false as const, error: '로그인이 필요합니다.' };
     if (session.user.userKind !== 'staff') {
-        return { ok: false as const, error: '吏곸썝留??쒗솕 二쇰Ц?곹깭?뺤씤???ㅽ뻾?????덉뒿?덈떎.' };
+        return { ok: false as const, error: '직원만 한화 주문상태확인을 실행할 수 있습니다.' };
     }
 
     const order = await prisma.order.findUnique({
@@ -2543,7 +2543,7 @@ export async function checkHanwhaOrderStatus(orderId: string) {
     const orderDateTo = order.requestedDeliveryDate;
     const shipToName = order.deliveryAddress.label || order.customer.companyName;
     const result = await runHanwhaAutomationQueued(
-        `二쇰Ц?곹깭議고쉶 ${order.orderNo}`,
+        `주문상태조회 ${order.orderNo}`,
         async () => checkHanwhaESalesOrderStatus({
             username: await getHanwhaUsername(),
             password: await getHanwhaPassword(),
