@@ -1894,6 +1894,42 @@ function normalizeStatusMatchText(value: string | null | undefined) {
         .toUpperCase();
 }
 
+function statusMaterialParts(value: string | null | undefined) {
+    const parts = (value ?? '')
+        .toUpperCase()
+        .replace(/\s+/g, '')
+        .split(/[_/\\-]+/)
+        .filter(Boolean);
+    const familyIndex = parts.findIndex((part) => ['LLD', 'HD', 'LD', 'EVA'].includes(part));
+    const bagIndex = parts.findIndex((part) => ['FFS', 'FB500', 'FB700', 'FB750', 'SEW'].includes(part));
+    if (familyIndex < 0 || bagIndex < 0 || bagIndex <= familyIndex) return null;
+
+    const grade = parts.slice(familyIndex + 1, bagIndex).join('');
+    const suffixFamily = Array.from(new Set(
+        parts
+            .slice(bagIndex + 1)
+            .map((part) => part.replace(/[^A-Z]/g, ''))
+            .filter(Boolean),
+    )).join('/');
+    if (!grade) return null;
+    return {
+        family: parts[familyIndex],
+        grade,
+        bag: parts[bagIndex],
+        suffixFamily,
+    };
+}
+
+function statusMaterialsCompatible(actualMaterial: string | null | undefined, expectedMaterial: string | null | undefined) {
+    const actual = statusMaterialParts(actualMaterial);
+    const expected = statusMaterialParts(expectedMaterial);
+    if (!actual || !expected) return false;
+    return actual.family === expected.family
+        && actual.grade === expected.grade
+        && actual.bag === expected.bag
+        && (!actual.suffixFamily || !expected.suffixFamily || actual.suffixFamily === expected.suffixFamily);
+}
+
 function datesEqual(left: string | null | undefined, right: string | null | undefined) {
     return (left ?? '').replace(/\D/g, '') === (right ?? '').replace(/\D/g, '');
 }
@@ -2077,6 +2113,7 @@ function orderStatusItemsMatch(actualLines: OrderDetailLine[], expectedItems: Ha
             if (used.has(index)) return false;
             const materialMatches = expectedMaterial
                 ? normalizeStatusMatchText(line.materialName) === expectedMaterial
+                || statusMaterialsCompatible(line.materialName, expected.materialName)
                 : false;
             const codeMatches = expectedCode
                 ? normalizeStatusMatchText(line.itemCode) === expectedCode
