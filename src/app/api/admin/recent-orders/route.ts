@@ -1,22 +1,26 @@
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { statusLabel } from '@/lib/orders';
+import { canViewAllStaffData } from '@/lib/staff-permissions';
 import { Prisma } from '@prisma/client';
 import { NextRequest, NextResponse } from 'next/server';
 
 type RecentRange = 'latest20' | '7d' | '14d' | '1m' | '3m' | 'all';
 type RecentSort = 'createdAt' | 'orderNo' | 'deliveryDate' | 'customer' | 'status';
 type SortDir = 'asc' | 'desc';
-type RecentStatus = 'all' | 'intake' | 'approved' | 'dispatchWaiting' | 'dispatched';
+type RecentStatus = 'all' | 'requested' | 'creditOver' | 'rejected' | 'approved' | 'dispatching' | 'dispatched' | 'shipped';
 
 const rangeOptions: RecentRange[] = ['latest20', '7d', '14d', '1m', '3m', 'all'];
 const sortOptions: RecentSort[] = ['createdAt', 'orderNo', 'deliveryDate', 'customer', 'status'];
 const statusOptions: Record<RecentStatus, string[]> = {
     all: [],
-    intake: ['REQUESTED', 'PENDING_SALES_REVIEW', 'SALES_REVIEWING', 'CREDIT_OVER_LIMIT', 'ON_HOLD'],
-    approved: ['APPROVED', 'SUPPLIER_ORDER_REQUIRED'],
-    dispatchWaiting: ['SUPPLIER_ORDER_COMPLETED', 'DISPATCH_WAITING', 'DISPATCHING', 'DISPATCH_FAILED', 'DISPATCH_RETRY_SCHEDULED'],
-    dispatched: ['DISPATCH_COMPLETED', 'READY_TO_SHIP', 'SHIPPING', 'SHIPPED', 'DELIVERY_CONFIRM_PENDING'],
+    requested: ['REQUESTED'],
+    creditOver: ['CREDIT_OVER_LIMIT'],
+    rejected: ['REJECTED'],
+    approved: ['APPROVED'],
+    dispatching: ['DISPATCHING'],
+    dispatched: ['DISPATCH_COMPLETED'],
+    shipped: ['SHIPPED'],
 };
 
 const dashboardOrderInclude = {
@@ -27,6 +31,8 @@ const dashboardOrderInclude = {
     requestedByCustomerUser: { select: { name: true } },
     deliveryDateChangeRequests: { orderBy: { createdAt: 'desc' }, take: 1, select: { status: true } },
 } as const;
+
+type RecentOrderRecord = Prisma.OrderGetPayload<{ include: typeof dashboardOrderInclude }>;
 
 function startDateForRange(range: RecentRange, today: Date) {
     if (range === 'latest20' || range === 'all') return null;
@@ -43,7 +49,7 @@ function compareText(a: string, b: string) {
     return a.localeCompare(b, 'ko-KR', { numeric: true, sensitivity: 'base' });
 }
 
-function mapOrderRow(o: any) {
+function mapOrderRow(o: RecentOrderRecord) {
     return {
         id: o.id,
         orderNo: o.orderNo,
@@ -56,7 +62,7 @@ function mapOrderRow(o: any) {
             defaultSalesRep: o.customer.defaultSalesRep,
         },
         deliveryAddress: { label: o.deliveryAddress.label },
-        items: o.items.map((it: any) => ({
+        items: o.items.map((it) => ({
             id: it.id,
             product: { productName: it.product.productName },
             requestedQuantity: it.requestedQuantity,
@@ -82,28 +88,37 @@ export async function GET(req: NextRequest) {
         ? params.get('recentStatus') as RecentStatus
         : 'all';
     const recentOwnerParam = params.get('recentOwner');
-    const recentOwner = recentOwnerParam === 'mine' ? 'mine' : 'all';
-    const selectedRecentUserId = '';
+    const canViewAll = canViewAllStaffData(session.user);
+    const recentOwner = canViewAll
+        ? (recentOwnerParam === 'mine' ? 'mine' : recentOwnerParam === 'user' ? 'user' : 'all')
+        : 'mine';
+    const selectedRecentUserId = canViewAll && recentOwner === 'user' ? params.get('recentUserId') ?? '' : '';
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const recentStart = startDateForRange(recentRange, today);
     const ownerUserId = recentOwner === 'mine' ? session.user.id : selectedRecentUserId;
     const ownerWhere: Prisma.OrderWhereInput = ownerUserId
-        ? { customer: { defaultSalesRepId: ownerUserId } }
+        ? {
+            OR: [
+                { requestedByUserId: ownerUserId },
+                { salesRepId: ownerUserId },
+                { customer: { defaultSalesRepId: ownerUserId } },
+            ],
+        }
         : {};
     const statusWhere: Prisma.OrderWhereInput = recentStatus === 'all'
         ? {}
-        : { status: { in: statusOptions[recentStatus] as any } };
+        : { status: { in: statusOptions[recentStatus] } };
 
     const raw = await prisma.order.findMany({
         where: { deletedAt: null, ...(recentStart ? { createdAt: { gte: recentStart } } : {}), ...ownerWhere, ...statusWhere },
         orderBy: { createdAt: 'desc' },
         take: recentRange === 'latest20' ? 20 : undefined,
-        include: dashboardOrderInclude as any,
+        include: dashboardOrderInclude,
     });
 
-    const sorted = [...raw].sort((a: any, b: any) => {
+    const sorted = [...raw].sort((a, b) => {
         let result = 0;
         if (recentSort === 'createdAt') result = a.createdAt.getTime() - b.createdAt.getTime();
         if (recentSort === 'deliveryDate') result = (a.requestedDeliveryDate?.getTime() ?? 0) - (b.requestedDeliveryDate?.getTime() ?? 0);

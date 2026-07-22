@@ -1,20 +1,19 @@
-﻿'use client';
+'use client';
 
 import { useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
+import { CheckCircle2, Loader2 } from 'lucide-react';
 import { confirmOrderReceipt } from '@/app/dispatch/actions';
 
 export default function ReceiptCompleteButton({ orderId }: { orderId: string }) {
     const router = useRouter();
     const [pending, startTransition] = useTransition();
 
-    function completeReceipt() {
-        const ok = window.confirm('정말 입고 완료 처리 하시겠습니까?\n\n완료 후에는 버튼이 사라지며 상태가 변경됩니다.');
+    function handleClick() {
+        const ok = window.confirm('이 주문을 출고완료 처리하시겠습니까?');
         if (!ok) return;
-
         startTransition(async () => {
-            const result = await confirmOrderReceipt(orderId, '대시보드에서 입고 완료 처리');
+            const result = await confirmOrderReceipt(orderId, '출고완료 처리');
             if (!result.ok) {
                 window.alert(result.error);
                 return;
@@ -26,12 +25,12 @@ export default function ReceiptCompleteButton({ orderId }: { orderId: string }) 
     return (
         <button
             type="button"
-            onClick={completeReceipt}
+            onClick={handleClick}
             disabled={pending}
-            className="inline-flex items-center gap-1 rounded-full bg-teal-600 px-2.5 py-0.5 text-xs font-bold text-white hover:bg-teal-700 disabled:opacity-60"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-orange-600 px-3 py-2 text-xs font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
         >
-            {pending && <Loader2 size={12} className="animate-spin" />}
-            입고처리
+            {pending ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+            출고완료
         </button>
     );
 }

@@ -1,6 +1,7 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
 // ⏱ 스크롤 속도 조절 — 숫자를 바꾸면 속도 변경 (ms)
 // 예) 100 = 매우 빠름 / 200 = 빠름 / 400 = 보통 / 600 = 느림
@@ -13,6 +14,9 @@ function easeOutCubic(t: number) {
 function findScrollParent(element: HTMLElement) {
     let current: HTMLElement | null = element.parentElement;
     while (current) {
+        // Mobile browsers scroll the document root, not <body>. Treating <body>
+        // as a nested scroll container applies the scroll offset twice.
+        if (current === document.body || current === document.documentElement) return null;
         const style = window.getComputedStyle(current);
         const canScroll = /(auto|scroll)/.test(style.overflowY) && current.scrollHeight > current.clientHeight;
         if (canScroll) return current;
@@ -40,7 +44,7 @@ function smoothScrollElement(container: HTMLElement | null, targetY: number, dur
 }
 
 function scrollToDashboardOrders() {
-    const el = document.getElementById('dashboard-orders') ?? document.getElementById('mobile-orders');
+    const el = document.getElementById('dashboard-orders');
     if (!el) return;
     const scrollParent = findScrollParent(el);
     if (scrollParent) {
@@ -64,13 +68,29 @@ export default function MobileStatusLink({
     children: React.ReactNode;
 }) {
     const router = useRouter();
+    const pathname = usePathname();
+    const searchParams = useSearchParams();
+    const targetUrl = new URL(href, 'https://order.hanyangpetro.com');
+    const targetStatus = targetUrl.searchParams.get('recentStatus');
+    const isSelectedDashboardStatus = pathname === targetUrl.pathname
+        && targetStatus !== null
+        && searchParams.get('recentStatus') === targetStatus;
+
+    useEffect(() => {
+        if (!isSelectedDashboardStatus) return;
+
+        // Query navigation finishes after the new server-rendered card list is mounted.
+        const frame = window.requestAnimationFrame(() => {
+            window.requestAnimationFrame(scrollToDashboardOrders);
+        });
+        return () => {
+            window.cancelAnimationFrame(frame);
+        };
+    }, [isSelectedDashboardStatus]);
 
     function handleClick(e: React.MouseEvent) {
         e.preventDefault();
         router.push(href, { scroll: false });
-        requestAnimationFrame(() => requestAnimationFrame(scrollToDashboardOrders));
-        window.setTimeout(scrollToDashboardOrders, 120);
-        window.setTimeout(scrollToDashboardOrders, 300);
     }
 
     return (

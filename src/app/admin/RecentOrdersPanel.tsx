@@ -8,7 +8,8 @@ import RecentOrdersTable, { type RecentOrderRow } from './RecentOrdersTable';
 type RecentRange = 'latest20' | '7d' | '14d' | '1m' | '3m' | 'all';
 type RecentSort = 'createdAt' | 'orderNo' | 'deliveryDate' | 'customer' | 'status';
 type SortDir = 'asc' | 'desc';
-type RecentOwner = 'all' | 'mine';
+type RecentOwner = 'all' | 'mine' | 'user';
+type StaffUserOption = { id: string; name: string };
 
 type DashboardOrderStatusChangedEvent = CustomEvent<{ orderId?: string; status?: string }>;
 
@@ -23,7 +24,6 @@ const rangeOptions: { value: RecentRange; label: string }[] = [
 
 const sortOptions: { value: RecentSort; label: string }[] = [
     { value: 'createdAt', label: '등록일시' },
-    { value: 'orderNo', label: '주문번호' },
     { value: 'deliveryDate', label: '도착일' },
     { value: 'customer', label: '거래처' },
     { value: 'status', label: '상태' },
@@ -41,6 +41,7 @@ export default function RecentOrdersPanel({
     initialOwner,
     initialUserId,
     canViewAllRecentOrders,
+    staffUsers = [],
 }: {
     initialRows: RecentOrderRow[];
     initialRange: RecentRange;
@@ -49,6 +50,7 @@ export default function RecentOrdersPanel({
     initialOwner: RecentOwner;
     initialUserId: string;
     canViewAllRecentOrders: boolean;
+    staffUsers?: StaffUserOption[];
 }) {
     const [orders, setOrders] = useState(initialRows);
     const [range, setRange] = useState<RecentRange>(initialRange);
@@ -59,15 +61,6 @@ export default function RecentOrdersPanel({
     const [query, setQuery] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-
-    useEffect(() => {
-        setOrders(initialRows);
-        setRange(initialRange);
-        setSort(initialSort);
-        setDir(initialDir);
-        setOwner(initialOwner);
-        setRecentUserId(initialUserId);
-    }, [initialRows, initialRange, initialSort, initialDir, initialOwner, initialUserId]);
 
     useEffect(() => {
         function handleStatusChanged(event: Event) {
@@ -86,8 +79,10 @@ export default function RecentOrdersPanel({
         const nextRange = next?.range ?? range;
         const nextSort = next?.sort ?? sort;
         const nextDir = next?.dir ?? dir;
-        const nextOwner = canViewAllRecentOrders ? (next?.owner ?? owner) : 'mine';
-        const nextUserId = next?.recentUserId ?? recentUserId;
+        const requestedOwner = canViewAllRecentOrders ? (next?.owner ?? owner) : 'mine';
+        const requestedUserId = next?.recentUserId ?? recentUserId;
+        const nextOwner = requestedOwner === 'user' && !requestedUserId ? 'all' : requestedOwner;
+        const nextUserId = nextOwner === 'user' ? requestedUserId : '';
 
         setIsLoading(true);
         setError(null);
@@ -155,6 +150,21 @@ export default function RecentOrdersPanel({
                             내 담당 거래처
                         </button>
                     </div>
+                    {canViewAllRecentOrders && staffUsers.length > 0 && (
+                        <select
+                            value={owner === 'user' ? recentUserId : ''}
+                            onChange={(e) => {
+                                const userId = e.target.value;
+                                void load(userId ? { owner: 'user', recentUserId: userId } : { owner: 'all', recentUserId: '' });
+                            }}
+                            className="rounded-lg border border-orange-200 bg-white px-2.5 py-1.5 text-slate-700 outline-none focus:border-orange-500"
+                        >
+                            <option value="">담당자별</option>
+                            {staffUsers.map((user) => (
+                                <option key={user.id} value={user.id}>{user.name}</option>
+                            ))}
+                        </select>
+                    )}
                     <select value={range} onChange={(e) => setRange(e.target.value as RecentRange)} className="rounded-lg border border-orange-200 bg-white px-2.5 py-1.5 text-slate-700 outline-none focus:border-orange-500">
                         {rangeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                     </select>
@@ -172,8 +182,12 @@ export default function RecentOrdersPanel({
 
             <RecentOrdersTable
                 orders={orders}
-                initialSort={sort}
-                initialDir={dir}
+                sort={sort}
+                dir={dir}
+                onSort={(nextSort, nextDir) => {
+                    setSort(nextSort);
+                    setDir(nextDir);
+                }}
                 searchQuery={query}
             />
         </section>

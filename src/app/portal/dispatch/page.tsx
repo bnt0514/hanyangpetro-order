@@ -12,6 +12,13 @@ function isoDate(date: Date) {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
+function rangeShortcut(days: number) {
+    const to = new Date();
+    const from = new Date();
+    from.setDate(to.getDate() - (days - 1));
+    return { from: isoDate(from), to: isoDate(to) };
+}
+
 function driverText(dispatch: { vehicleNumber: string | null; driverName: string | null; driverPhone: string | null }) {
     return [dispatch.vehicleNumber, dispatch.driverName, dispatch.driverPhone].filter(Boolean).join(' · ') || '-';
 }
@@ -23,9 +30,9 @@ export default async function PortalDispatchPage({ searchParams }: { searchParam
     if (!session.user.customerId) redirect('/login');
 
     const sp = await searchParams;
-    const today = isoDate(new Date());
-    const from = /^\d{4}-\d{2}-\d{2}$/.test(sp.from ?? '') ? sp.from! : today;
-    const to = /^\d{4}-\d{2}-\d{2}$/.test(sp.to ?? '') ? sp.to! : today;
+    const defaultRange = rangeShortcut(93);
+    const from = /^\d{4}-\d{2}-\d{2}$/.test(sp.from ?? '') ? sp.from! : defaultRange.from;
+    const to = /^\d{4}-\d{2}-\d{2}$/.test(sp.to ?? '') ? sp.to! : defaultRange.to;
     const fromDate = new Date(`${from}T00:00:00`);
     const toDate = new Date(`${to}T00:00:00`);
     toDate.setDate(toDate.getDate() + 1);
@@ -71,7 +78,7 @@ export default async function PortalDispatchPage({ searchParams }: { searchParam
                                     <div className="min-w-0">
                                         <p className="font-mono text-xs text-slate-400">{dispatch.order.orderNo}</p>
                                         <p className="mt-1 truncate text-base font-bold text-slate-900">
-                                            {dispatch.order.items.map((item) => item.product.productName).join(', ')}
+                                            {dispatch.order.items.map((item) => item.product?.productName ?? '제품 정보 없음').join(', ')}
                                         </p>
                                     </div>
                                     <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-700">

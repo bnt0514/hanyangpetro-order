@@ -4,13 +4,6 @@ const prisma = new PrismaClient();
 const EFFECTIVE = new Set([
     'DISPATCH_COMPLETED',
     'SHIPPED',
-    'DELIVERY_CONFIRM_PENDING',
-    'DELIVERY_CONFIRMED',
-    'ERP_INPUT_WAITING',
-    'ERP_INPUT_COMPLETED',
-    'INVOICE_WAITING',
-    'INVOICE_COMPLETED',
-    'COMPLETED',
 ]);
 
 function normalizeCompanyName(value) {

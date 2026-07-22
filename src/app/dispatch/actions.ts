@@ -4,18 +4,24 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { extractHanwhaDriverFields } from '@/lib/hanwha-dispatch';
 import { isSameQuantity } from '@/lib/product-matching';
+import { isDispatchDestinationMatch } from '@/lib/dispatch-destination-match';
 import { revalidatePath } from 'next/cache';
 import { execFile } from 'node:child_process';
-import { scrapeHanwhaDispatch } from '@/lib/hanwha-scraper';
 import { syncOrderWarehouseStockMovements } from '@/lib/warehouse-stock-sync';
-import { isHanwhaAutomationBusy, runHanwhaAutomationQueued } from '@/lib/hanwha-automation-gate';
 import {
     canManageHanwhaCredentials,
-    getHanwhaPassword,
-    getHanwhaUsername,
     setHanwhaPassword,
 } from '@/lib/hanwha-credentials';
-import { OrderStatus } from '@/shared/enums';
+import { isYangHeeCheol } from '@/lib/staff-permissions';
+import { ORDER_STATUS } from '@/lib/orders';
+import { applyHanwhaDispatchMatch } from '@/lib/hanwha-dispatch-auto-match';
+import { dispatchCompletedStatusForOrder } from '@/lib/shipment-status';
+import {
+    BACKGROUND_JOB_TYPES,
+    enqueueBackgroundJob,
+    toBackgroundJobView,
+    type BackgroundJobView,
+} from '@/lib/background-jobs';
 
 export type DispatchRowVM = {
     id: string;
@@ -39,7 +45,12 @@ export type DispatchSnapshotVM = {
 
 export type DispatchFetchResult =
     | { ok: true; snapshotId: string; rowCount: number; cached: boolean; snapshot: DispatchSnapshotVM }
+    | { ok: true; queued: true; job: BackgroundJobView; cached: false; snapshot: DispatchSnapshotVM | null; message: string }
     | { ok: false; error: string; errorCode?: string };
+
+export type DispatchJobStatusResult =
+    | { ok: true; job: BackgroundJobView; snapshot: DispatchSnapshotVM | null }
+    | { ok: false; error: string };
 
 async function getSnapshotById(snapshotId: string): Promise<DispatchSnapshotVM> {
     const snapshot = await prisma.hanwhaDispatchSnapshot.findUniqueOrThrow({
@@ -64,6 +75,14 @@ async function getSnapshotById(snapshotId: string): Promise<DispatchSnapshotVM> 
             matchedAt: r.matchedAt?.toISOString() ?? null,
         })),
     };
+}
+
+async function getSnapshotByDate(dispatchDate: Date): Promise<DispatchSnapshotVM | null> {
+    const snapshot = await prisma.hanwhaDispatchSnapshot.findUnique({
+        where: { dispatchDate },
+        select: { id: true },
+    });
+    return snapshot ? getSnapshotById(snapshot.id) : null;
 }
 
 /**
@@ -105,92 +124,50 @@ export async function fetchHanwhaDispatch(
         }
     }
 
-    // DB 우선 자격증명 로드
-    const username = await getHanwhaUsername();
-    const password = await getHanwhaPassword();
-
-    // 스크래핑 (시간 오래 걸림). 배차조회는 같은 한화 화면을 공유하므로 기존 작업이 있으면 즉시 안내한다.
-    if (isHanwhaAutomationBusy()) {
-        return { ok: false, error: '이미 배차조회가 진행중입니다. 잠시 후 조회해주세요.', errorCode: 'BUSY' };
-    }
-    const result = await runHanwhaAutomationQueued(
-        `배차 조회 ${isoDate}`,
-        () => scrapeHanwhaDispatch(isoDate, { username, password }),
-    );
-
-    if (!result.ok) {
-        const friendly =
-            result.errorCode === 'AUTH_FAILED'
-                ? '한화 H-CRM 자동 로그인에 실패했습니다. 한화 사이트의 비밀번호가 변경된 것으로 보입니다. 담당자(양희철 대표 / 차성식 관리자)에게 비밀번호 갱신을 요청해주세요.'
-                : result.errorCode === 'NO_CREDENTIALS'
-                    ? '한화 계정 정보가 등록되지 않았습니다. 담당자(양희철 대표 / 차성식 관리자)에게 문의해주세요.'
-                    : (result.error ?? '알 수 없는 오류가 발생했습니다.');
-
-        await prisma.hanwhaDispatchSnapshot.upsert({
-            where: { dispatchDate },
-            update: {
-                fetchedAt: new Date(),
-                fetchedByUserId: session.user.id,
-                status: result.errorCode === 'AUTH_FAILED' ? 'AUTH_FAILED' : 'FAILED',
-                errorMessage: friendly,
-                rowCount: 0,
-            },
-            create: {
-                dispatchDate,
-                fetchedByUserId: session.user.id,
-                status: result.errorCode === 'AUTH_FAILED' ? 'AUTH_FAILED' : 'FAILED',
-                errorMessage: friendly,
-            },
-        });
-        revalidatePath('/admin/dispatch');
-        return { ok: false, error: friendly, errorCode: result.errorCode };
-    }
-
-    // 성공 → 트랜잭션으로 기존 스냅샷 삭제 후 재생성
-    const totalRows = result.rows.reduce((sum, ic) => sum + ic.lines.length, 0);
-
-    const snapshot = await prisma.$transaction(async (tx) => {
-        await tx.hanwhaDispatchSnapshot.deleteMany({ where: { dispatchDate } });
-        const snap = await tx.hanwhaDispatchSnapshot.create({
-            data: {
-                dispatchDate,
-                fetchedAt: new Date(),
-                fetchedByUserId: session.user.id,
-                status: 'OK',
-                rowCount: totalRows,
-            },
-        });
-        for (const ic of result.rows) {
-            for (const line of ic.lines) {
-                await tx.hanwhaDispatchRow.create({
-                    data: {
-                        snapshotId: snap.id,
-                        indoChiIndex: ic.indoChiIndex,
-                        indoChiName: ic.indoChiName,
-                        materialNameRaw: line.materialNameRaw,
-                        materialName: line.materialName,
-                        quantityKg: line.quantityKg,
-                        rawCells: JSON.stringify(line.rawCells),
-                    },
-                });
-            }
-        }
-        return snap;
+    const { job, created } = await enqueueBackgroundJob({
+        type: BACKGROUND_JOB_TYPES.HANWHA_DISPATCH_FETCH,
+        queueKey: `HANWHA_DISPATCH:${isoDate}`,
+        entityType: 'HANWHA_DISPATCH_DATE',
+        entityId: isoDate,
+        title: `배차조회 ${isoDate}`,
+        message: force ? '배차 재조회를 백그라운드에서 시작합니다.' : '배차조회를 백그라운드에서 시작합니다.',
+        requestedByUserId: session.user.id,
+        metadata: { isoDate, force },
     });
 
-    revalidatePath('/admin/dispatch');
     return {
         ok: true,
-        snapshotId: snapshot.id,
-        rowCount: totalRows,
+        queued: true,
+        job: toBackgroundJobView(job),
         cached: false,
-        snapshot: await getSnapshotById(snapshot.id),
+        snapshot: await getSnapshotByDate(dispatchDate),
+        message: created
+            ? '배차조회 작업을 백그라운드에 등록했습니다. 완료되면 자동으로 결과가 표시됩니다.'
+            : '같은 날짜 배차조회가 이미 진행 중입니다. 완료되면 같은 결과를 표시합니다.',
     };
 }
 
 /** 캐시된 스냅샷을 비우고 강제 재조회 */
 export async function refetchHanwhaDispatch(isoDate: string) {
     return fetchHanwhaDispatch(isoDate, true);
+}
+
+export async function getHanwhaDispatchJobStatus(jobId: string): Promise<DispatchJobStatusResult> {
+    const session = await auth();
+    if (!session?.user || session.user.userKind !== 'staff') return { ok: false, error: '권한이 없습니다.' };
+
+    const job = await prisma.backgroundJob.findUnique({ where: { id: jobId } });
+    if (!job) return { ok: false, error: '배차조회 작업을 찾을 수 없습니다.' };
+
+    const metadata = JSON.parse(job.metadata || '{}') as { isoDate?: string };
+    const dispatchDate = metadata.isoDate && /^\d{4}-\d{2}-\d{2}$/.test(metadata.isoDate)
+        ? new Date(`${metadata.isoDate}T00:00:00`)
+        : null;
+    return {
+        ok: true,
+        job: toBackgroundJobView(job),
+        snapshot: dispatchDate ? await getSnapshotByDate(dispatchDate) : null,
+    };
 }
 
 /** 저장된 스냅샷 삭제 */
@@ -205,10 +182,13 @@ export async function clearHanwhaDispatch(isoDate: string) {
     return { ok: true as const };
 }
 
-export async function matchHanwhaDispatchRow(rowId: string, orderId: string) {
+async function legacyMatchHanwhaDispatchRow(rowId: string, orderId: string, matchMode: 'AUTO' | 'MANUAL' = 'MANUAL') {
     const session = await auth();
     if (!session?.user || session.user.userKind !== 'staff') {
         return { ok: false as const, error: '직원만 배차 매칭을 할 수 있습니다.' };
+    }
+    if (matchMode !== 'AUTO' && !isYangHeeCheol(session.user)) {
+        return { ok: false as const, error: '양희철만 수동 배차 매칭을 할 수 있습니다.' };
     }
 
     const [row, order] = await Promise.all([
@@ -220,6 +200,8 @@ export async function matchHanwhaDispatchRow(rowId: string, orderId: string) {
             where: { id: orderId },
             include: {
                 items: true,
+                customer: { select: { companyName: true } },
+                deliveryAddress: { select: { label: true, addressLine1: true, addressLine2: true } },
                 dispatches: {
                     where: { carrierName: '한화 H-CRM' },
                     select: { id: true, hanwhaQuantityTon: true, hanwhaDispatchRowId: true },
@@ -231,20 +213,29 @@ export async function matchHanwhaDispatchRow(rowId: string, orderId: string) {
     if (!row) return { ok: false as const, error: '배차 라인을 찾을 수 없습니다.' };
     if (!order || order.deletedAt) return { ok: false as const, error: '주문을 찾을 수 없습니다.' };
 
+    if (matchMode === 'MANUAL' && !isDispatchDestinationMatch(row.indoChiName, {
+        customerName: order.customer.companyName,
+        addressLabel: order.deliveryAddress.label,
+        addressLine1: order.deliveryAddress.addressLine1,
+        addressLine2: order.deliveryAddress.addressLine2,
+    })) {
+        return { ok: false as const, error: '인도처와 도착지가 일치하는 주문만 수동 매칭할 수 있습니다.' };
+    }
+
     const dispatchableStatuses: string[] = [
-        OrderStatus.DISPATCH_WAITING,
-        OrderStatus.DISPATCH_COMPLETED,
-        OrderStatus.APPROVED,
+        ORDER_STATUS.DISPATCHING,
+        ORDER_STATUS.DISPATCH_COMPLETED,
+        ORDER_STATUS.SHIPPED,
     ];
     if (!dispatchableStatuses.includes(order.status)) {
         return {
             ok: false as const,
-            error: `현재 주문 상태(${order.status})에서는 배차 매칭을 할 수 없습니다. 배차 대기/완료 상태여야 합니다.`,
+            error: `현재 주문 상태(${order.status})에서는 배차 매칭을 할 수 없습니다. 배차중/배차완료 상태여야 합니다.`,
         };
     }
 
     // 이미 DISPATCH_COMPLETED면 상태 변경 없이 배차 기록만 추가 (N:1 주문←→배차)
-    const alreadyDispatched = order.status === OrderStatus.DISPATCH_COMPLETED;
+    const alreadyDispatched = order.status === ORDER_STATUS.DISPATCH_COMPLETED || order.status === ORDER_STATUS.SHIPPED;
     const driverFields = extractHanwhaDriverFields(row.rawCells);
     const orderQuantityTon = order.items.reduce((sum, item) => sum + item.requestedQuantity, 0);
     const matchedQuantityTon = order.dispatches.reduce((sum, dispatch) => {
@@ -265,14 +256,12 @@ export async function matchHanwhaDispatchRow(rowId: string, orderId: string) {
             error: `배차 수량이 오더 수량을 초과합니다. 오더 ${orderQuantityTon}TON / 기매칭 ${matchedQuantityTon}TON / 추가 ${nextDispatchQuantityTon}TON`,
         };
     }
+    const now = new Date();
     const nextMatchedQuantityTon = matchedQuantityTon + Number(nextDispatchQuantityTon);
     const nextStatus = nextMatchedQuantityTon + 0.0001 >= orderQuantityTon
-        ? OrderStatus.DISPATCH_COMPLETED
-        : order.status === OrderStatus.APPROVED
-            ? OrderStatus.DISPATCH_WAITING
-            : order.status;
+        ? (order.status === ORDER_STATUS.SHIPPED ? ORDER_STATUS.SHIPPED : dispatchCompletedStatusForOrder(order, now))
+        : order.status;
 
-    const now = new Date();
     await prisma.$transaction(async (tx) => {
         await tx.hanwhaDispatchRow.update({
             where: { id: rowId },
@@ -312,7 +301,7 @@ export async function matchHanwhaDispatchRow(rowId: string, orderId: string) {
                     previousStatus: order.status,
                     newStatus: nextStatus,
                     changedByUserId: session.user.id,
-                    changeReason: nextStatus === OrderStatus.DISPATCH_COMPLETED
+                    changeReason: nextStatus === ORDER_STATUS.DISPATCH_COMPLETED || nextStatus === ORDER_STATUS.SHIPPED
                         ? `한화 배차 조회 라인 매칭 완료 (${row.indoChiName})`
                         : `한화 배차 조회 라인 부분 매칭 (${row.indoChiName})`,
                 },
@@ -338,6 +327,29 @@ export async function matchHanwhaDispatchRow(rowId: string, orderId: string) {
     return { ok: true as const };
 }
 
+export async function matchHanwhaDispatchRow(rowId: string, orderId: string, matchMode: 'AUTO' | 'MANUAL' = 'MANUAL') {
+    const session = await auth();
+    if (!session?.user || session.user.userKind !== 'staff') {
+        return { ok: false as const, error: '직원만 배차 매칭할 수 있습니다.' };
+    }
+    if (matchMode !== 'AUTO' && !isYangHeeCheol(session.user)) {
+        return { ok: false as const, error: '양희철만 수동 배차 매칭을 할 수 있습니다.' };
+    }
+
+    const result = await applyHanwhaDispatchMatch({
+        rowId,
+        orderId,
+        matchMode,
+        matchedByUserId: session.user.id,
+    });
+    if (!result.ok) return result;
+
+    revalidatePath('/admin');
+    revalidatePath('/admin/dispatch');
+    revalidatePath(`/admin/orders/${orderId}`);
+    return result;
+}
+
 export async function deleteHanwhaDispatchMatch(matchId: string) {
     const session = await auth();
     if (!session?.user || session.user.userKind !== 'staff') {
@@ -354,7 +366,7 @@ export async function deleteHanwhaDispatchMatch(matchId: string) {
     const orderId = row?.matchedOrderId ?? dispatch?.orderId;
     if (!orderId) return { ok: false as const, error: '연결된 주문을 찾을 수 없습니다.' };
 
-    const order = await prisma.order.findUnique({ where: { id: orderId }, select: { status: true, deletedAt: true } });
+    const order = await prisma.order.findUnique({ where: { id: orderId }, select: { status: true, deletedAt: true, hanwhaOrderedAt: true } });
     if (!order || order.deletedAt) return { ok: false as const, error: '주문을 찾을 수 없습니다.' };
     const deleteLabel = dispatch?.carrierName === '수기 배차' ? '수기 배차내역' : '한화 배차 매칭';
 
@@ -369,9 +381,22 @@ export async function deleteHanwhaDispatchMatch(matchId: string) {
                 data: { matchedOrderId: null, matchedAt: null, matchedByUserId: null },
             });
         }
-        const remainingDispatchCount = await tx.dispatch.count({ where: { orderId } });
-        const nextStatus = remainingDispatchCount === 0 && order.status === OrderStatus.DISPATCH_COMPLETED
-            ? OrderStatus.DISPATCH_WAITING
+        const remainingOrder = await tx.order.findUnique({
+            where: { id: orderId },
+            select: {
+                items: { select: { requestedQuantity: true } },
+                dispatches: { select: { hanwhaQuantityTon: true } },
+            },
+        });
+        const remainingOrderQuantityTon = remainingOrder?.items.reduce((sum, item) => sum + item.requestedQuantity, 0) ?? 0;
+        const remainingDispatchQuantityTon = remainingOrder?.dispatches.reduce((sum, item) => sum + (item.hanwhaQuantityTon ?? 0), 0) ?? 0;
+        const dispatchStillComplete = remainingDispatchQuantityTon + 0.0001 >= remainingOrderQuantityTon && remainingOrderQuantityTon > 0;
+        const canRollbackDispatchStatus =
+            order.status === ORDER_STATUS.DISPATCHING ||
+            order.status === ORDER_STATUS.DISPATCH_COMPLETED ||
+            order.status === ORDER_STATUS.SHIPPED;
+        const nextStatus = canRollbackDispatchStatus && !dispatchStillComplete
+            ? (remainingDispatchQuantityTon > 0 || order.hanwhaOrderedAt ? ORDER_STATUS.DISPATCHING : ORDER_STATUS.APPROVED)
             : order.status;
         if (nextStatus !== order.status) {
             await tx.order.update({ where: { id: orderId }, data: { status: nextStatus } });
@@ -420,7 +445,7 @@ export async function createManualDispatch(formData: FormData) {
     });
     if (!order || order.deletedAt) return { ok: false as const, error: '주문을 찾을 수 없습니다.' };
 
-    const dispatchableStatuses: string[] = [OrderStatus.APPROVED, OrderStatus.DISPATCH_WAITING, OrderStatus.DISPATCH_COMPLETED];
+    const dispatchableStatuses: string[] = [ORDER_STATUS.DISPATCHING, ORDER_STATUS.DISPATCH_COMPLETED, ORDER_STATUS.SHIPPED];
     if (!dispatchableStatuses.includes(order.status)) {
         return { ok: false as const, error: `현재 주문 상태(${order.status})에서는 배차를 입력할 수 없습니다.` };
     }
@@ -432,9 +457,12 @@ export async function createManualDispatch(formData: FormData) {
     }
 
     const dispatchDate = order.requestedDeliveryDate ?? new Date();
-    const alreadyCompleted = order.status === OrderStatus.DISPATCH_COMPLETED;
+    const alreadyCompleted = order.status === ORDER_STATUS.DISPATCH_COMPLETED || order.status === ORDER_STATUS.SHIPPED;
     const nextTotal = alreadyDispatchedTon + quantityTon;
-    const nextStatus = nextTotal + 0.0001 >= orderQuantityTon ? OrderStatus.DISPATCH_COMPLETED : order.status;
+    const now = new Date();
+    const nextStatus = nextTotal + 0.0001 >= orderQuantityTon
+        ? (order.status === ORDER_STATUS.SHIPPED ? ORDER_STATUS.SHIPPED : dispatchCompletedStatusForOrder(order, now))
+        : order.status;
 
     await prisma.$transaction(async (tx) => {
         await tx.dispatch.create({
@@ -477,33 +505,24 @@ export async function createManualDispatch(formData: FormData) {
 export async function confirmOrderReceipt(orderId: string, reason?: string) {
     const session = await auth();
     if (!session?.user || session.user.userKind !== 'staff') {
-        return { ok: false as const, error: '직원만 입고 완료 처리할 수 있습니다.' };
+        return { ok: false as const, error: '직원만 출고완료 처리할 수 있습니다.' };
     }
 
     const order = await prisma.order.findUnique({ where: { id: orderId } });
     if (!order || order.deletedAt) return { ok: false as const, error: '주문을 찾을 수 없습니다.' };
 
     await prisma.$transaction(async (tx) => {
-        await tx.deliveryReceipt.create({
-            data: {
-                orderId,
-                receiptStatus: 'CONFIRMED',
-                confirmedByUserId: session.user.id,
-                confirmedAt: new Date(),
-                memo: reason?.trim() || '직원 입고 완료 처리',
-            },
-        });
         await tx.order.update({
             where: { id: orderId },
-            data: { status: OrderStatus.COMPLETED },
+            data: { status: ORDER_STATUS.SHIPPED },
         });
         await tx.orderStatusHistory.create({
             data: {
                 orderId,
                 previousStatus: order.status,
-                newStatus: OrderStatus.COMPLETED,
+                newStatus: ORDER_STATUS.SHIPPED,
                 changedByUserId: session.user.id,
-                changeReason: reason?.trim() || '입고 완료 처리',
+                changeReason: reason?.trim() || '출고완료 처리',
             },
         });
         await syncOrderWarehouseStockMovements(tx, orderId);

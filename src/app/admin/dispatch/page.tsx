@@ -7,6 +7,7 @@ import { canManageHanwhaCredentials } from '@/lib/hanwha-credentials';
 import { matchProductToMaterial } from '@/lib/product-matching';
 import DispatchClient from './DispatchClient';
 import HomepageArchiveLink from '@/components/HomepageArchiveLink';
+import { isYangHeeCheol } from '@/lib/staff-permissions';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,8 +36,8 @@ export default async function AdminDispatchPage({
     });
 
     const dispatchWaitingOrders = await prisma.order.findMany({
-        where: { status: { in: ['APPROVED', 'DISPATCH_WAITING', 'DISPATCH_COMPLETED'] }, deletedAt: null },
-        orderBy: [{ requestedDeliveryDate: 'asc' }, { createdAt: 'desc' }],
+        where: { status: { in: ['DISPATCHING', 'DISPATCH_COMPLETED', 'SHIPPED'] }, deletedAt: null },
+        orderBy: [{ requestedDeliveryDate: 'desc' }, { createdAt: 'desc' }],
         include: {
             customer: { select: { companyName: true, customerCode: true } },
             deliveryAddress: { select: { label: true, addressLine1: true, addressLine2: true } },
@@ -145,6 +146,7 @@ export default async function AdminDispatchPage({
                     defaultDate={defaultDate}
                     initial={initial}
                     canManageCredentials={canManageHanwhaCredentials(session.user.role)}
+                    canManualMatch={isYangHeeCheol(session.user)}
                     matchCandidates={matchCandidates}
                 />
             </main>

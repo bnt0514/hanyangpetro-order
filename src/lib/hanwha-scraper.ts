@@ -6,6 +6,8 @@
  */
 import path from 'path';
 import { chromium, type Page } from 'playwright';
+import { markHanwhaDispatchCompletionStatus } from '@/lib/hanwha-dispatch';
+import { installPlaywrightEvaluateNameShim } from '@/lib/playwright-evaluate-shim';
 
 export interface ScrapedLine {
     materialNameRaw: string | null;
@@ -50,6 +52,18 @@ function controlledProfileDir() {
     return path.join(process.cwd(), 'tmp', 'hanwha-esales-controlled-profile');
 }
 
+function controlledChromeLogFile() {
+    return path.join(process.cwd(), 'tmp', 'hanwha-esales-chrome.log');
+}
+
+function controlledChromeLauncher() {
+    return path.join(process.cwd(), 'scripts', 'launch-hanwha-controlled-chrome.cjs');
+}
+
+function isExpiredESalesPageUrl(url: string) {
+    return /session(?:30)?out/i.test(url);
+}
+
 function sleep(ms: number) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -90,18 +104,18 @@ function findColumnIndex(headers: string[], patterns: RegExp[], fallback = -1) {
 
 async function launchControlledChrome() {
     const { spawn } = await import('child_process');
-    const child = spawn(chromePath(), [
-        `--remote-debugging-port=${REMOTE_DEBUGGING_PORT}`,
-        `--user-data-dir=${controlledProfileDir()}`,
-        '--no-first-run',
-        '--disable-session-crashed-bubble',
-        '--hide-crash-restore-bubble',
-        '--new-window',
-        ESALES_LOGIN_URL,
-    ], {
-        detached: true,
+    const child = spawn(process.execPath, [controlledChromeLauncher()], {
+        detached: false,
         stdio: 'ignore',
-        windowsHide: false,
+        windowsHide: true,
+        env: {
+            ...process.env,
+            CHROME_PATH: chromePath(),
+            HANWHA_ESALES_CDP_PORT: String(REMOTE_DEBUGGING_PORT),
+            HANWHA_ESALES_PROFILE_DIR: controlledProfileDir(),
+            HANWHA_ESALES_LOGIN_URL: ESALES_LOGIN_URL,
+            CHROME_LOG_FILE: controlledChromeLogFile(),
+        },
     });
     child.unref();
 }
@@ -129,16 +143,67 @@ async function isCdpOpen() {
     }
 }
 
+async function connectToControlledChrome() {
+    let lastError: unknown;
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+        if (!await isCdpOpen()) {
+            await launchControlledChrome();
+        }
+        await waitForCdp();
+        try {
+            return await chromium.connectOverCDP(
+                `http://127.0.0.1:${REMOTE_DEBUGGING_PORT}`,
+                { timeout: 30_000 },
+            );
+        } catch (error) {
+            lastError = error;
+            if (attempt === 0) await sleep(1000);
+        }
+    }
+
+    throw lastError instanceof Error
+        ? lastError
+        : new Error('한화 e-Sales Chrome 연결에 실패했습니다.');
+}
+
 async function hasLoggedInESalesShell(page: Page) {
     return page.evaluate(() => {
-        function visible(el: Element | null): el is HTMLElement {
-            return !!el && el instanceof HTMLElement && el.offsetParent !== null;
+        function exposed(el: Element | null): el is HTMLElement {
+            if (!el || !(el instanceof HTMLElement)) return false;
+            const rect = el.getBoundingClientRect();
+            const style = getComputedStyle(el);
+            if (
+                rect.width <= 0
+                || rect.height <= 0
+                || style.display === 'none'
+                || style.visibility === 'hidden'
+                || rect.right <= 0
+                || rect.bottom <= 0
+                || rect.left >= innerWidth
+                || rect.top >= innerHeight
+            ) return false;
+            const x = Math.min(innerWidth - 1, Math.max(0, rect.left + rect.width / 2));
+            const y = Math.min(innerHeight - 1, Math.max(0, rect.top + rect.height / 2));
+            const top = document.elementFromPoint(x, y);
+            return Boolean(top && (top === el || el.contains(top) || top.contains(el)));
         }
         function textOf(el: Element | null) {
             return (el?.textContent || '').replace(/\s+/g, ' ').trim();
         }
+        const shellSelectors = [
+            'div[id*="frameLeft.form.divLeft.form.grdTree"]',
+            'div[id*="frameNavi.form.divTab"]',
+            'div[id*="POP_ORDER_REG"]',
+            'div[id*="ESD_PARTNER_INFO_V"]',
+            'div[id*="ESD_SALES_ITEM_V"]',
+        ];
+        if (shellSelectors.some((selector) => Array.from(document.querySelectorAll(selector)).some(exposed))) {
+            return true;
+        }
+        if (exposed(document.querySelector('input[id*="frameLogin"][id*="edtId"]'))) return false;
         const visibleText = Array.from(document.querySelectorAll('div,button,[role="button"],[role="treeitem"]'))
-            .filter(visible)
+            .filter(exposed)
             .map(textOf)
             .join(' ');
         if (
@@ -154,21 +219,21 @@ async function hasLoggedInESalesShell(page: Page) {
             'div[id*="POP_ORDER_REG"]',
             'div[id*="ESD_PARTNER_INFO_V"]',
             'div[id*="ESD_SALES_ITEM_V"]',
-        ].join(','))).some(visible);
+        ].join(','))).some(exposed);
     }).catch(() => false);
 }
 
 async function getDispatchESalesPage(): Promise<AcquiredESalesPage> {
-    if (!await isCdpOpen()) {
+    const cdpWasOpen = await isCdpOpen();
+    if (!cdpWasOpen) {
         await launchControlledChrome();
     }
-    await waitForCdp();
-
-    const browser = await chromium.connectOverCDP(`http://127.0.0.1:${REMOTE_DEBUGGING_PORT}`);
+    const browser = await connectToControlledChrome();
     const context = browser.contexts()[0] ?? await browser.newContext();
 
     const esalesPages = context.pages().filter((candidate) => candidate.url().includes('esales.hanwhasolutions.com'));
     for (const candidate of esalesPages) {
+        await installPlaywrightEvaluateNameShim(candidate);
         if (!await hasLoggedInESalesShell(candidate)) continue;
         registerDialogHandler(candidate);
         await candidate.bringToFront().catch(() => undefined);
@@ -176,10 +241,17 @@ async function getDispatchESalesPage(): Promise<AcquiredESalesPage> {
         return { page: candidate };
     }
 
-    const existingESalesPage = esalesPages[0];
+    // When the controlled Chrome was lost, Chrome has already opened one tab.
+    // Reuse that tab for recovery instead of creating another e-Sales tab.
+    const existingESalesPage = esalesPages.find((candidate) => candidate.url().includes('/login.html'))
+        ?? esalesPages[0]
+        ?? context.pages()[0];
     const page = existingESalesPage ?? await context.newPage();
+    await installPlaywrightEvaluateNameShim(page);
     registerDialogHandler(page);
-    if (!existingESalesPage) {
+    if (!existingESalesPage || !cdpWasOpen || isExpiredESalesPageUrl(page.url())) {
+        // A newly launched Chrome reports CDP before Nexacro has rendered.
+        // Put the same existing tab on the login page before searching controls.
         await page.goto(ESALES_LOGIN_URL, { waitUntil: 'domcontentloaded', timeout: 60_000 });
     }
     await page.waitForLoadState('domcontentloaded', { timeout: 60_000 }).catch(() => undefined);
@@ -425,8 +497,22 @@ async function clickLoginButton(page: Page) {
     });
 }
 
-async function loginAndSendOtpIfNeeded(page: Page, username: string, password: string) {
-    if (await hasLoggedInESalesShell(page)) return;
+async function waitForDispatchLoginState(page: Page, userSelectors: string[], forceLogin = false) {
+    // Nexacro completes its DOM work after domcontentloaded. A fresh browser
+    // can otherwise be mistaken for a missing login screen before it renders.
+    for (let attempt = 0; attempt < 120; attempt += 1) {
+        if (!forceLogin && await hasLoggedInESalesShell(page)) return { state: 'ACTIVE' as const };
+        const otpVisible = await page.locator('div[id$="frm_LoginOTP.form.btnSendOTP"]').first().isVisible().catch(() => false);
+        if (otpVisible) return { state: 'OTP' as const };
+        for (const selector of userSelectors) {
+            if (await hasVisibleSelector(page, selector)) return { state: 'LOGIN' as const };
+        }
+        await page.waitForTimeout(250);
+    }
+    throw new Error('Hanwha e-Sales login screen did not become ready.');
+}
+
+async function loginAndSendOtpIfNeeded(page: Page, username: string, password: string, forceLogin = false) {
 
     const userSelectors = [
         'input[id$="frameLogin.form.divLogin.form.edtId:input"]',
@@ -438,13 +524,16 @@ async function loginAndSendOtpIfNeeded(page: Page, username: string, password: s
         'input[id*="frameLogin"][id*="edtPw"][id$=":input"]',
         'input[id*="edtPw"][id$=":input"]',
     ];
+    const initialState = await waitForDispatchLoginState(page, userSelectors, forceLogin);
+    if (initialState.state === 'ACTIVE') return false;
+    if (initialState.state === 'OTP') return true;
     const userSelector = await (async () => {
         for (const selector of userSelectors) {
             if (await hasVisibleSelector(page, selector)) return selector;
         }
         return null;
     })();
-    if (!userSelector) return;
+    if (!userSelector) throw new Error('한화 e-Sales 로그인 화면을 찾지 못했습니다.');
     const passwordSelector = await (async () => {
         for (const selector of passwordSelectors) {
             if (await hasVisibleSelector(page, selector)) return selector;
@@ -459,9 +548,29 @@ async function loginAndSendOtpIfNeeded(page: Page, username: string, password: s
     await page.waitForTimeout(1500);
     await clickNexacro(page, 'div[id$="POP_LOGIN_OTP_NOTI.form.btnClose"]', 4000).catch(() => undefined);
     await page.waitForTimeout(800);
-    if (await page.locator('div[id$="frm_LoginOTP.form.btnSendOTP"]').first().isVisible().catch(() => false)) {
-        await clickNexacro(page, 'div[id$="frm_LoginOTP.form.btnSendOTP"]');
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+        if (!forceLogin && await hasLoggedInESalesShell(page)) return false;
+        if (await page.locator('div[id$="frm_LoginOTP.form.btnSendOTP"]').first().isVisible().catch(() => false)) {
+            await clickNexacro(page, 'div[id$="frm_LoginOTP.form.btnSendOTP"]');
+            return true;
+        }
+        await page.waitForTimeout(250);
     }
+    return false;
+}
+
+async function forceDispatchLogin(page: Page, username: string, password: string) {
+    // A Nexacro shell can retain a client-side countdown after the server
+    // session has died. This path is used only after its navigation menu is
+    // missing, so clearing the dedicated controlled profile is intentional.
+    await page.context().clearCookies().catch(() => undefined);
+    await page.evaluate(() => {
+        window.localStorage.clear();
+        window.sessionStorage.clear();
+    }).catch(() => undefined);
+    await page.goto(ESALES_LOGIN_URL, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+    await page.waitForTimeout(800);
+    return loginAndSendOtpIfNeeded(page, username, password, true);
 }
 
 async function waitForDispatchMenu(page: Page) {
@@ -679,12 +788,13 @@ async function clickDispatchProgressMenuFast(page: Page) {
     if (!clicked) throw new Error('주문 진행 조회/배차 조회 메뉴를 클릭하지 못했습니다.');
 }
 
-async function openDispatchProgressPageFast(page: Page) {
+async function openDispatchProgressPageFast(page: Page, waitingForOtp = false) {
     if (await isDispatchProgressPageFast(page)) return;
-    for (let attempt = 0; attempt < 60; attempt += 1) {
+    const maxAttempts = waitingForOtp ? 180 : 60;
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
         if (await hasDispatchProgressMenuFast(page)) break;
         await page.waitForTimeout(1000);
-        if (attempt === 59) throw new Error('OTP 인증 후 주문 진행 조회/배차 조회 메뉴가 나타나지 않았습니다.');
+        if (attempt === maxAttempts - 1) throw new Error('OTP 인증 후 주문 진행 조회/배차 조회 메뉴가 나타나지 않았습니다.');
     }
     await clickDispatchProgressMenuFast(page);
     await page.waitForFunction(() => {
@@ -704,16 +814,28 @@ async function openDispatchProgressPageFast(page: Page) {
 
 async function fillArrivalDateRange(page: Page, ymd: string) {
     await focusNexacroWindowTab(page, 'winESDMY-10-145');
-    const selectors = [
-        'input[id*="winESDMY-10-145"][id$="form.divWork.form.divSearch.form.calETDAT_FROM.calendaredit:input"]',
-        'input[id*="winESDMY-10-145"][id$="form.divWork.form.divSearch.form.calETDAT_TO.calendaredit:input"]',
-        'input[id*="winESDMY-10-145"][id*="form.divWork.form.divSearch.form.calETDAT_FROM.calendaredit:input"]',
-        'input[id*="winESDMY-10-145"][id*="form.divWork.form.divSearch.form.calETDAT_TO.calendaredit:input"]',
+    const selectorGroups = [
+        [
+            'input[id*="winESDMY-10-145"][id$="form.divWork.form.divSearch.form.calETDAT_FROM.calendaredit:input"]',
+            'input[id*="winESDMY-10-145"][id*="form.divWork.form.divSearch.form.calETDAT_FROM.calendaredit:input"]',
+        ],
+        [
+            'input[id*="winESDMY-10-145"][id$="form.divWork.form.divSearch.form.calETDAT_TO.calendaredit:input"]',
+            'input[id*="winESDMY-10-145"][id*="form.divWork.form.divSearch.form.calETDAT_TO.calendaredit:input"]',
+        ],
     ];
 
-    for (const selector of selectors) {
-        const input = page.locator(selector).first();
-        if (!(await input.isVisible().catch(() => false))) continue;
+    for (const selectors of selectorGroups) {
+        let input = null;
+        for (const selector of selectors) {
+            const candidate = page.locator(selector).first();
+            if (await candidate.isVisible().catch(() => false)) {
+                input = candidate;
+                break;
+            }
+        }
+        if (!input) continue;
+
         await input.click({ force: true });
         await page.waitForTimeout(150);
         await input.press('Control+A');
@@ -841,7 +963,29 @@ function lineFromCells(headers: string[], cells: string[]): ScrapedLine {
     };
 }
 
-export async function scrapeHanwhaDispatch(
+async function hasUsableDispatchNavigation(page: Page, timeoutMs = 5_000) {
+    const started = Date.now();
+    while (Date.now() - started < timeoutMs) {
+        if (await isDispatchProgressPageFast(page) || await hasDispatchProgressMenuFast(page)) return true;
+        await page.waitForTimeout(250);
+    }
+    return false;
+}
+
+function dispatchCompletionStatusFromMainRow(headers: string[], cells: string[]): string | null {
+    const statusIndex = findColumnIndex(headers, [/출고완료여부/, /출고.*완료.*여부/, /완료여부/], -1);
+    const fallbackIndex = cells.length - 1;
+    const index = statusIndex >= 0 ? statusIndex : fallbackIndex;
+    const header = headers[index] ?? '';
+    const raw = cells[index]?.trim() || '';
+    if (!raw) return null;
+    if (statusIndex >= 0 || /출고|완료|여부/.test(header) || /^(Y|N|예|아니오|완료|미완료|출고완료|출고전)$/i.test(raw)) {
+        return raw;
+    }
+    return null;
+}
+
+async function scrapeHanwhaDispatchOnce(
     isoDate: string,
     opts: ScrapeOptions = {},
 ): Promise<ScrapeResult> {
@@ -855,9 +999,15 @@ export async function scrapeHanwhaDispatch(
     try {
         const acquired = await getDispatchESalesPage();
         page = acquired.page;
-        await loginAndSendOtpIfNeeded(page, username, password);
+        let otpRequested = await loginAndSendOtpIfNeeded(page, username, password);
+        // The visible countdown alone is not a valid session check. If the
+        // dispatch page/menu cannot be reached, immediately begin a clean
+        // login instead of waiting for a later menu timeout.
+        if (!otpRequested && !await hasUsableDispatchNavigation(page)) {
+            otpRequested = await forceDispatchLogin(page, username, password);
+        }
         await closeAllNexacroWorkTabs(page);
-        await openDispatchProgressPageFast(page);
+        await openDispatchProgressPageFast(page, otpRequested);
         await focusNexacroWindowTab(page, 'winESDMY-10-145');
 
         const ymd = isoToYmd(isoDate);
@@ -884,9 +1034,16 @@ export async function scrapeHanwhaDispatch(
 
             const lineGridName = await findLineGridName(page);
             const lineGrid = lineGridName ? await readGrid(page, lineGridName) : { headers: [], rows: [] };
+            const dispatchCompletionStatus = dispatchCompletionStatusFromMainRow(mainGrid.headers, mainRow.cells);
             const lines = lineGrid.rows.length > 0
-                ? lineGrid.rows.map((row) => lineFromCells(lineGrid.headers, row.cells))
-                : [lineFromCells(mainGrid.headers, mainRow.cells)];
+                ? lineGrid.rows.map((row) => ({
+                    ...lineFromCells(lineGrid.headers, row.cells),
+                    rawCells: markHanwhaDispatchCompletionStatus(row.cells, dispatchCompletionStatus),
+                }))
+                : [{
+                    ...lineFromCells(mainGrid.headers, mainRow.cells),
+                    rawCells: markHanwhaDispatchCompletionStatus(mainRow.cells, dispatchCompletionStatus),
+                }];
             const indoChiName = mainRow.cells[indoChiIndex]?.trim()
                 || mainRow.cells.find((cell) => /[가-힣]/.test(cell) && cell.length >= 2)
                 || `행 ${idx + 1}`;
@@ -906,4 +1063,20 @@ export async function scrapeHanwhaDispatch(
             errorCode: 'UNKNOWN',
         };
     }
+}
+
+export async function scrapeHanwhaDispatch(
+    isoDate: string,
+    opts: ScrapeOptions = {},
+): Promise<ScrapeResult> {
+    const first = await scrapeHanwhaDispatchOnce(isoDate, opts);
+    if (first.ok || !/target page, context or browser has been closed/i.test(first.error ?? '')) {
+        return first;
+    }
+
+    // Chrome can disappear while a user or Windows closes the previous
+    // controlled process. Reconnect once so this request starts its login
+    // recovery instead of failing without ever opening the e-Sales screen.
+    await sleep(750);
+    return scrapeHanwhaDispatchOnce(isoDate, opts);
 }

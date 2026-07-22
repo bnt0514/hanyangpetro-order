@@ -10,19 +10,31 @@ import {
     openHanwhaESalesOrder,
     prepareHanwhaESalesApprovalForOrders,
     requestHanwhaESalesApprovalForOrders,
-    resumeHanwhaESalesOrderAfterProductSelection,
     type HanwhaESalesOrderInput,
 } from '@/lib/hanwha-esales-login';
 import { getHanwhaPassword, getHanwhaUsername } from '@/lib/hanwha-credentials';
 import { syncOrderWarehouseStockMovements } from '@/lib/warehouse-stock-sync';
 import { productIdentityKey } from '@/lib/product-identity';
 import { getEffectivePrice } from '@/app/admin/credit/actions';
-import { randomBytes } from 'crypto';
 import { calculateCustomerReceivable } from '@/lib/credit-balance';
-import { previousBusinessDate } from '@/lib/korean-holidays';
 import { resolveHanwhaMaterialName } from '@/lib/hanwha-material-map';
 import { purchaseRequestDateFromOrderNo } from '@/lib/ledger-policy';
 import { runHanwhaAutomationQueued } from '@/lib/hanwha-automation-gate';
+import { isCanonicalOrderStatus, normalizeOrderStatus, ORDER_STATUS_VALUES } from '@/lib/orders';
+import { isYangHeeCheol } from '@/lib/staff-permissions';
+import {
+    BACKGROUND_JOB_TYPES,
+    enqueueBackgroundJob,
+    parseJobJsonAs,
+    toBackgroundJobView,
+    updateBackgroundJobResult,
+    type BackgroundJobView,
+} from '@/lib/background-jobs';
+import {
+    HanwhaProductSelectionRequiredError,
+    resumeHanwhaNewOrderAfterProductSelection,
+    type HanwhaNewOrderJobMetadata,
+} from '@/lib/hanwha-new-order-job';
 
 type HanwhaOrderJobStatus = 'QUEUED' | 'RUNNING' | 'WAITING_MANUAL_ACTION' | 'DONE' | 'FAILED';
 
@@ -43,6 +55,7 @@ type HanwhaOrderJob = {
     manualAction?: 'PRODUCT_SELECTION';
     manualTitle?: string;
     manualButtonLabel?: string;
+    forceReorder?: boolean;
 };
 
 class HanwhaManualProductSelectionError extends Error {
@@ -86,7 +99,15 @@ export type CreateOrderInput = {
 };
 
 export type CreateOrderResult =
-    | { ok: true; orderId: string; orderNo: string; status?: string; creditOver?: boolean; creditOverMessage?: string }
+    | {
+        ok: true;
+        orderId: string;
+        orderNo: string;
+        status?: string;
+        creditOver?: boolean;
+        creditOverMessage?: string;
+        hanwhaOrderQueued?: boolean;
+    }
     | { ok: false; error: string; duplicate: true; duplicateOrderNos: string[] }
     | { ok: false; error: string };
 
@@ -175,6 +196,10 @@ function resolveHanwhaBagType(value: string | null | undefined, productName: str
     return normalizeHanwhaBagType(value) ?? defaultHanwhaBagTypeForProduct(productName);
 }
 
+function isApprovedHanwhaStatus(value: string | null | undefined) {
+    return (value ?? '').trim() === '승인';
+}
+
 function isHanwhaSupplierName(value: string | null | undefined) {
     const normalized = normalizeCompanyName(value);
     return normalized === '한화솔루션' || normalized.includes('한화솔루션');
@@ -257,19 +282,8 @@ export async function updateDeliveryAddressDefaultRequest(
 }
 
 const SPLIT_REMAINING_ORDER_STATUSES = new Set([
-    'DISPATCH_WAITING',
-    'DISPATCHING',
     'DISPATCH_COMPLETED',
-    'DISPATCH_FAILED',
-    'DISPATCH_RETRY_SCHEDULED',
     'SHIPPED',
-    'DELIVERY_CONFIRM_PENDING',
-    'DELIVERY_CONFIRMED',
-    'ERP_INPUT_WAITING',
-    'ERP_INPUT_COMPLETED',
-    'INVOICE_WAITING',
-    'INVOICE_COMPLETED',
-    'COMPLETED',
 ]);
 
 function addDays(date: Date, days: number) {
@@ -414,7 +428,7 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
 
     const isStaff = session.user.userKind === 'staff';
     const productIdsForDefaults = Array.from(new Set(input.items.map((it) => it.productId)));
-    const [inputCustomer, productsForDefaults, activeCompanies] = await Promise.all([
+    const [inputCustomer, productsForDefaults, activeCompanies, hanwhaSupplier] = await Promise.all([
         prisma.customer.findUnique({ where: { id: input.customerId }, select: { companyName: true, receivableAmount: true, creditLimit: true, openingReceivable: true, openingReceivableDate: true } }),
         prisma.product.findMany({
             where: { id: { in: productIdsForDefaults }, isActive: true },
@@ -425,11 +439,17 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
                 defaultSalesEntityId: true,
                 defaultPurchaseEntityId: true,
                 defaultSupplierId: true,
+                hanwhaMaterialName: true,
+                hanwhaItemCode: true,
             },
         }),
         prisma.companyEntity.findMany({
             where: { isActive: true },
             select: { id: true, code: true, displayName: true, legalName: true, isDefaultSales: true, isDefaultPurchase: true },
+        }),
+        prisma.supplier.findFirst({
+            where: { isActive: true, supplierName: { contains: '한화솔루션' } },
+            select: { id: true },
         }),
     ]);
     if (!inputCustomer) return { ok: false, error: '嫄곕옒泥섎? 李얠쓣 ???놁뒿?덈떎.' };
@@ -478,7 +498,14 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
             const purchaseSupplierId = warehouseOutbound
                 ? null
                 : isStaff
-                    ? (it.purchaseSupplierId || product.defaultSupplierId || null)
+                    ? (
+                        it.purchaseSupplierId
+                        || product.defaultSupplierId
+                        // A direct-sale Hanwha product must never lose its
+                        // supplier simply because a client-side combobox value
+                        // did not reach the save request.
+                        || ((product.hanwhaItemCode?.trim() || product.hanwhaMaterialName?.trim()) ? hanwhaSupplier?.id ?? null : null)
+                    )
                     : (product.defaultSupplierId || null);
             if (!isInternalPurchaseOnly && (!salesEntityId || !companyIds.has(salesEntityId))) throw new Error(`${index + 1}번째 품목의 매출주체가 올바르지 않습니다.`);
             if (!purchaseEntityId || !companyIds.has(purchaseEntityId)) throw new Error(`${index + 1}번째 품목의 매입주체가 올바르지 않습니다.`);
@@ -509,7 +536,13 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
     const projectedReceivable = currentReceivable + estimatedOrderAmount;
     const isCreditOver = inputCustomer.creditLimit > 0 && projectedReceivable > inputCustomer.creditLimit;
     const creditOverAmount = Math.max(0, projectedReceivable - inputCustomer.creditLimit);
-    const initialStatus = isCreditOver ? 'CREDIT_OVER_LIMIT' : 'REQUESTED';
+    // 직원이 직접 등록한 일반 주문은 매입처까지 확정된 내부 등록이므로
+    // 별도의 오더 승인 단계를 거치지 않는다. 여신초과는 기존 승인 절차를 유지한다.
+    const initialStatus = isCreditOver
+        ? 'CREDIT_OVER_LIMIT'
+        : isStaff
+            ? 'APPROVED'
+            : 'REQUESTED';
 
     // ?? ?꾩갑吏 寃利? ID媛 ?덉쑝硫?湲곗〈 ?꾩갑吏 寃利? ?놁쑝硫?二쇰Ц ?앹꽦 ???먮룞 ?앹꽦 ??
     let resolvedAddressId = input.deliveryAddressId;
@@ -546,7 +579,7 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
                 customerId: input.customerId,
                 requestedDeliveryDate: { gte: deliveryDate, lt: nextDeliveryDate },
                 deletedAt: null,
-                status: { notIn: ['CANCELLED', 'REJECTED'] },
+                status: { not: 'REJECTED' },
                 items: { some: { productId: { in: aliasProductIds.length > 0 ? aliasProductIds : productIds } } },
             },
             select: {
@@ -584,11 +617,14 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
 
     // ?? ?몃옖??뀡?쇰줈 二쇰Ц ?앹꽦 ??????????????????????????????????
     try {
+        const sameDayDelivery = Boolean(input.sameDayDelivery && isStaff);
         const requestedDeliveryDate = new Date(input.deliveryDate + 'T00:00:00');
         const requestedPurchaseDate = new Date(input.orderDate + 'T00:00:00');
-        const salesLedgerDate = input.shipAhead && isStaff ? nextMonthFirst(requestedDeliveryDate) : null;
-        const purchaseLedgerDate = input.purchaseCarryover && isStaff
+        const salesLedgerDate = input.shipAhead && isStaff && !sameDayDelivery ? nextMonthFirst(requestedDeliveryDate) : null;
+        const purchaseLedgerDate = input.purchaseCarryover && isStaff && !sameDayDelivery
             ? nextMonthFirst(requestedPurchaseDate)
+            : sameDayDelivery
+                ? requestedDeliveryDate
             : requestedPurchaseDate;
         const driverCustomerNotice = input.driverCustomerNotice?.trim() || null;
         const orderExtraRequest = input.orderExtraRequest?.trim() || null;
@@ -623,6 +659,7 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
                     creditWarningLevel: isCreditOver ? 2 : projectedReceivable >= inputCustomer.creditLimit * 0.8 && inputCustomer.creditLimit > 0 ? 1 : 0,
                     estimatedAmount: estimatedOrderAmount,
                     requestedDeliveryDate,
+                    sameDayDelivery,
                     driverCustomerNotice,
                     orderExtraRequest,
                     items: {
@@ -649,7 +686,7 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
                             changedByUserId:
                                 session.user.userKind === 'staff' ? session.user.id : undefined,
                             changeReason: isCreditOver
-                                ? `주문 등록 - 여신한도 ${creditOverAmount.toLocaleString('ko-KR')}원 초과, 양희철 승인 필요`
+                                ? `주문 등록 - 여신한도 ${creditOverAmount.toLocaleString('ko-KR')}원 초과, 여신초과 승인 필요`
                                 : salesLedgerDate || purchaseLedgerDate
                                     ? `주문 등록 - ${[
                                         salesLedgerDate ? `매출일자 ${dateToIso(salesLedgerDate)}` : null,
@@ -722,6 +759,30 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
             });
         }
 
+        // Staff orders with a Hanwha purchase supplier are approved at save
+        // time. Queue the e-Sales work here, not after a detail page mount.
+        const resolvedSupplierIds = Array.from(new Set(
+            resolvedItems
+                .map((item) => item.purchaseSupplierId)
+                .filter((supplierId): supplierId is string => Boolean(supplierId)),
+        ));
+        const hasHanwhaPurchaseSupplier = resolvedSupplierIds.length > 0 && Boolean(await prisma.supplier.findFirst({
+            where: {
+                id: { in: resolvedSupplierIds },
+                isActive: true,
+                supplierName: { contains: '한화솔루션' },
+            },
+            select: { id: true },
+        }));
+        let hanwhaOrderQueued = false;
+        if (isStaff && initialStatus === 'APPROVED' && hasHanwhaPurchaseSupplier) {
+            const queued = await enqueueHanwhaNewOrder(order.id, true);
+            hanwhaOrderQueued = queued.ok;
+            if (!queued.ok) {
+                console.error(`Unable to queue automatic Hanwha order for ${order.orderNo}: ${queued.error}`);
+            }
+        }
+
         revalidatePath('/admin');
         revalidatePath('/portal');
 
@@ -732,8 +793,9 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
             status: initialStatus,
             creditOver: isCreditOver,
             creditOverMessage: isCreditOver
-                ? `여신한도 초과 상태로 저장되었습니다. 초과액 ${creditOverAmount.toLocaleString('ko-KR')}원. 양희철 승인 전에는 오더승인으로 진행할 수 없습니다.`
+                ? `여신한도 초과 상태로 저장되었습니다. 초과액 ${creditOverAmount.toLocaleString('ko-KR')}원. 여신초과 승인 전에는 오더승인으로 진행할 수 없습니다.`
                 : undefined,
+            hanwhaOrderQueued,
         };
     } catch (e) {
         console.error('createOrder failed:', e);
@@ -750,13 +812,11 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
 export type ChangeStatusResult = { ok: true } | { ok: false; error: string };
 
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
-    REQUESTED: ['APPROVED', 'ON_HOLD', 'REJECTED', 'PENDING_SALES_REVIEW'],
-    PENDING_SALES_REVIEW: ['APPROVED', 'ON_HOLD', 'REJECTED'],
-    CREDIT_OVER_LIMIT: ['APPROVED', 'ON_HOLD', 'REJECTED'],
-    ON_HOLD: ['APPROVED', 'REJECTED', 'REQUESTED'],
-    APPROVED: ['DISPATCH_WAITING', 'CANCELLED'],
-    DISPATCH_WAITING: ['DISPATCH_COMPLETED'],
-    DISPATCHING: ['DISPATCH_COMPLETED'],
+    REQUESTED: ['APPROVED', 'REJECTED'],
+    CREDIT_OVER_LIMIT: ['APPROVED', 'REJECTED'],
+    APPROVED: ['DISPATCHING', 'REJECTED'],
+    DISPATCHING: ['DISPATCH_COMPLETED', 'REJECTED'],
+    DISPATCH_COMPLETED: ['SHIPPED', 'REJECTED'],
 };
 
 export async function changeOrderStatus(
@@ -776,19 +836,24 @@ export async function changeOrderStatus(
     });
     if (!order) return { ok: false, error: '二쇰Ц??李얠쓣 ???놁뒿?덈떎.' };
 
-    const allowed = ALLOWED_TRANSITIONS[order.status] ?? [];
+    const currentStatus = normalizeOrderStatus(order.status);
+    if (!isCanonicalOrderStatus(nextStatus)) {
+        return { ok: false, error: '사용하지 않는 주문 상태입니다.' };
+    }
+
+    const allowed = ALLOWED_TRANSITIONS[currentStatus] ?? [];
     if (!allowed.includes(nextStatus)) {
         return {
             ok: false,
-            error: `'${order.status}' 상태에서 '${nextStatus}'로 변경할 수 없습니다.`,
+            error: `'${currentStatus}' 상태에서 '${nextStatus}'로 변경할 수 없습니다.`,
         };
     }
 
     if (nextStatus === 'APPROVED') {
-        if (order.status === 'CREDIT_OVER_LIMIT' && order.creditOverride?.status !== 'APPROVED') {
+        if (currentStatus === 'CREDIT_OVER_LIMIT' && order.creditOverride?.status !== 'APPROVED') {
             return {
                 ok: false,
-                error: '여신초과 오더는 양희철 승인 완료 후에만 오더승인으로 진행할 수 있습니다.',
+                error: '여신초과 오더는 여신초과 승인 완료 후에만 오더승인으로 진행할 수 있습니다.',
             };
         }
         const isInternalPurchaseOnly = isHanyangCustomerName(order.customer.companyName);
@@ -853,14 +918,14 @@ export async function manualChangeOrderStatus(
     }
     if (!reason?.trim()) return { ok: false, error: '?곹깭 蹂寃??ъ쑀瑜??낅젰?댁＜?몄슂.' };
 
-    const allowedStatuses = Object.values(OrderStatus) as string[];
+    const allowedStatuses = ORDER_STATUS_VALUES as string[];
     if (!allowedStatuses.includes(nextStatus)) {
         return { ok: false, error: '議댁옱?섏? ?딅뒗 二쇰Ц ?곹깭?낅땲??' };
     }
 
     const order = await prisma.order.findUnique({ where: { id: orderId } });
     if (!order || order.deletedAt) return { ok: false, error: '二쇰Ц??李얠쓣 ???놁뒿?덈떎.' };
-    if (order.status === nextStatus) return { ok: false, error: '?대? 媛숈? ?곹깭?낅땲??' };
+    if (normalizeOrderStatus(order.status) === nextStatus) return { ok: false, error: '이미 같은 주문 상태입니다.' };
 
     try {
         await prisma.$transaction(async (tx) => {
@@ -921,6 +986,29 @@ export async function updateOrderDeliveryDate(
                 where: { id: orderId },
                 data: { requestedDeliveryDate: nextDate },
             });
+            if (order.sameDayDelivery) {
+                await tx.orderItem.updateMany({
+                    where: { orderId },
+                    data: {
+                        salesLedgerDate: null,
+                        purchaseLedgerDate: nextDate,
+                    },
+                });
+                await tx.ledgerEntry.updateMany({
+                    where: { orderItem: { orderId }, ledgerType: 'SALES' },
+                    data: { transactionDate: nextDate },
+                });
+                await tx.ledgerEntry.updateMany({
+                    where: {
+                        ledgerType: 'PURCHASE',
+                        OR: [
+                            { orderId },
+                            { orderItem: { orderId } },
+                        ],
+                    },
+                    data: { transactionDate: nextDate },
+                });
+            }
             await tx.orderStatusHistory.create({
                 data: {
                     orderId,
@@ -936,6 +1024,7 @@ export async function updateOrderDeliveryDate(
         revalidatePath(`/admin/orders/${orderId}`);
         revalidatePath('/portal');
         revalidatePath(`/portal/orders/${orderId}`);
+        revalidatePath('/admin/today-shipping');
         return { ok: true };
     } catch (e) {
         console.error('updateOrderDeliveryDate failed:', e);
@@ -1055,6 +1144,7 @@ export async function updateOrderSalesLedgerDateMode(
             orderNo: true,
             createdAt: true,
             status: true,
+            hanwhaOrderedAt: true,
             deletedAt: true,
             requestedDeliveryDate: true,
             items: { select: { id: true, salesLedgerDate: true } },
@@ -1079,6 +1169,12 @@ export async function updateOrderSalesLedgerDateMode(
                 where: { orderId },
                 data: { salesLedgerDate: nextDate },
             });
+            if (shipAhead) {
+                await tx.order.update({
+                    where: { id: orderId },
+                    data: { sameDayDelivery: false },
+                });
+            }
             await tx.ledgerEntry.updateMany({
                 where: { orderItem: { orderId }, ledgerType: 'SALES' },
                 data: { transactionDate: nextDate ?? deliveryDate },
@@ -1097,6 +1193,7 @@ export async function updateOrderSalesLedgerDateMode(
         revalidatePath(`/admin/orders/${orderId}`);
         revalidatePath(`/portal/orders/${orderId}`);
         revalidatePath('/admin/ledger');
+        revalidatePath('/admin/today-shipping');
         return { ok: true };
     } catch (e) {
         console.error('updateOrderSalesLedgerDateMode failed:', e);
@@ -1138,6 +1235,12 @@ export async function updateOrderPurchaseLedgerDateMode(
                 where: { orderId: order.id },
                 data: { purchaseLedgerDate: nextDate },
             });
+            if (carryover) {
+                await tx.order.update({
+                    where: { id: order.id },
+                    data: { sameDayDelivery: false },
+                });
+            }
             await tx.ledgerEntry.updateMany({
                 where: { orderId: order.id, ledgerType: 'PURCHASE' },
                 data: { transactionDate: nextDate },
@@ -1156,10 +1259,98 @@ export async function updateOrderPurchaseLedgerDateMode(
         revalidatePath('/admin/reports/sales-daily');
         revalidatePath('/admin/reports/performance');
         revalidatePath('/admin/ledger');
+        revalidatePath('/admin/today-shipping');
         return { ok: true };
     } catch (e) {
         console.error('updateOrderPurchaseLedgerDateMode failed:', e);
         return { ok: false, error: '매입일자 변경 중 오류가 발생했습니다.' };
+    }
+}
+
+export async function updateOrderSameDayDeliveryMode(
+    orderId: string,
+    sameDayDelivery: boolean,
+    reason?: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+    const session = await auth();
+    if (!session?.user || session.user.userKind !== 'staff') return { ok: false, error: '직원만 변경할 수 있습니다.' };
+
+    const order = await prisma.order.findUnique({
+        where: { id: orderId },
+        select: {
+            id: true,
+            orderNo: true,
+            createdAt: true,
+            status: true,
+            requestedDeliveryDate: true,
+            sameDayDelivery: true,
+            deletedAt: true,
+            items: { select: { id: true, salesLedgerDate: true, purchaseLedgerDate: true } },
+        },
+    });
+    if (!order || order.deletedAt) return { ok: false, error: '주문을 찾을 수 없습니다.' };
+    if (!order.requestedDeliveryDate) return { ok: false, error: '도착일자가 없어 당일도착 일자를 계산할 수 없습니다.' };
+    if (order.items.length === 0) return { ok: false, error: '수정할 품목이 없습니다.' };
+
+    const basePurchaseDate = purchaseRequestDateFromOrderNo(order.orderNo) ?? order.createdAt;
+    const requestedDeliveryDate = order.requestedDeliveryDate;
+    const nextPurchaseDate = sameDayDelivery ? requestedDeliveryDate : basePurchaseDate;
+    const nextSalesDate = null;
+    const currentPurchaseDates = Array.from(new Set(order.items.map((item) => dateToIso(item.purchaseLedgerDate ?? basePurchaseDate))));
+    const currentSalesDates = Array.from(new Set(order.items.map((item) => item.salesLedgerDate ? dateToIso(item.salesLedgerDate) : '도착일 기준')));
+    const nextPurchaseLabel = dateToIso(nextPurchaseDate);
+    const nextSalesLabel = '도착일 기준';
+
+    if (order.sameDayDelivery === sameDayDelivery) {
+        return { ok: false, error: sameDayDelivery ? '이미 당일도착으로 설정되어 있습니다.' : '이미 당일도착이 해제되어 있습니다.' };
+    }
+
+    try {
+        await prisma.$transaction(async (tx) => {
+            await tx.order.update({
+                where: { id: order.id },
+                data: { sameDayDelivery },
+            });
+            await tx.orderItem.updateMany({
+                where: { orderId: order.id },
+                data: {
+                    salesLedgerDate: nextSalesDate,
+                    purchaseLedgerDate: nextPurchaseDate,
+                },
+            });
+            await tx.ledgerEntry.updateMany({
+                where: { orderItem: { orderId: order.id }, ledgerType: 'SALES' },
+                data: { transactionDate: requestedDeliveryDate },
+            });
+            await tx.ledgerEntry.updateMany({
+                where: {
+                    ledgerType: 'PURCHASE',
+                    OR: [
+                        { orderId: order.id },
+                        { orderItem: { orderId: order.id } },
+                    ],
+                },
+                data: { transactionDate: nextPurchaseDate },
+            });
+            await tx.orderStatusHistory.create({
+                data: {
+                    orderId: order.id,
+                    previousStatus: order.status,
+                    newStatus: order.status,
+                    changedByUserId: session.user.id,
+                    changeReason: `[당일도착 ${sameDayDelivery ? '설정' : '해제'}] 매출일자 ${currentSalesDates.join(', ')} -> ${nextSalesLabel} / 매입일자 ${currentPurchaseDates.join(', ')} -> ${nextPurchaseLabel}${reason ? ` / ${reason}` : ''}`,
+                },
+            });
+        });
+        revalidatePath(`/admin/orders/${order.id}`);
+        revalidatePath('/admin/reports/sales-daily');
+        revalidatePath('/admin/reports/performance');
+        revalidatePath('/admin/ledger');
+        revalidatePath('/admin/today-shipping');
+        return { ok: true };
+    } catch (e) {
+        console.error('updateOrderSameDayDeliveryMode failed:', e);
+        return { ok: false, error: '당일도착 변경 중 오류가 발생했습니다.' };
     }
 }
 
@@ -1185,6 +1376,7 @@ export async function updateOrderPurchaseLedgerDate(
             orderNo: true,
             createdAt: true,
             status: true,
+            hanwhaOrderedAt: true,
             deletedAt: true,
             requestedDeliveryDate: true,
             items: { select: { id: true, purchaseLedgerDate: true } },
@@ -1248,12 +1440,12 @@ export async function requestOrderDeliveryDateChange(input: {
     reason?: string;
 }): Promise<ChangeStatusResult> {
     const session = await auth();
-    if (!session?.user) return { ok: false, error: '濡쒓렇?몄씠 ?꾩슂?⑸땲??' };
+    if (!session?.user) return { ok: false, error: '로그인이 필요합니다.' };
     if (session.user.userKind !== 'customer' || !session.user.customerId) {
-        return { ok: false, error: '嫄곕옒泥섎쭔 ?꾩갑??蹂寃쎌쓣 ?붿껌?????덉뒿?덈떎.' };
+        return { ok: false, error: '거래처만 도착일 변경을 요청할 수 있습니다.' };
     }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(input.requestedDate)) {
-        return { ok: false, error: '蹂寃??먰븯???꾩갑?쇱쓣 ?뺤씤??二쇱꽭??' };
+        return { ok: false, error: '변경 원하는 도착일을 확인해 주세요.' };
     }
 
     const order = await prisma.order.findUnique({
@@ -1261,25 +1453,25 @@ export async function requestOrderDeliveryDateChange(input: {
         select: { id: true, customerId: true, requestedDeliveryDate: true, status: true, deletedAt: true },
     });
     if (!order || order.deletedAt || order.customerId !== session.user.customerId) {
-        return { ok: false, error: '二쇰Ц??李얠쓣 ???놁뒿?덈떎.' };
+        return { ok: false, error: '주문을 찾을 수 없습니다.' };
     }
 
     const requestedDate = new Date(`${input.requestedDate}T00:00:00`);
-    if (Number.isNaN(requestedDate.getTime())) return { ok: false, error: '蹂寃??먰븯???꾩갑?쇱쓣 ?뺤씤??二쇱꽭??' };
+    if (Number.isNaN(requestedDate.getTime())) return { ok: false, error: '변경 원하는 도착일을 확인해 주세요.' };
 
     const now = new Date();
     const currentDelivery = order.requestedDeliveryDate ? new Date(order.requestedDeliveryDate) : null;
     if (currentDelivery) {
         currentDelivery.setHours(11, 0, 0, 0);
         if (now >= currentDelivery) {
-            return { ok: false, error: '?꾩갑???뱀씪 ?ㅼ쟾 11???댄썑?먮뒗 蹂寃??붿껌??遺덇??⑸땲?? ?대떦?먯뿉寃??곕씫?댁＜?몄슂.' };
+            return { ok: false, error: '도착일 당일 오전 11시 이후에는 변경 요청이 불가합니다. 담당자에게 연락해 주세요.' };
         }
     }
 
     await prisma.$transaction(async (tx) => {
         await tx.deliveryDateChangeRequest.updateMany({
             where: { orderId: input.orderId, status: 'PENDING' },
-            data: { status: 'REJECTED', reviewMemo: '??蹂寃??붿껌?쇰줈 ?먮룞 醫낅즺', reviewedAt: new Date() },
+            data: { status: 'REJECTED', reviewMemo: '새 변경 요청으로 자동 종료', reviewedAt: new Date() },
         });
         await tx.deliveryDateChangeRequest.create({
             data: {
@@ -1295,8 +1487,8 @@ export async function requestOrderDeliveryDateChange(input: {
                 orderId: input.orderId,
                 previousStatus: order.status,
                 newStatus: order.status,
-                customerMessage: `?꾩갑??蹂寃??붿껌: ${input.requestedDate}`,
-                changeReason: `[?꾩갑??蹂寃??붿껌] ${input.requestedDate}${input.reason?.trim() ? ` / ${input.reason.trim()}` : ''}`,
+                customerMessage: `도착일 변경 요청: ${input.requestedDate}`,
+                changeReason: `[도착일 변경 요청] ${input.requestedDate}${input.reason?.trim() ? ` / ${input.reason.trim()}` : ''}`,
             },
         });
     });
@@ -1315,8 +1507,8 @@ export async function reviewOrderDeliveryDateChangeRequest(
     reviewMemo?: string,
 ): Promise<ChangeStatusResult> {
     const session = await auth();
-    if (!session?.user) return { ok: false, error: '濡쒓렇?몄씠 ?꾩슂?⑸땲??' };
-    if (session.user.userKind !== 'staff') return { ok: false, error: '吏곸썝留??붿껌??泥섎━?????덉뒿?덈떎.' };
+    if (!session?.user) return { ok: false, error: '로그인이 필요합니다.' };
+    if (session.user.userKind !== 'staff') return { ok: false, error: '직원만 요청을 처리할 수 있습니다.' };
 
     const request = await prisma.deliveryDateChangeRequest.findUnique({
         where: { id: requestId },
@@ -1350,10 +1542,10 @@ export async function reviewOrderDeliveryDateChangeRequest(
                 previousStatus: request.order.status,
                 newStatus: request.order.status,
                 changedByUserId: session.user.id,
-                customerMessage: decision === 'APPROVED' ? `?꾩갑??蹂寃??붿껌???뱀씤?섏뿀?듬땲?? (${nextDateText})` : '?꾩갑??蹂寃??붿껌??諛섎젮?섏뿀?듬땲??',
+                customerMessage: decision === 'APPROVED' ? `도착일 변경 요청이 승인되었습니다. (${nextDateText})` : '도착일 변경 요청이 반려되었습니다.',
                 changeReason: decision === 'APPROVED'
-                    ? `[?꾩갑??蹂寃??붿껌 ?뱀씤] ${currentDateText} ??${nextDateText}${reviewMemo?.trim() ? ` / ${reviewMemo.trim()}` : ''}`
-                    : `[?꾩갑??蹂寃??붿껌 諛섎젮] ?붿껌??${nextDateText}${reviewMemo?.trim() ? ` / ${reviewMemo.trim()}` : ''}`,
+                    ? `[도착일 변경 요청 승인] ${currentDateText} -> ${nextDateText}${reviewMemo?.trim() ? ` / ${reviewMemo.trim()}` : ''}`
+                    : `[도착일 변경 요청 반려] 요청일 ${nextDateText}${reviewMemo?.trim() ? ` / ${reviewMemo.trim()}` : ''}`,
             },
         });
     });
@@ -1446,13 +1638,13 @@ export async function cancelOwnOrder(orderId: string): Promise<ChangeStatusResul
         await prisma.$transaction(async (tx) => {
             await tx.order.update({
                 where: { id: orderId },
-                data: { status: 'CANCELLED' },
+                data: { status: 'REJECTED' },
             });
             await tx.orderStatusHistory.create({
                 data: {
                     orderId,
                     previousStatus: order.status,
-                    newStatus: 'CANCELLED',
+                    newStatus: 'REJECTED',
                     changeReason: `嫄곕옒泥??먭? 痍⑥냼 (${session.user.name ?? session.user.id})`,
                 },
             });
@@ -1685,7 +1877,7 @@ export async function updateOrderItem(
                         orderSource: 'SALES_MANUAL',
                         status: 'REQUESTED',
                         requestedDeliveryDate: nextDeliveryDate,
-                        memo: `[誘몃같李⑤텇 ?먮룞?앹꽦] ?먯삤??${item.order.orderNo} / ${item.product.productName} ${remainingQuantity}${item.unit}`,
+                        memo: `[미배차분 자동생성] 원오더 ${item.order.orderNo} / ${item.product.productName} ${remainingQuantity}${item.unit}`,
                         items: {
                             create: {
                                 productId: item.productId,
@@ -1708,7 +1900,7 @@ export async function updateOrderItem(
                                 previousStatus: null,
                                 newStatus: 'REQUESTED',
                                 changedByUserId: session.user.id,
-                                changeReason: `[誘몃같李⑤텇 ?먮룞?앹꽦] ${item.order.orderNo} ?섎웾 異뺤냼遺?${remainingQuantity}${item.unit}`,
+                                changeReason: `[미배차분 자동생성] ${item.order.orderNo} 수량 축소분 ${remainingQuantity}${item.unit}`,
                             },
                         },
                     },
@@ -1754,7 +1946,7 @@ export async function updateOrderItem(
                 changeDesc.push(`?덈ぉ: ${item.product.productName} ??${nextProduct.productName}`);
             if (previousQuantity !== nextQuantity) {
                 const splitText = options?.createBackorderForReducedQuantity && previousQuantity > nextQuantity && SPLIT_REMAINING_ORDER_STATUSES.has(item.order.status)
-                    ? ` (誘몃같李⑤텇 ${previousQuantity - nextQuantity}${item.unit} ?듭씪 ?좉퇋?ㅻ뜑 ?앹꽦)`
+                    ? ` (미배차분 ${previousQuantity - nextQuantity}${item.unit} 익일 신규오더 생성)`
                     : '';
                 changeDesc.push(`?섎웾: ${previousQuantity}${item.unit} ??${nextQuantity}${item.unit}${splitText}`);
             }
@@ -1977,16 +2169,16 @@ export async function createMissingDispatchBackorder(
 ): Promise<ChangeStatusResult & { backorderNo?: string }> {
     const session = await auth();
     if (!session?.user) return { ok: false, error: '濡쒓렇?몄씠 ?꾩슂?⑸땲??' };
-    if (session.user.userKind !== 'staff') return { ok: false, error: '吏곸썝留?誘몃같李⑤텇???앹꽦?????덉뒿?덈떎.' };
-    if (!deliveryDate) return { ok: false, error: '蹂寃??⑺뭹?붿껌?쇱쓣 ?낅젰??二쇱꽭??' };
+    if (session.user.userKind !== 'staff') return { ok: false, error: '직원만 미배차분을 생성할 수 있습니다.' };
+    if (!deliveryDate) return { ok: false, error: '변경 납품요청일을 입력해 주세요.' };
 
     const nextDeliveryDate = new Date(`${deliveryDate}T00:00:00`);
-    if (Number.isNaN(nextDeliveryDate.getTime())) return { ok: false, error: '?⑺뭹?붿껌???뺤떇???щ컮瑜댁? ?딆뒿?덈떎.' };
+    if (Number.isNaN(nextDeliveryDate.getTime())) return { ok: false, error: '납품요청일 형식이 올바르지 않습니다.' };
 
     const normalized = missingItems
         .map((item) => ({ itemId: item.itemId, quantity: Number(item.quantity) }))
         .filter((item) => item.itemId && Number.isFinite(item.quantity) && item.quantity > 0);
-    if (normalized.length === 0) return { ok: false, error: '誘몃같李??섎웾??1媛??댁긽 ?낅젰??二쇱꽭??' };
+    if (normalized.length === 0) return { ok: false, error: '미배차 수량을 1개 이상 입력해 주세요.' };
 
     const order = await prisma.order.findUnique({
         where: { id: orderId },
@@ -1995,23 +2187,23 @@ export async function createMissingDispatchBackorder(
             items: { include: { product: { select: { productName: true } } } },
         },
     });
-    if (!order || order.deletedAt) return { ok: false, error: '二쇰Ц??李얠쓣 ???놁뒿?덈떎.' };
+    if (!order || order.deletedAt) return { ok: false, error: '주문을 찾을 수 없습니다.' };
 
     const missingByItemId = new Map(normalized.map((item) => [item.itemId, item.quantity]));
     const selectedItems = order.items.filter((item) => missingByItemId.has(item.id));
-    if (selectedItems.length !== normalized.length) return { ok: false, error: '?좏깮???덈ぉ??李얠쓣 ???놁뒿?덈떎.' };
+    if (selectedItems.length !== normalized.length) return { ok: false, error: '선택한 품목을 찾을 수 없습니다.' };
 
     for (const item of selectedItems) {
         const quantity = missingByItemId.get(item.id)!;
         if (quantity > item.requestedQuantity) {
-            return { ok: false, error: `${item.product.productName} 誘몃같李??섎웾??二쇰Ц ?섎웾蹂대떎 ?쎈땲??` };
+            return { ok: false, error: `${item.product.productName} 미배차 수량이 주문 수량보다 큽니다.` };
         }
     }
 
     const fullOrderMissing = order.items.every((item) => missingByItemId.get(item.id) === item.requestedQuantity);
     const wouldRemoveAllItems = order.items.every((item) => (missingByItemId.get(item.id) ?? 0) >= item.requestedQuantity);
     if (wouldRemoveAllItems && !fullOrderMissing) {
-        return { ok: false, error: '?꾩껜 ?덈ぉ 誘몃같李⑤뒗 ?꾩껜 ?섎웾???좏깮??二쇱꽭??' };
+        return { ok: false, error: '전체 품목 미배차는 전체 수량을 선택해 주세요.' };
     }
 
     try {
@@ -2029,7 +2221,7 @@ export async function createMissingDispatchBackorder(
                     status: 'APPROVED',
                     requestedDeliveryDate: nextDeliveryDate,
                     memo: compactJoin([
-                        `[誘몃같李⑤텇 ?먮룞?앹꽦] ?먯삤??${order.orderNo}`,
+                        `[미배차분 자동생성] 원오더 ${order.orderNo}`,
                         order.orderExtraRequest ?? order.memo,
                     ], '\n'),
                     driverCustomerNotice: order.driverCustomerNotice,
@@ -2057,21 +2249,21 @@ export async function createMissingDispatchBackorder(
                             previousStatus: null,
                             newStatus: 'APPROVED',
                             changedByUserId: session.user.id,
-                            changeReason: `[誘몃같李⑤텇 ?먮룞?앹꽦] ?먯삤??${order.orderNo} / 蹂寃??⑺뭹?붿껌??${deliveryDate}`,
+                            changeReason: `[미배차분 자동생성] 원오더 ${order.orderNo} / 변경 납품요청일 ${deliveryDate}`,
                         },
                     },
                 },
             });
 
             if (fullOrderMissing) {
-                await tx.order.update({ where: { id: orderId }, data: { status: 'DISPATCH_FAILED' } });
+                await tx.order.update({ where: { id: orderId }, data: { status: 'REJECTED' } });
                 await tx.orderStatusHistory.create({
                     data: {
                         orderId,
                         previousStatus: order.status,
-                        newStatus: 'DISPATCH_FAILED',
+                        newStatus: 'REJECTED',
                         changedByUserId: session.user.id,
-                        changeReason: `[?꾩껜 誘몃같李? ${backorderNo} ?먮룞 ?앹꽦 / 蹂寃??⑺뭹?붿껌??${deliveryDate}`,
+                        changeReason: `[전체 미배차] ${backorderNo} 자동 생성 / 변경 납품요청일 ${deliveryDate}`,
                     },
                 });
                 return;
@@ -2124,7 +2316,7 @@ export async function createMissingDispatchBackorder(
                     previousStatus: order.status,
                     newStatus: order.status,
                     changedByUserId: session.user.id,
-                    changeReason: `[誘몃같李⑤텇 遺꾪븷] ${backorderNo} ?먮룞 ?앹꽦 / ${selectedItems.map((item) => `${item.product.productName} ${missingByItemId.get(item.id)}${item.unit}`).join(', ')}`,
+                    changeReason: `[미배차분 분할] ${backorderNo} 자동 생성 / ${selectedItems.map((item) => `${item.product.productName} ${missingByItemId.get(item.id)}${item.unit}`).join(', ')}`,
                 },
             });
         });
@@ -2134,7 +2326,7 @@ export async function createMissingDispatchBackorder(
         return { ok: true, backorderNo };
     } catch (e) {
         console.error('createMissingDispatchBackorder failed:', e);
-        return { ok: false, error: '誘몃같李⑤텇 ?ㅻ뜑 ?앹꽦 以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎.' };
+        return { ok: false, error: '미배차분 오더 생성 중 오류가 발생했습니다.' };
     }
 }
 
@@ -2146,6 +2338,7 @@ async function runHanwhaOrderJob(job: HanwhaOrderJob, approveAfterOrder: boolean
             orderNo: true,
             createdAt: true,
             status: true,
+            hanwhaOrderedAt: true,
             deletedAt: true,
             requestedDeliveryDate: true,
             driverCustomerNotice: true,
@@ -2181,7 +2374,8 @@ async function runHanwhaOrderJob(job: HanwhaOrderJob, approveAfterOrder: boolean
     if (!order || order.deletedAt) {
         throw new Error('주문을 찾을 수 없습니다.');
     }
-    if (order.status !== OrderStatus.APPROVED) {
+    const canRunReorder = Boolean(job.forceReorder && order.hanwhaOrderedAt && order.status === OrderStatus.DISPATCHING);
+    if (order.status !== OrderStatus.APPROVED && !canRunReorder) {
         throw new Error('승인 완료된 주문에서만 한화 e-Sales를 열 수 있습니다.');
     }
 
@@ -2273,23 +2467,26 @@ async function runHanwhaOrderJob(job: HanwhaOrderJob, approveAfterOrder: boolean
 
     const postOrderMessage = await runHanwhaPostOrderStep(approveAfterOrder, result.orderNo);
 
+    const nextOrderStatus = order.status === OrderStatus.APPROVED ? OrderStatus.DISPATCHING : order.status;
     await prisma.order.update({
         where: { id: job.orderId },
-        data: { hanwhaOrderedAt: new Date() },
+        data: { hanwhaOrderedAt: new Date(), status: nextOrderStatus },
     });
 
     await prisma.orderStatusHistory.create({
         data: {
             orderId: job.orderId,
             previousStatus: order.status,
-            newStatus: order.status,
+            newStatus: nextOrderStatus,
             changedByUserId: job.requestedByUserId,
             changeReason: approveAfterOrder
-                ? `[?쒗솕 e-Sales] ?由ъ젏?ㅻ뜑 ?먮룞 ?낅젰 ??議고쉶/泥댄겕/?뱀씤?붿껌 ?꾨즺 (?쒗솕?붾（???덈ぉ ${hanwhaItems.length}嫄?/ 二쇰Ц ${order.orderNo})`
-                : `[?쒗솕 e-Sales] ?由ъ젏?ㅻ뜑 ?먮룞 ?낅젰 ??議고쉶/泥댄겕 ?꾨즺 (?쒗솕?붾（???덈ぉ ${hanwhaItems.length}嫄?/ 二쇰Ц ${order.orderNo})`,
+                ? `[한화 e-Sales] 대리점오더 자동 입력 후 조회/체크/승인요청 완료 (한화솔루션 품목 ${hanwhaItems.length}건 / 주문 ${order.orderNo})`
+                : `[한화 e-Sales] 대리점오더 자동 입력 후 조회/체크 완료 (한화솔루션 품목 ${hanwhaItems.length}건 / 주문 ${order.orderNo})`,
         },
     });
 
+    revalidatePath('/admin');
+    revalidatePath('/admin/dispatch');
     revalidatePath(`/admin/orders/${job.orderId}`);
     job.message = `${result.message} ${postOrderMessage}`;
 }
@@ -2354,22 +2551,33 @@ export async function getHanwhaNewOrderJobStatus(jobId: string) {
     if (!session?.user || session.user.userKind !== 'staff') {
         return { ok: false as const, error: '沅뚰븳???놁뒿?덈떎.' };
     }
-    const { jobs } = hanwhaQueue();
-    const job = jobs.get(jobId);
-    if (!job) return { ok: false as const, error: '?쒗솕 e-Sales ?닿린 ?묒뾽 ?뺣낫瑜?李얠쓣 ???놁뒿?덈떎.' };
+    const job = await prisma.backgroundJob.findUnique({ where: { id: jobId } });
+    if (!job || job.type !== BACKGROUND_JOB_TYPES.HANWHA_NEW_ORDER) {
+        return { ok: false as const, error: '?쒗솕 e-Sales ?닿린 ?묒뾽 ?뺣낫瑜?李얠쓣 ???놁뒿?덈떎.' };
+    }
+    const metadata = parseJobJsonAs<HanwhaNewOrderJobMetadata>(job.metadata);
+    const position = job.status === 'QUEUED'
+        ? await prisma.backgroundJob.count({
+            where: {
+                type: BACKGROUND_JOB_TYPES.HANWHA_NEW_ORDER,
+                status: 'QUEUED',
+                queuedAt: { lte: job.queuedAt },
+            },
+        })
+        : 0;
 
     return {
         ok: true as const,
         jobId: job.id,
-        orderId: job.orderId,
-        orderNo: job.orderNo,
-        status: job.status,
-        position: job.status === 'QUEUED' ? hanwhaJobPosition(job.id) : 0,
+        orderId: metadata?.orderId ?? job.entityId ?? '',
+        orderNo: job.title.replace(/^.*?\s/, ''),
+        status: job.status as HanwhaOrderJobStatus,
+        position,
         message: job.message,
         error: job.error,
-        manualAction: job.manualAction,
-        manualTitle: job.manualTitle,
-        manualButtonLabel: job.manualButtonLabel,
+        manualAction: metadata?.manualAction,
+        manualTitle: metadata?.manualTitle,
+        manualButtonLabel: metadata?.manualButtonLabel,
     };
 }
 
@@ -2386,6 +2594,7 @@ async function enqueueHanwhaNewOrder(orderId: string, approveAfterOrder: boolean
             id: true,
             orderNo: true,
             status: true,
+            hanwhaOrderedAt: true,
             deletedAt: true,
             items: {
                 select: {
@@ -2404,70 +2613,61 @@ async function enqueueHanwhaNewOrder(orderId: string, approveAfterOrder: boolean
     });
 
     if (!order || order.deletedAt) return { ok: false as const, error: '주문을 찾을 수 없습니다.' };
-    if (order.status !== OrderStatus.APPROVED) return { ok: false as const, error: '승인 완료된 주문에서만 한화 e-Sales를 열 수 있습니다.' };
+    const isReorder = Boolean(order.hanwhaOrderedAt);
+    const canReorder = isReorder && isYangHeeCheol(session.user);
+    if (isReorder && !canReorder) {
+        return { ok: false as const, error: '이미 한화오더가 정상 완료된 주문입니다. 재오더는 양희철만 가능합니다.' };
+    }
+    if (order.status !== OrderStatus.APPROVED && !(canReorder && order.status === OrderStatus.DISPATCHING)) {
+        return { ok: false as const, error: '승인 완료 또는 배차중 주문에서만 한화 e-Sales를 열 수 있습니다.' };
+    }
     if (!order.items.some(isHanwhaOrderItem)) {
         return { ok: false as const, error: '한화 e-Sales에 입력할 한화 품목이 없습니다. 매입처가 한화솔루션이거나 제품 DB에 한화 품목코드가 등록된 품목만 처리합니다.' };
     }
 
-    const { queue, jobs } = hanwhaQueue();
-    const existing = Array.from(jobs.values()).find((job) =>
-        job.orderId === orderId && (job.status === 'QUEUED' || job.status === 'RUNNING' || job.status === 'WAITING_MANUAL_ACTION')
-    );
-    if (existing) {
-        const existingApproves = Boolean(existing.approveAfterOrder);
-        if (existingApproves !== approveAfterOrder) {
-            return {
-                ok: false as const,
-                error: existingApproves
-                    ? '이미 승인요청까지 포함한 한화오더 작업이 진행 중입니다. 완료 후 테스트를 다시 실행해주세요.'
-                    : '이미 테스트 작업이 진행 중입니다. 완료 후 한화오더를 다시 실행해주세요.',
-            };
-        }
-        return {
-            ok: true as const,
-            jobId: existing.id,
-            status: existing.status,
-            position: existing.status === 'QUEUED' ? hanwhaJobPosition(existing.id) : 0,
-            message: existing.status === 'WAITING_MANUAL_ACTION'
-                ? (existing.message ?? 'e-Sales에서 필요한 수동 조치를 완료한 뒤 계속 버튼을 눌러주세요.')
-                : existing.status === 'RUNNING'
-                ? '한화오더가 현재 한화 e-Sales 입력 진행 중입니다.'
-                : approveAfterOrder
-                    ? `이미 승인요청 포함 한화오더 대기열에 있습니다. 현재 ${hanwhaJobPosition(existing.id)}번째입니다.`
-                    : `이미 테스트 대기열에 있습니다. 현재 ${hanwhaJobPosition(existing.id)}번째입니다.`,
-            manualAction: existing.manualAction,
-            manualTitle: existing.manualTitle,
-            manualButtonLabel: existing.manualButtonLabel,
-        };
-    }
-
-    const job: HanwhaOrderJob = {
-        id: randomBytes(12).toString('hex'),
-        orderId,
-        orderNo: order.orderNo,
+    const queued = await enqueueBackgroundJob({
+        type: BACKGROUND_JOB_TYPES.HANWHA_NEW_ORDER,
+        queueKey: `hanwha-new-order:${orderId}`,
+        entityType: 'ORDER',
+        entityId: orderId,
+        title: `한화오더 ${order.orderNo}`,
+        message: approveAfterOrder
+            ? '한화 e-Sales 입력 후 승인요청 대기열에 등록했습니다. 곧 진행을 시작합니다.'
+            : '한화 e-Sales 입력 대기열에 등록했습니다. 곧 진행을 시작합니다.',
         requestedByUserId: session.user.id,
-        approveAfterOrder,
-        status: 'QUEUED',
-        queuedAt: Date.now(),
-    };
-    jobs.set(job.id, job);
-    queue.push(job);
-    const position = hanwhaJobPosition(job.id);
-
-    void processHanwhaOrderQueue();
+        metadata: {
+            orderId,
+            approveAfterOrder,
+            forceReorder: canReorder,
+        } satisfies HanwhaNewOrderJobMetadata,
+    });
+    const job = queued.job;
+    const metadata = parseJobJsonAs<HanwhaNewOrderJobMetadata>(job.metadata);
+    const position = job.status === 'QUEUED'
+        ? await prisma.backgroundJob.count({
+            where: {
+                type: BACKGROUND_JOB_TYPES.HANWHA_NEW_ORDER,
+                status: 'QUEUED',
+                queuedAt: { lte: job.queuedAt },
+            },
+        })
+        : 0;
 
     return {
         ok: true as const,
         jobId: job.id,
-        status: job.status,
+        status: job.status as HanwhaOrderJobStatus,
         position,
-        message: position === 1
-            ? (approveAfterOrder
-                ? '한화 e-Sales 입력 후 승인요청 대기열에 등록했습니다. 곧 진행을 시작합니다.'
-                : '한화 e-Sales 입력 대기열에 등록했습니다. 곧 진행을 시작합니다.')
-            : (approveAfterOrder
-                ? `다른 한화 e-Sales 작업이 진행 중입니다. 승인요청 포함 대기열 ${position}번째로 등록했습니다.`
-                : `다른 한화 e-Sales 입력이 진행 중입니다. 대기열 ${position}번째로 등록했습니다.`),
+        message: job.message ?? (job.status === 'WAITING_MANUAL_ACTION'
+            ? 'e-Sales에서 필요한 수동 조치를 완료한 뒤 계속 버튼을 눌러주세요.'
+            : job.status === 'RUNNING'
+                ? '한화오더가 현재 한화 e-Sales 입력 진행 중입니다.'
+                : position > 1
+                    ? `다른 한화 e-Sales 작업이 진행 중입니다. 대기열 ${position}번째입니다.`
+                    : '한화 e-Sales 입력 대기열에 등록했습니다. 곧 진행을 시작합니다.'),
+        manualAction: metadata?.manualAction,
+        manualTitle: metadata?.manualTitle,
+        manualButtonLabel: metadata?.manualButtonLabel,
     };
 }
 
@@ -2477,6 +2677,82 @@ export async function startHanwhaNewOrder(orderId: string) {
 
 export async function startHanwhaNewOrderWithApproval(orderId: string) {
     return enqueueHanwhaNewOrder(orderId, true);
+}
+
+export type HanwhaOrderStatusCheckStartResult =
+    | { ok: true; cached: true; message: string; status: string; rowText: string }
+    | { ok: true; queued: true; job: BackgroundJobView; message: string }
+    | { ok: false; error: string };
+
+export type HanwhaOrderStatusCheckJobResult =
+    | { ok: true; job: BackgroundJobView; status?: string; rowText?: string; message?: string }
+    | { ok: false; error: string };
+
+export async function startHanwhaOrderStatusCheck(orderId: string): Promise<HanwhaOrderStatusCheckStartResult> {
+    const session = await auth();
+    if (!session?.user) return { ok: false, error: '로그인이 필요합니다.' };
+    if (session.user.userKind !== 'staff') {
+        return { ok: false, error: '직원만 한화 주문상태확인을 실행할 수 있습니다.' };
+    }
+
+    const order = await prisma.order.findUnique({
+        where: { id: orderId },
+        select: {
+            id: true,
+            orderNo: true,
+            hanwhaStatusText: true,
+            hanwhaStatusRowText: true,
+            deletedAt: true,
+        },
+    });
+    if (!order || order.deletedAt) return { ok: false, error: '주문을 찾을 수 없습니다.' };
+
+    if (isApprovedHanwhaStatus(order.hanwhaStatusText)) {
+        return {
+            ok: true,
+            cached: true,
+            message: '한화 e-Sales 주문상태를 확인했습니다. 현재 상태: 승인',
+            status: '승인',
+            rowText: order.hanwhaStatusRowText ?? '',
+        };
+    }
+
+    const { job, created } = await enqueueBackgroundJob({
+        type: BACKGROUND_JOB_TYPES.HANWHA_ORDER_STATUS_CHECK,
+        queueKey: `HANWHA_ORDER_STATUS:${order.id}`,
+        entityType: 'ORDER',
+        entityId: order.id,
+        title: `주문상태확인 ${order.orderNo}`,
+        message: '한화 e-Sales 주문상태확인을 백그라운드에서 진행합니다.',
+        requestedByUserId: session.user.id,
+        metadata: { orderId: order.id },
+    });
+
+    return {
+        ok: true,
+        queued: true,
+        job: toBackgroundJobView(job),
+        message: created
+            ? '주문상태확인 작업을 등록했습니다. 완료되면 자동으로 반영됩니다.'
+            : '이 주문의 상태확인 작업이 이미 진행 중입니다. 완료되면 자동으로 반영됩니다.',
+    };
+}
+
+export async function getHanwhaOrderStatusCheckJobStatus(jobId: string): Promise<HanwhaOrderStatusCheckJobResult> {
+    const session = await auth();
+    if (!session?.user || session.user.userKind !== 'staff') return { ok: false, error: '권한이 없습니다.' };
+
+    const job = await prisma.backgroundJob.findUnique({ where: { id: jobId } });
+    if (!job) return { ok: false, error: '주문상태확인 작업을 찾을 수 없습니다.' };
+
+    const result = parseJobJsonAs<{ message?: string; status?: string; rowText?: string }>(job.result);
+    return {
+        ok: true,
+        job: toBackgroundJobView(job),
+        message: result?.message,
+        status: result?.status,
+        rowText: result?.rowText,
+    };
 }
 
 export async function checkHanwhaOrderStatus(orderId: string) {
@@ -2494,6 +2770,11 @@ export async function checkHanwhaOrderStatus(orderId: string) {
             createdAt: true,
             requestedDeliveryDate: true,
             hanwhaOrderedAt: true,
+            hanwhaStatusText: true,
+            hanwhaStatusRowText: true,
+            hanwhaStatusSource: true,
+            hanwhaStatusCheckedAt: true,
+            hanwhaStatusManualApprovedAt: true,
             deletedAt: true,
             customer: { select: { companyName: true } },
             deliveryAddress: {
@@ -2525,6 +2806,15 @@ export async function checkHanwhaOrderStatus(orderId: string) {
 
     if (!order || order.deletedAt) return { ok: false as const, error: '주문을 찾을 수 없습니다.' };
     if (!order.requestedDeliveryDate) return { ok: false as const, error: '도착일자가 없어 한화 주문상태를 확인할 수 없습니다.' };
+
+    if (isApprovedHanwhaStatus(order.hanwhaStatusText)) {
+        return {
+            ok: true as const,
+            message: '한화 e-Sales 주문상태를 확인했습니다. 현재 상태: 승인',
+            status: '승인',
+            rowText: order.hanwhaStatusRowText ?? '',
+        };
+    }
 
     const hanwhaItems = order.items.filter(isHanwhaOrderItem);
     if (hanwhaItems.length === 0) {
@@ -2565,6 +2855,17 @@ export async function checkHanwhaOrderStatus(orderId: string) {
     );
 
     if (!result.ok) return { ok: false as const, error: result.error };
+    await prisma.order.update({
+        where: { id: order.id },
+        data: {
+            hanwhaStatusText: result.status,
+            hanwhaStatusRowText: result.rowText,
+            hanwhaStatusCheckedAt: new Date(),
+            hanwhaStatusSource: 'ORDER_DETAIL_CHECK',
+        },
+    });
+    revalidatePath('/admin/today-shipping');
+    revalidatePath(`/admin/orders/${order.id}`);
     return {
         ok: true as const,
         message: result.message,
@@ -2599,101 +2900,78 @@ export async function completeHanwhaManualAction(jobId: string) {
         return { ok: false as const, error: '沅뚰븳???놁뒿?덈떎.' };
     }
 
-    const { jobs } = hanwhaQueue();
-    const job = jobs.get(jobId);
-    if (!job) return { ok: false as const, error: '?쒗솕 e-Sales ?묒뾽 ?뺣낫瑜?李얠쓣 ???놁뒿?덈떎.' };
+    const job = await prisma.backgroundJob.findUnique({ where: { id: jobId } });
+    if (!job || job.type !== BACKGROUND_JOB_TYPES.HANWHA_NEW_ORDER) {
+        return { ok: false as const, error: '?쒗솕 e-Sales ?묒뾽 ?뺣낫瑜?李얠쓣 ???놁뒿?덈떎.' };
+    }
     if (job.status !== 'WAITING_MANUAL_ACTION') {
         return { ok: false as const, error: '?섎룞 議곗튂 ?湲?以묒씤 ?묒뾽???꾨떃?덈떎.' };
     }
-    if (job.manualAction !== 'PRODUCT_SELECTION') {
+    const metadata = parseJobJsonAs<HanwhaNewOrderJobMetadata>(job.metadata);
+    if (metadata?.manualAction !== 'PRODUCT_SELECTION') {
         return { ok: false as const, error: '???섎룞 議곗튂???꾩쭅 ?먮룞 ?댁뼱媛湲곕? 吏?먰븯吏 ?딆뒿?덈떎.' };
     }
-    if (!job.resumeInput || job.resumeRowIndex == null) {
+    if (!metadata.resumeInput || metadata.resumeRowIndex == null) {
         return { ok: false as const, error: '?댁뼱媛湲??뺣낫媛 ?놁뼱 ?먮룞 ?낅젰???ш컻?????놁뒿?덈떎.' };
     }
 
-    job.status = 'RUNNING';
-    job.error = undefined;
-    job.message = '?섎룞 ?좏깮???덈ぉ ?댄썑 ?낅젰???댁뼱??吏꾪뻾 以묒엯?덈떎.';
+    await prisma.backgroundJob.update({
+        where: { id: job.id },
+        data: {
+            status: 'RUNNING',
+            error: null,
+            message: '?섎룞 ?좏깮???덈ぉ ?댄썑 ?낅젰???댁뼱??吏꾪뻾 以묒엯?덈떎.',
+            heartbeatAt: new Date(),
+        },
+    });
 
-    let continuation: {
-        result: Awaited<ReturnType<typeof resumeHanwhaESalesOrderAfterProductSelection>>;
-        postOrderMessage: string | null;
-    };
     try {
-        continuation = await runHanwhaAutomationQueued(
-            `?쒗솕?ㅻ뜑 ?댁뼱媛湲?${job.orderNo}`,
-            async () => {
-                const result = await resumeHanwhaESalesOrderAfterProductSelection(job.resumeInput!, job.resumeRowIndex!);
-                if (!result.ok) return { result, postOrderMessage: null };
-
-                job.message = job.approveAfterOrder
-                    ? `${result.message} 승인요청을 이어서 진행 중입니다.`
-                    : `${result.message} 주문 진행 조회와 체크를 이어서 진행 중입니다.`;
-
-                const postOrderMessage = await runHanwhaPostOrderStep(Boolean(job.approveAfterOrder), result.orderNo);
-                return { result, postOrderMessage };
-            },
+        const result = await runHanwhaAutomationQueued(
+            `?쒗솕?ㅻ뜑 ?댁뼱媛湲?${job.title}`,
+            () => resumeHanwhaNewOrderAfterProductSelection({ ...metadata, requestedByUserId: session.user.id }),
         );
+        await updateBackgroundJobResult(job.id, 'DONE', {
+            message: result.message,
+            result: { orderId: metadata.orderId },
+        });
+        revalidatePath('/admin');
+        revalidatePath('/admin/dispatch');
+        revalidatePath(`/admin/orders/${metadata.orderId}`);
+        return { ok: true as const, jobId: job.id, status: 'DONE' as const, message: result.message };
     } catch (error) {
-        job.status = 'FAILED';
-        job.finishedAt = Date.now();
-        job.error = error instanceof Error ? error.message : '한화 e-Sales 후속 처리 중 오류가 발생했습니다.';
-        return { ok: false as const, error: job.error };
-    }
-    const { result, postOrderMessage } = continuation;
-
-    if (!result.ok) {
-        if (result.manualAction === 'PRODUCT_SELECTION') {
-            job.status = 'WAITING_MANUAL_ACTION';
-            job.resumeRowIndex = result.rowIndex ?? job.resumeRowIndex;
-            job.manualAction = result.manualAction;
-            job.manualTitle = result.manualTitle ?? job.manualTitle;
-            job.manualButtonLabel = result.manualButtonLabel ?? job.manualButtonLabel;
-            job.message = result.error;
+        if (error instanceof HanwhaProductSelectionRequiredError) {
+            const waitingMetadata: HanwhaNewOrderJobMetadata = {
+                ...metadata,
+                resumeInput: error.resumeInput,
+                resumeRowIndex: error.resumeRowIndex,
+                manualAction: 'PRODUCT_SELECTION',
+                manualTitle: error.manualTitle,
+                manualButtonLabel: error.manualButtonLabel,
+            };
+            await prisma.backgroundJob.update({
+                where: { id: job.id },
+                data: {
+                    status: 'WAITING_MANUAL_ACTION',
+                    message: error.message,
+                    error: null,
+                    metadata: JSON.stringify(waitingMetadata),
+                    heartbeatAt: new Date(),
+                },
+            });
             return {
                 ok: true as const,
                 jobId: job.id,
-                status: job.status,
-                message: result.error,
-                manualAction: job.manualAction,
-                manualTitle: job.manualTitle,
-                manualButtonLabel: job.manualButtonLabel,
+                status: 'WAITING_MANUAL_ACTION' as const,
+                message: error.message,
+                manualAction: waitingMetadata.manualAction,
+                manualTitle: waitingMetadata.manualTitle,
+                manualButtonLabel: waitingMetadata.manualButtonLabel,
             };
         }
-        job.status = 'FAILED';
-        job.finishedAt = Date.now();
-        job.error = result.error;
-        return { ok: false as const, error: result.error };
+        const message = error instanceof Error ? error.message : '한화 e-Sales 후속 처리 중 오류가 발생했습니다.';
+        await updateBackgroundJobResult(job.id, 'FAILED', { error: message });
+        return { ok: false as const, error: message };
     }
-
-    job.status = 'DONE';
-    job.finishedAt = Date.now();
-    job.message = `${result.message} ${postOrderMessage}`;
-    await prisma.order.update({
-        where: { id: job.orderId },
-        data: { hanwhaOrderedAt: new Date() },
-    });
-    await prisma.orderStatusHistory.create({
-        data: {
-            orderId: job.orderId,
-            previousStatus: OrderStatus.APPROVED,
-            newStatus: OrderStatus.APPROVED,
-            changedByUserId: session.user.id,
-            changeReason: job.approveAfterOrder
-                ? `[?쒗솕 e-Sales] ?섎룞 ?덈ぉ ?좏깮 ???由ъ젏?ㅻ뜑 ?먮룞 ?낅젰 諛??뱀씤?붿껌 ?꾨즺 (${job.orderNo})`
-                : `[?쒗솕 e-Sales] ?섎룞 ?덈ぉ ?좏깮 ???由ъ젏?ㅻ뜑 ?먮룞 ?낅젰 諛?議고쉶/泥댄겕 ?꾨즺 (${job.orderNo})`,
-        },
-    }).catch(() => undefined);
-    revalidatePath(`/admin/orders/${job.orderId}`);
-    void processHanwhaOrderQueue();
-
-    return {
-        ok: true as const,
-        jobId: job.id,
-        status: job.status,
-        message: job.message,
-    };
 }
 
 export async function completeHanwhaProductSelection(jobId: string) {

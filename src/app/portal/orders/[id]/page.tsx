@@ -8,7 +8,6 @@ import { hanwhaDriverInfo, joinHanwhaDriverInfo, parseHanwhaMaterialFromMemo } f
 import { statusLabel, statusColor, fmtDate, fmtDateTime, fmtNumber } from '@/lib/orders';
 import { ArrowLeft, MapPin, Calendar, FileText, Clock } from 'lucide-react';
 import CancelButton from './CancelButton';
-import BackButton from '@/components/BackButton';
 import DeliveryDateChangeRequestButton from './DeliveryDateChangeRequestButton';
 import HomepageArchiveLink from '@/components/HomepageArchiveLink';
 
@@ -31,13 +30,22 @@ export default async function PortalOrderDetail({
             customer: true,
             deliveryAddress: true,
             items: { include: { product: true } },
-            statusHistory: { orderBy: { createdAt: 'asc' } },
+            statusHistory: {
+                orderBy: { createdAt: 'asc' },
+                select: { id: true, createdAt: true, newStatus: true },
+            },
             deliveryDateChangeRequests: { orderBy: { createdAt: 'desc' }, take: 3 },
         },
     });
 
     if (!order || order.customerId !== session.user.customerId || order.deletedAt) notFound();
 
+    const deliveryAddress = order.deliveryAddress;
+    const deliveryLabel = deliveryAddress?.label ?? '도착지 미지정';
+    const deliveryAddressText = [
+        deliveryAddress?.addressLine1,
+        deliveryAddress?.addressLine2,
+    ].filter(Boolean).join(' ');
     const dispatchRows = await prisma.hanwhaDispatchRow.findMany({
         where: { matchedOrderId: order.id },
         orderBy: [{ createdAt: 'asc' }],
@@ -59,7 +67,7 @@ export default async function PortalOrderDetail({
         }))
         : hanwhaDispatches.map((dispatch) => ({
             id: dispatch.id,
-            indoChiName: order.deliveryAddress.label,
+            indoChiName: deliveryLabel,
             materialNameRaw: dispatch.hanwhaMaterialNameRaw ?? parseHanwhaMaterialFromMemo(dispatch.memo),
             materialName: dispatch.hanwhaMaterialName ?? parseHanwhaMaterialFromMemo(dispatch.memo),
             quantityTon: dispatch.hanwhaQuantityTon,
@@ -118,14 +126,15 @@ export default async function PortalOrderDetail({
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6 text-sm">
                         <Info icon={<MapPin size={14} />} label="도착지">
-                            <span className="font-medium">{order.deliveryAddress.label}</span>
-                            <span className="block text-xs text-slate-500">
-                                {order.deliveryAddress.addressLine1}
-                                {order.deliveryAddress.addressLine2 ? ` ${order.deliveryAddress.addressLine2}` : ''}
-                            </span>
-                            {order.deliveryAddress.contactPhone && (
+                            <span className="font-medium">{deliveryLabel}</span>
+                            {deliveryAddressText && (
                                 <span className="block text-xs text-slate-500">
-                                    전화번호 {order.deliveryAddress.contactPhone}
+                                    {deliveryAddressText}
+                                </span>
+                            )}
+                            {deliveryAddress?.contactPhone && (
+                                <span className="block text-xs text-slate-500">
+                                    전화번호 {deliveryAddress.contactPhone}
                                 </span>
                             )}
                         </Info>
@@ -165,7 +174,7 @@ export default async function PortalOrderDetail({
                                 {order.items.map((it) => (
                                     <tr key={it.id}>
                                         <td className="px-6 py-3 font-medium text-slate-800">
-                                            {it.product.productName}
+                                            {it.product?.productName ?? '제품 정보 없음'}
                                         </td>
                                         <td className="px-6 py-3 text-right text-slate-700">
                                             {fmtNumber(it.requestedQuantity)} {it.unit}
@@ -199,11 +208,6 @@ export default async function PortalOrderDetail({
                                 >
                                     {statusLabel(h.newStatus)}
                                 </span>
-                                {h.changeReason && (
-                                    <span className="text-xs text-slate-500 ml-2">
-                                        {h.changeReason}
-                                    </span>
-                                )}
                             </li>
                         ))}
                     </ul>

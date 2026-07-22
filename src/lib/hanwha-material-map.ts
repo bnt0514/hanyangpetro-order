@@ -16,7 +16,7 @@ const MATERIALS_BY_STANDARD_NAME: Record<string, string[]> = {
     'LDPE<5303>': ['MF_LD_5303_FFS_LD1'],
     'LDPE<963>': ['MF_LD_963_FB750_LD2', 'MF_LD_963_FFS_LD2'],
     'LDPE<5302>': ['MF_LD_5302_FFS_LD1'],
-    'HDPE<7600>': ['MF_HD_7600_FFS_LP3'],
+    'HDPE<7600>': ['MF_HD_7600_FFS_LP2'],
     'LLDPE<9730>': ['MF_LLD_9730_FFS_LP1'],
     'LDPE<303>': ['MF_LD_303_FFS_LD'],
     'LDPE<749>': ['MF_LD_749_FFS_LD1'],
@@ -42,6 +42,7 @@ const MATERIALS_BY_STANDARD_NAME: Record<string, string[]> = {
     'HDPE<8380>': ['MF_HD_8380_FFS_LP2'],
     'mLLDPE<M1810HC>': ['MF_LLD_M1810HC_FFS_LP1/LP 2', 'MF_LLD_M1810HC_FB700_LP1/LP 2'],
     'LDPE<5301>': ['MF_LD_5301_FFS_LD1'],
+    'PCR LDPE<R5301>': ['CN_LD_R5301_JID_LD1'],
     'LDPE<5321A>': ['MF_LD_5321A_FB500_LD1', 'MF_LD_5321A_FFS_LD1'],
 };
 
@@ -107,7 +108,7 @@ export function resolveHanwhaMaterialName(input: {
             if (sewMaterial) return sewMaterial;
         }
         const exactBagMaterial = mapped.find((material) => materialBagRank(material, bagType) === 0);
-        return exactBagMaterial ?? fallbackMaterialName(input.productName, bagType);
+        return exactBagMaterial ?? (bagType === 'FFS' && mapped.length === 1 ? mapped[0] : fallbackMaterialName(input.productName, bagType));
     }
 
     const explicit = input.explicitMaterialName?.trim();

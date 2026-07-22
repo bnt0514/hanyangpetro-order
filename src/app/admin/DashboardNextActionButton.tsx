@@ -5,37 +5,45 @@ import { useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { CheckCircle2, Loader2, Truck } from 'lucide-react';
 import { changeOrderStatus } from '@/app/orders/actions';
-import { confirmOrderReceipt } from '@/app/dispatch/actions';
 
-type NextAction =
-    | { kind: 'status'; nextStatus: string; label: string; confirmMessage: string; tone: 'emerald' | 'sky' }
-    | { kind: 'receipt'; label: string; confirmMessage: string; tone: 'teal' };
+type NextAction = {
+    nextStatus: string;
+    label: string;
+    confirmMessage: string;
+    tone: 'emerald' | 'sky' | 'orange';
+};
 
 function nextActionForStatus(status: string): NextAction | null {
-    if (status === 'REQUESTED' || status === 'PENDING_SALES_REVIEW' || status === 'ON_HOLD') {
+    if (status === 'REQUESTED') {
         return {
-            kind: 'status',
             nextStatus: 'APPROVED',
             label: '오더 승인',
             confirmMessage: '이 주문을 승인 처리할까요?',
             tone: 'emerald',
         };
     }
-    if (status === 'DISPATCH_WAITING' || status === 'DISPATCHING') {
+    if (status === 'CREDIT_OVER_LIMIT') {
         return {
-            kind: 'status',
-            nextStatus: 'DISPATCH_COMPLETED',
-            label: '배차 완료',
-            confirmMessage: '이 주문을 배차 완료 처리할까요?',
+            nextStatus: 'APPROVED',
+            label: '오더 승인',
+            confirmMessage: '여신 승인 상태를 확인한 뒤 이 주문을 승인 처리할까요?',
+            tone: 'emerald',
+        };
+    }
+    if (status === 'APPROVED') {
+        return {
+            nextStatus: 'DISPATCHING',
+            label: '배차로 보내기',
+            confirmMessage: '이 주문을 배차중으로 변경할까요?',
             tone: 'sky',
         };
     }
-    if (status === 'DISPATCH_COMPLETED' || status === 'DELIVERY_CONFIRM_PENDING') {
+    if (status === 'DISPATCH_COMPLETED') {
         return {
-            kind: 'receipt',
-            label: '입고 완료',
-            confirmMessage: '정말 입고 완료 처리할까요?\n\n완료 후 상태가 변경됩니다.',
-            tone: 'teal',
+            nextStatus: 'SHIPPED',
+            label: '출고완료',
+            confirmMessage: '이 주문을 출고완료 처리할까요?',
+            tone: 'orange',
         };
     }
     return null;
@@ -44,7 +52,7 @@ function nextActionForStatus(status: string): NextAction | null {
 const toneClass: Record<NextAction['tone'], string> = {
     emerald: 'bg-emerald-600 hover:bg-emerald-700',
     sky: 'bg-sky-600 hover:bg-sky-700',
-    teal: 'bg-teal-600 hover:bg-teal-700',
+    orange: 'bg-orange-600 hover:bg-orange-700',
 };
 
 export default function DashboardNextActionButton({ orderId, currentStatus }: { orderId: string; currentStatus: string }) {
@@ -60,24 +68,21 @@ export default function DashboardNextActionButton({ orderId, currentStatus }: { 
         if (!window.confirm(action!.confirmMessage)) return;
 
         startTransition(async () => {
-            const result = action!.kind === 'receipt'
-                ? await confirmOrderReceipt(orderId, '대시보드에서 입고 완료 처리')
-                : await changeOrderStatus(orderId, action!.nextStatus, `[대시보드 빠른처리] ${action!.label}`);
+            const result = await changeOrderStatus(orderId, action!.nextStatus, `[대시보드 빠른처리] ${action!.label}`);
 
             if (!result.ok) {
                 window.alert(result.error);
                 return;
             }
 
-            const changedStatus = action!.kind === 'receipt' ? 'COMPLETED' : action!.nextStatus;
             window.dispatchEvent(new CustomEvent('dashboard-order-status-changed', {
-                detail: { orderId, status: changedStatus },
+                detail: { orderId, status: action!.nextStatus },
             }));
             router.refresh();
         });
     }
 
-    const Icon = action.kind === 'receipt' ? CheckCircle2 : action.nextStatus === 'DISPATCH_COMPLETED' ? Truck : CheckCircle2;
+    const Icon = action.nextStatus === 'DISPATCHING' ? Truck : CheckCircle2;
 
     return (
         <button

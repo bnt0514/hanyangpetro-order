@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { saveDeliveryAddress, updateCustomer } from '../actions';
+import { deleteDeliveryAddress, saveDeliveryAddress, updateCustomer } from '../actions';
 import { useF8SaveShortcut } from '@/hooks/useF8SaveShortcut';
 
 type CustomerVM = {
@@ -104,6 +104,29 @@ export default function CustomerEditor({ customer, addresses, staffUsers }: { cu
                 return;
             }
             setMessage('도착지가 저장되었습니다.');
+            router.refresh();
+        });
+    }
+
+    function deleteAddress() {
+        if (selectedAddressId === 'new') return;
+        const label = selectedAddress?.label || addressForm.label || '선택한 도착지';
+        const confirmed = window.confirm(`${label} 도착지를 삭제할까요?\n기존 주문 기록은 유지되고, 새 주문 선택 목록에서는 숨겨집니다.`);
+        if (!confirmed) return;
+
+        setMessage(null);
+        startTransition(async () => {
+            const result = await deleteDeliveryAddress({
+                customerId: customer.id,
+                addressId: selectedAddressId,
+            });
+            if (!result.ok) {
+                setMessage(result.error);
+                return;
+            }
+            setSelectedAddressId('new');
+            setAddressForm({ ...emptyAddress });
+            setMessage('도착지가 삭제되었습니다.');
             router.refresh();
         });
     }
@@ -225,9 +248,16 @@ export default function CustomerEditor({ customer, addresses, staffUsers }: { cu
                                 사용중
                             </label>
                         </div>
-                        <button type="button" disabled={pending} onClick={saveAddress} title="이 영역에서 F8로도 저장할 수 있습니다" className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
-                            도착지 저장 (F8)
-                        </button>
+                        <div className="flex items-center gap-2">
+                            {selectedAddressId !== 'new' && (
+                                <button type="button" disabled={pending} onClick={deleteAddress} className="rounded-xl border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-60">
+                                    삭제
+                                </button>
+                            )}
+                            <button type="button" disabled={pending} onClick={saveAddress} title="이 영역에서 F8로도 저장할 수 있습니다" className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
+                                도착지 저장 (F8)
+                            </button>
+                        </div>
                     </div>
                 </div>
             </section>

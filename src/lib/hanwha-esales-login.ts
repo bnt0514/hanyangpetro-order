@@ -1,6 +1,7 @@
 ﻿import type { Page } from 'playwright';
 
 import path from 'path';
+import { installPlaywrightEvaluateNameShim } from '@/lib/playwright-evaluate-shim';
 
 export type HanwhaESalesLoginResult =
     | { ok: true; message: string; orderNo?: string | null }
@@ -46,6 +47,30 @@ export type HanwhaESalesOrderStatusItem = {
     quantity: number;
 };
 
+export type HanwhaESalesOrderDetailLine = {
+    itemCode: string;
+    materialName: string;
+    quantity: number | null;
+    deliveryDate: string;
+    cells: string[];
+};
+
+export type HanwhaESalesTodayShipmentStatusRow = {
+    rowIndex: number;
+    orderDateYmd?: string | null;
+    orderNo?: string | null;
+    shipToName?: string | null;
+    deliveryDateYmd?: string | null;
+    status: string;
+    rowText: string;
+    rawCells: string[];
+    detailLines: HanwhaESalesOrderDetailLine[];
+};
+
+export type HanwhaESalesTodayShipmentStatusResult =
+    | { ok: true; message: string; rows: HanwhaESalesTodayShipmentStatusRow[] }
+    | { ok: false; error: string; errorCode?: string };
+
 const ESALES_LOGIN_URL = 'https://esales.hanwhasolutions.com/esplus/resources/login.html';
 const REMOTE_DEBUGGING_PORT = 9224;
 const AUTOMATION_WINDOW_NAME_PREFIX = 'hanyangpetro-esales-automation:';
@@ -57,6 +82,14 @@ function chromePath() {
 
 function controlledProfileDir() {
     return path.join(process.cwd(), 'tmp', 'hanwha-esales-controlled-profile');
+}
+
+function controlledChromeLogFile() {
+    return path.join(process.cwd(), 'tmp', 'hanwha-esales-chrome.log');
+}
+
+function controlledChromeLauncher() {
+    return path.join(process.cwd(), 'scripts', 'launch-hanwha-controlled-chrome.cjs');
 }
 
 function sleep(ms: number) {
@@ -177,18 +210,18 @@ async function isCdpOpen() {
 
 async function launchControlledChrome() {
     const { spawn } = await import('child_process');
-    const child = spawn(chromePath(), [
-        `--remote-debugging-port=${REMOTE_DEBUGGING_PORT}`,
-        `--user-data-dir=${controlledProfileDir()}`,
-        '--no-first-run',
-        '--disable-session-crashed-bubble',
-        '--hide-crash-restore-bubble',
-        '--new-window',
-        ESALES_LOGIN_URL,
-    ], {
-        detached: true,
+    const child = spawn(process.execPath, [controlledChromeLauncher()], {
+        detached: false,
         stdio: 'ignore',
-        windowsHide: false,
+        windowsHide: true,
+        env: {
+            ...process.env,
+            CHROME_PATH: chromePath(),
+            HANWHA_ESALES_CDP_PORT: String(REMOTE_DEBUGGING_PORT),
+            HANWHA_ESALES_PROFILE_DIR: controlledProfileDir(),
+            HANWHA_ESALES_LOGIN_URL: ESALES_LOGIN_URL,
+            CHROME_LOG_FILE: controlledChromeLogFile(),
+        },
     });
     child.unref();
 }
@@ -200,6 +233,28 @@ async function ensureCdp() {
     await waitForCdp();
 }
 
+async function connectToControlledChrome() {
+    const { chromium } = await import('playwright');
+    let lastError: unknown;
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+        await ensureCdp();
+        try {
+            return await chromium.connectOverCDP(
+                `http://127.0.0.1:${REMOTE_DEBUGGING_PORT}`,
+                { timeout: 30_000 },
+            );
+        } catch (error) {
+            lastError = error;
+            if (attempt === 0) await sleep(1000);
+        }
+    }
+
+    throw lastError instanceof Error
+        ? lastError
+        : new Error('한화 e-Sales Chrome 연결에 실패했습니다.');
+}
+
 async function hasVisibleSelector(page: Page, selector: string) {
     return page.evaluate((selector) => {
         return Array.from(document.querySelectorAll(selector))
@@ -209,31 +264,44 @@ async function hasVisibleSelector(page: Page, selector: string) {
 
 async function hasLoggedInESalesShell(page: Page) {
     return page.evaluate(() => {
-        function visible(el: Element | null): el is HTMLElement {
+        function exposed(el: Element | null): el is HTMLElement {
             if (!el || !(el instanceof HTMLElement)) return false;
             const rect = el.getBoundingClientRect();
             const style = getComputedStyle(el);
-            return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
+            if (
+                rect.width <= 0
+                || rect.height <= 0
+                || style.display === 'none'
+                || style.visibility === 'hidden'
+                || rect.right <= 0
+                || rect.bottom <= 0
+                || rect.left >= innerWidth
+                || rect.top >= innerHeight
+            ) return false;
+            const x = Math.min(innerWidth - 1, Math.max(0, rect.left + rect.width / 2));
+            const y = Math.min(innerHeight - 1, Math.max(0, rect.top + rect.height / 2));
+            const top = document.elementFromPoint(x, y);
+            return Boolean(top && (top === el || el.contains(top) || top.contains(el)));
         }
         function textOf(el: Element | null) {
             return (el?.textContent || '').replace(/\s+/g, ' ').trim();
         }
+        // A countdown can survive after the server session is gone. Require
+        // an authenticated navigation/work area before treating the shell as active.
         const shellSelectors = [
+            'div[id*="frameLeft.form.divLeft.form.grdTree"]',
             'div[id*="winESDMY-10-400"]',
-            'div[id*="frameLeft.form.divLeft"]',
             'div[id*="frameNavi.form.divTab"]',
-            'div[id*="frameBottom.form.btnExtension"]',
-            'div[id*="frameBottom.form.staTime"]',
-            'div[id*="frameTop"]',
             'div[id*="POP_ORDER_REG"]',
             'div[id*="ESD_PARTNER_INFO_V"]',
             'div[id*="ESD_SALES_ITEM_V"]',
         ];
-        if (shellSelectors.some((selector) => Array.from(document.querySelectorAll(selector)).some(visible))) {
+        if (shellSelectors.some((selector) => Array.from(document.querySelectorAll(selector)).some(exposed))) {
             return true;
         }
+        if (exposed(document.querySelector('input[id*="frameLogin"][id*="edtId"]'))) return false;
         const visibleText = Array.from(document.querySelectorAll('div,button,[role="button"],[role="treeitem"]'))
-            .filter(visible)
+            .filter(exposed)
             .map(textOf)
             .join(' ');
         if (
@@ -248,23 +316,30 @@ async function hasLoggedInESalesShell(page: Page) {
     }).catch(() => false);
 }
 
-async function getESalesPage() {
-    await ensureCdp();
+function isExpiredESalesPageUrl(url: string) {
+    return /session(?:30)?out/i.test(url);
+}
 
-    const { chromium } = await import('playwright');
-    const browser = await chromium.connectOverCDP(`http://127.0.0.1:${REMOTE_DEBUGGING_PORT}`);
+async function getESalesPage() {
+    const browser = await connectToControlledChrome();
     const context = browser.contexts()[0] ?? await browser.newContext();
     const esalesPages = context.pages().filter((candidate) => candidate.url().includes('esales.hanwhasolutions.com'));
     let page: Page | undefined;
     for (const candidate of esalesPages) {
+        await installPlaywrightEvaluateNameShim(candidate);
         if (await hasLoggedInESalesShell(candidate)) {
             page = candidate;
             break;
         }
     }
-    page ??= esalesPages[0];
+    page ??= esalesPages.find((candidate) => candidate.url().includes('/login.html')) ?? esalesPages[0];
+    if (page) await installPlaywrightEvaluateNameShim(page);
     if (!page) {
         page = await context.newPage();
+        await installPlaywrightEvaluateNameShim(page);
+        await page.goto(ESALES_LOGIN_URL, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+    } else if (isExpiredESalesPageUrl(page.url())) {
+        // Reuse the controlled e-Sales tab. Do not close it or create another tab.
         await page.goto(ESALES_LOGIN_URL, { waitUntil: 'domcontentloaded', timeout: 60_000 });
     }
     await page.bringToFront();
@@ -687,29 +762,59 @@ async function setNexacroValues(page: Page, values: Array<{ selector: string; va
     }
 }
 
-async function loginAndSendOtp(page: Page, input: { username: string; password: string }) {
+async function loginAndSendOtp(
+    page: Page,
+    input: { username: string; password: string },
+    forceLogin = false,
+) {
     await page.waitForTimeout(1500);
-    if (await hasLoggedInESalesShell(page)) return false;
+    if (!forceLogin && await hasLoggedInESalesShell(page)) return false;
 
     const userSelector = 'input[id$="frameLogin.form.divLogin.form.edtId:input"]';
     const passwordSelector = 'input[id$="frameLogin.form.divLogin.form.edtPw:input"]';
-    const hasLoginForm = await hasVisibleSelector(page, userSelector);
-    if (!hasLoginForm) return false;
+    let hasLoginForm = false;
+    for (let attempt = 0; attempt < 120; attempt += 1) {
+        hasLoginForm = await hasVisibleSelector(page, userSelector);
+        if (hasLoginForm) break;
+        const otpVisible = await page.locator('div[id$="frm_LoginOTP.form.btnSendOTP"]').first().isVisible().catch(() => false);
+        if (otpVisible) {
+            await clickBySuffixOrText(page, ['frm_LoginOTP.form.btnSendOTP'], ['send']);
+            await page.waitForTimeout(1000);
+            return true;
+        }
+        if (!forceLogin && await hasLoggedInESalesShell(page)) return false;
+        await page.waitForTimeout(250);
+    }
+    if (!hasLoginForm) {
+        if (forceLogin) {
+            throw new Error('한화 e-Sales 강제 로그인 화면이 준비되지 않아 OTP를 전송하지 못했습니다.');
+        }
+        return false;
+    }
 
     await fillInput(page, userSelector, input.username);
     await fillInput(page, passwordSelector, input.password);
     await clickBySuffixOrText(page, ['btnLogin'], ['login']);
     await page.waitForTimeout(1500);
-    if (await hasLoggedInESalesShell(page)) return false;
+    if (!forceLogin && await hasLoggedInESalesShell(page)) return false;
     await clickBySuffixOrText(page, ['POP_LOGIN_OTP_NOTI.form.btnClose'], ['close'], 4000).catch(() => undefined);
     await page.waitForTimeout(800);
-    if (await hasLoggedInESalesShell(page)) return false;
+    if (!forceLogin && await hasLoggedInESalesShell(page)) return false;
 
-    const otpVisible = await page.locator('div[id$="frm_LoginOTP.form.btnSendOTP"]').first().isVisible().catch(() => false);
-    if (!otpVisible) return false;
-    await clickBySuffixOrText(page, ['frm_LoginOTP.form.btnSendOTP'], ['send']);
-    await page.waitForTimeout(1000);
-    return true;
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+        const otpVisible = await page.locator('div[id$="frm_LoginOTP.form.btnSendOTP"]').first().isVisible().catch(() => false);
+        if (otpVisible) {
+            await clickBySuffixOrText(page, ['frm_LoginOTP.form.btnSendOTP'], ['send']);
+            await page.waitForTimeout(1000);
+            return true;
+        }
+        if (!forceLogin && await hasLoggedInESalesShell(page)) return false;
+        await page.waitForTimeout(250);
+    }
+    if (forceLogin) {
+        throw new Error('한화 e-Sales 강제 로그인 후 OTP 전송 버튼을 찾지 못했습니다.');
+    }
+    return false;
 }
 
 async function waitForOrderMenu(page: Page) {
@@ -1637,6 +1742,18 @@ async function clickMainSearchButtonAndWaitForRows(
     throw new Error(`한화 e-Sales 주문 진행 조회 결과가 없습니다. 조회 기간(${orderDateFromYmd}~${orderDateToYmd})을 확인해주세요.`);
 }
 
+async function clearESalesSessionForForcedLogin(page: Page) {
+    // This runs only after the controlled browser was lost or Windows rebooted.
+    // The profile is dedicated to e-Sales, so clearing it cannot affect a user's normal browser session.
+    await page.context().clearCookies();
+    await page.evaluate(() => {
+        window.localStorage.clear();
+        window.sessionStorage.clear();
+    }).catch(() => undefined);
+    await page.goto(ESALES_LOGIN_URL, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+    await page.waitForTimeout(800);
+}
+
 async function clickMainSearchButton(page: Page) {
     await clickNexacro(page, [
         'div[id*="winESDMY-10-400"][id$="form.divTitle.form.btnSearch"]',
@@ -1942,13 +2059,7 @@ type OrderStatusListRow = {
     score: number;
 };
 
-type OrderDetailLine = {
-    itemCode: string;
-    materialName: string;
-    quantity: number | null;
-    deliveryDate: string;
-    cells: string[];
-};
+type OrderDetailLine = HanwhaESalesOrderDetailLine;
 
 async function findOrderStatusRows(page: Page, shipToName: string) {
     const target = normalizeOrderMatchText(shipToName);
@@ -2129,6 +2240,14 @@ function orderStatusItemsMatch(actualLines: OrderDetailLine[], expectedItems: Ha
     });
 }
 
+export function hanwhaOrderStatusItemsMatch(
+    actualLines: HanwhaESalesOrderDetailLine[],
+    expectedItems: HanwhaESalesOrderStatusItem[],
+    deliveryDateYmd: string,
+) {
+    return orderStatusItemsMatch(actualLines, expectedItems, deliveryDateYmd);
+}
+
 async function findMatchingOrderStatusRow(page: Page, input: {
     shipToName: string;
     deliveryDateYmd: string;
@@ -2160,6 +2279,149 @@ async function checkOrderStatusFromOrderList(page: Page, input: {
     await openOrderInputList(page);
     await clickMainSearchButtonAndWaitForRows(page, input.orderDateFromYmd, input.orderDateToYmd);
     return findMatchingOrderStatusRow(page, input);
+}
+
+type OrderStatusRawListRow = {
+    id: string;
+    rowIndex: number;
+    rowText: string;
+    rawCells: string[];
+    status: string;
+    orderNo: string | null;
+    shipToName: string | null;
+    deliveryDateYmd: string | null;
+};
+
+async function readOrderStatusRawListRows(page: Page, targetDeliveryDateYmds: string[]): Promise<OrderStatusRawListRow[]> {
+    return page.evaluate((targetYmds) => {
+        function visible(el: Element | null): el is HTMLElement {
+            if (!el || !(el instanceof HTMLElement)) return false;
+            const rect = el.getBoundingClientRect();
+            const style = getComputedStyle(el);
+            return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
+        }
+        function textOf(el: Element | null) {
+            return (el?.textContent || '').replace(/\s+/g, ' ').trim();
+        }
+        function cellIndex(id: string) {
+            const match = id.match(/\.cell_-?\d+_(\d+)$/);
+            return match ? Number(match[1]) : 0;
+        }
+        function rowIndex(id: string) {
+            const match = id.match(/gridrow_(-?\d+)/);
+            return match ? Number(match[1]) : 0;
+        }
+        function ymd(value: string | null | undefined) {
+            const digits = (value ?? '').replace(/\D/g, '');
+            return digits.length === 8 ? digits : '';
+        }
+        function isGridCell(el: Element | null): el is HTMLElement {
+            return !!el
+                && el instanceof HTMLElement
+                && visible(el)
+                && el.classList.contains('GridCellControl')
+                && /\.cell_\d+_\d+$/.test(el.id);
+        }
+        function orderNoCandidate(cells: string[]) {
+            return cells.find((cell) => /^[A-Z0-9][A-Z0-9-]{5,}$/.test(cell) && !ymd(cell) && !/^\d+(\.\d+)?$/.test(cell)) ?? null;
+        }
+        function shipToCandidate(cells: string[]) {
+            const rejected = new Set(['승인', '승인요청', '저장', '완료', '반려', '취소']);
+            return cells.find((cell) => {
+                if (!cell || rejected.has(cell)) return false;
+                if (ymd(cell) || /^\d+(\.\d+)?$/.test(cell)) return false;
+                if (/^MF_|_FFS|_FB\d+/i.test(cell)) return false;
+                return /[가-힣A-Za-z]/.test(cell) && cell.length >= 2 && cell.length <= 40;
+            }) ?? null;
+        }
+
+        const targetSet = new Set(targetYmds);
+        const rows = Array.from(document.querySelectorAll('div[id*="winESDMY-10-400"][id*="form.divWork.form.grdMain.body.gridrow_"]'))
+            .filter((el): el is HTMLElement => el instanceof HTMLElement && visible(el) && /\.body\.gridrow_\d+$/.test(el.id))
+            .sort((a, b) => rowIndex(a.id) - rowIndex(b.id));
+
+        return rows.map((row) => {
+            const rawCells = Array.from(row.querySelectorAll('div[id*=".cell_"]'))
+                .filter(isGridCell)
+                .sort((a, b) => cellIndex(a.id) - cellIndex(b.id))
+                .map(textOf);
+            const nonEmptyCells = rawCells.filter(Boolean);
+            const rowText = textOf(row);
+            const dates = rawCells.map(ymd).filter(Boolean);
+            return {
+                id: row.id,
+                rowIndex: rowIndex(row.id),
+                rowText,
+                rawCells,
+                status: rawCells[12] || nonEmptyCells.at(-1) || '',
+                orderNo: orderNoCandidate(rawCells),
+                shipToName: shipToCandidate(rawCells),
+                deliveryDateYmd: dates.find((date) => targetSet.has(date)) ?? dates.at(-1) ?? null,
+            };
+        });
+    }, targetDeliveryDateYmds);
+}
+
+async function waitForOrderStatusRawListRows(page: Page, targetDeliveryDateYmds: string[], timeoutMs = 8_000) {
+    const started = Date.now();
+    let lastRows: OrderStatusRawListRow[] = [];
+    while (Date.now() - started < timeoutMs) {
+        lastRows = await readOrderStatusRawListRows(page, targetDeliveryDateYmds);
+        if (lastRows.length > 0) return lastRows;
+        await page.waitForTimeout(300);
+    }
+    return lastRows;
+}
+
+async function readTodayShipmentStatusRows(
+    page: Page,
+    orderDateFromYmd: string,
+    targetDeliveryDateYmds: string[],
+    orderDateToYmd = orderDateFromYmd,
+) {
+    await openOrderInputList(page);
+    await focusNexacroWindowTab(page, 'winESDMY-10-400');
+    await fillOrderListDateRange(page, orderDateFromYmd, orderDateToYmd);
+    await clickMainSearchButton(page);
+
+    const rows = await waitForOrderStatusRawListRows(page, targetDeliveryDateYmds);
+    const targetSet = new Set(targetDeliveryDateYmds);
+    const rowsWithTargetDate = rows.filter((row) =>
+        targetDeliveryDateYmds.some((target) => sameDateDigits(row.deliveryDateYmd, target))
+        || row.rawCells.some((cell) => targetSet.has((cell ?? '').replace(/\D/g, '')))
+    );
+    const rowsToInspect = rowsWithTargetDate.length > 0 ? rowsWithTargetDate : rows;
+    const result: HanwhaESalesTodayShipmentStatusRow[] = [];
+
+    for (const row of rowsToInspect) {
+        let detailLines: OrderDetailLine[] = [];
+        try {
+            await openOrderStatusDetailPopup(page, row.id);
+            detailLines = await waitForOrderStatusDetailLines(page);
+        } catch {
+            detailLines = [];
+        } finally {
+            await closeVisibleESalesPopups(page).catch(() => undefined);
+        }
+
+        const rawRowMatchesTarget = targetDeliveryDateYmds.some((target) => sameDateDigits(row.deliveryDateYmd, target))
+            || row.rawCells.some((cell) => targetSet.has((cell ?? '').replace(/\D/g, '')));
+        const detailMatchesTarget = detailLines.some((line) => targetDeliveryDateYmds.some((target) => datesEqual(line.deliveryDate, target)));
+        if (!rawRowMatchesTarget && !detailMatchesTarget) continue;
+
+        result.push({
+            rowIndex: row.rowIndex,
+            orderNo: row.orderNo,
+            shipToName: row.shipToName,
+            deliveryDateYmd: row.deliveryDateYmd,
+            status: row.status,
+            rowText: row.rowText,
+            rawCells: row.rawCells,
+            detailLines,
+        });
+    }
+
+    return result;
 }
 
 async function fillProductDetailsAfterSelection(page: Page, item: HanwhaESalesOrderItem, rowIndex: number, deliveryDateYmd: string) {
@@ -2240,6 +2502,7 @@ async function automateOrder(page: Page, input: HanwhaESalesOrderInput) {
 export async function openHanwhaESalesLogin(input: {
     username: string | null;
     password: string | null;
+    forceLogin?: boolean;
 }): Promise<HanwhaESalesLoginResult> {
     if (!input.username || !input.password) {
         return { ok: false, error: '한화 e-Sales 계정 정보가 설정되지 않았습니다.' };
@@ -2250,7 +2513,14 @@ export async function openHanwhaESalesLogin(input: {
 
     try {
         const page = await getESalesPage();
-        const otpClicked = await loginAndSendOtp(page, { username: input.username, password: input.password });
+        if (input.forceLogin) {
+            await clearESalesSessionForForcedLogin(page);
+        }
+        const otpClicked = await loginAndSendOtp(
+            page,
+            { username: input.username, password: input.password },
+            Boolean(input.forceLogin),
+        );
         return {
             ok: true,
             message: otpClicked
@@ -2458,6 +2728,127 @@ export async function checkHanwhaESalesOrderStatus(input: {
         return {
             ok: false,
             error: displayErrorMessage(error, '한화 e-Sales 주문상태 확인 중 오류가 발생했습니다. e-Sales 주문 진행 조회 화면에서 상태를 확인해주세요.'),
+        };
+    }
+}
+
+export async function scrapeHanwhaESalesTodayShipmentStatuses(input: {
+    username: string | null;
+    password: string | null;
+    orderDateYmd: string;
+    targetDeliveryDateYmd: string;
+    sameDayDeliveryDateYmd?: string | null;
+    targetDeliveryDateYmds?: string[];
+}): Promise<HanwhaESalesTodayShipmentStatusResult> {
+    if (!input.username || !input.password) {
+        return { ok: false, error: '한화 e-Sales 계정 정보가 설정되지 않았습니다.', errorCode: 'NO_CREDENTIALS' };
+    }
+    if (process.platform !== 'win32') {
+        return { ok: false, error: '한화 e-Sales 상태 조회는 Windows 업무 PC에서만 실행할 수 있습니다.' };
+    }
+
+    const orderDateYmd = formatYmd(input.orderDateYmd);
+    const targetDeliveryDateYmd = formatYmd(input.targetDeliveryDateYmd);
+    const sameDayDeliveryDateYmd = formatYmd(input.sameDayDeliveryDateYmd);
+    const targetDeliveryDateYmds = Array.from(new Set([
+        ...((input.targetDeliveryDateYmds ?? []).map(formatYmd)),
+        targetDeliveryDateYmd,
+        sameDayDeliveryDateYmd,
+    ].filter(Boolean)));
+    if (!orderDateYmd || targetDeliveryDateYmds.length === 0) {
+        return { ok: false, error: '금일 출고예정 조회에 필요한 날짜 정보가 없습니다.' };
+    }
+
+    try {
+        const page = await getFreshESalesPage('today-shipping');
+        await loginAndSendOtp(page, { username: input.username, password: input.password });
+        const rows = (await readTodayShipmentStatusRows(page, orderDateYmd, targetDeliveryDateYmds))
+            .map((row) => ({ ...row, orderDateYmd }));
+        return {
+            ok: true,
+            rows,
+            message: `한화 e-Sales 금일 출고예정 상태 ${rows.length}건을 조회했습니다.`,
+        };
+    } catch (error) {
+        return {
+            ok: false,
+            error: displayErrorMessage(error, '한화 e-Sales 금일 출고예정 상태 조회 중 오류가 발생했습니다.'),
+        };
+    }
+}
+
+export async function scrapeHanwhaESalesShipmentStatusesByOrderDates(input: {
+    username: string | null;
+    password: string | null;
+    orderDateYmds: string[];
+    targetDeliveryDateYmds: string[];
+}): Promise<HanwhaESalesTodayShipmentStatusResult> {
+    if (!input.username || !input.password) {
+        return { ok: false, error: '한화 e-Sales 계정 정보가 설정되지 않았습니다.', errorCode: 'NO_CREDENTIALS' };
+    }
+    if (process.platform !== 'win32') {
+        return { ok: false, error: '한화 e-Sales 상태 조회는 Windows 업무 PC에서만 실행할 수 있습니다.' };
+    }
+
+    const orderDateYmds = Array.from(new Set(input.orderDateYmds.map(formatYmd).filter(Boolean))).sort();
+    const targetDeliveryDateYmds = Array.from(new Set(input.targetDeliveryDateYmds.map(formatYmd).filter(Boolean))).sort();
+    if (orderDateYmds.length === 0) return { ok: true, rows: [], message: '조회할 한화 오더완료일자가 없습니다.' };
+    if (targetDeliveryDateYmds.length === 0) return { ok: false, error: '금일 출고예정 조회에 필요한 납품요청일 정보가 없습니다.' };
+
+    try {
+        const page = await getFreshESalesPage('today-shipping');
+        await loginAndSendOtp(page, { username: input.username, password: input.password });
+        const rows: HanwhaESalesTodayShipmentStatusRow[] = [];
+        for (const orderDateYmd of orderDateYmds) {
+            const dateRows = await readTodayShipmentStatusRows(page, orderDateYmd, targetDeliveryDateYmds);
+            rows.push(...dateRows.map((row) => ({ ...row, orderDateYmd })));
+        }
+        return {
+            ok: true,
+            rows,
+            message: `한화 e-Sales 금일 출고예정 상태 ${rows.length}건을 조회했습니다.`,
+        };
+    } catch (error) {
+        return {
+            ok: false,
+            error: displayErrorMessage(error, '한화 e-Sales 금일 출고예정 상태 조회 중 오류가 발생했습니다.'),
+        };
+    }
+}
+
+export async function scrapeHanwhaESalesShipmentStatusesByOrderDateRange(input: {
+    username: string | null;
+    password: string | null;
+    orderDateFromYmd: string | null;
+    orderDateToYmd: string | null;
+    targetDeliveryDateYmds: string[];
+}): Promise<HanwhaESalesTodayShipmentStatusResult> {
+    if (!input.username || !input.password) {
+        return { ok: false, error: '한화 e-Sales 계정 정보가 설정되지 않았습니다.', errorCode: 'NO_CREDENTIALS' };
+    }
+    if (process.platform !== 'win32') {
+        return { ok: false, error: '한화 e-Sales 상태 조회는 Windows 업무 PC에서만 실행할 수 있습니다.' };
+    }
+
+    const orderDateFromYmd = formatYmd(input.orderDateFromYmd);
+    const orderDateToYmd = formatYmd(input.orderDateToYmd);
+    const targetDeliveryDateYmds = Array.from(new Set(input.targetDeliveryDateYmds.map(formatYmd).filter(Boolean))).sort();
+    if (!orderDateFromYmd || !orderDateToYmd) return { ok: true, rows: [], message: '조회할 한화 오더완료일자 범위가 없습니다.' };
+    if (targetDeliveryDateYmds.length === 0) return { ok: false, error: '금일 출고예정 조회에 필요한 납품요청일 정보가 없습니다.' };
+
+    try {
+        const page = await getFreshESalesPage('today-shipping');
+        await loginAndSendOtp(page, { username: input.username, password: input.password });
+        const rows = await readTodayShipmentStatusRows(page, orderDateFromYmd, targetDeliveryDateYmds, orderDateToYmd);
+        return {
+            ok: true,
+            rows,
+            message: `한화 e-Sales 금일 출고예정 상태 ${rows.length}건을 조회했습니다.`,
+        };
+    } catch (error) {
+        return {
+            ok: false,
+            error: displayErrorMessage(error, '한화 e-Sales 금일 출고예정 상태 조회 중 오류가 발생했습니다.'),
         };
     }
 }

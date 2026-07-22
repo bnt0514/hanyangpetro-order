@@ -26,8 +26,9 @@ export default async function PortalOrdersPage({ searchParams }: { searchParams:
 
     const sp = await searchParams;
     const today = isoDate(new Date());
-    const from = /^\d{4}-\d{2}-\d{2}$/.test(sp.from ?? '') ? sp.from! : today;
-    const to = /^\d{4}-\d{2}-\d{2}$/.test(sp.to ?? '') ? sp.to! : today;
+    const defaultRange = rangeShortcut(93);
+    const from = /^\d{4}-\d{2}-\d{2}$/.test(sp.from ?? '') ? sp.from! : defaultRange.from;
+    const to = /^\d{4}-\d{2}-\d{2}$/.test(sp.to ?? '') ? sp.to! : defaultRange.to;
     const fromDate = new Date(`${from}T00:00:00`);
     const toDate = new Date(`${to}T00:00:00`);
     toDate.setDate(toDate.getDate() + 1);
@@ -78,7 +79,7 @@ export default async function PortalOrdersPage({ searchParams }: { searchParams:
                                 <div className="flex items-start justify-between gap-3">
                                     <div className="min-w-0 flex-1">
                                         <p className="truncate text-base font-bold text-slate-900">
-                                            {order.items.map((item) => item.product.productName).join(', ')}
+                                            {order.items.map((item) => item.product?.productName ?? '제품 정보 없음').join(', ')}
                                         </p>
                                         <p className="mt-1 text-sm text-slate-500">
                                             {order.items.map((item) => `${fmtNumber(item.requestedQuantity)}${item.unit}`).join(' · ')}

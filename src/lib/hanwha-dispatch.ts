@@ -15,6 +15,20 @@ export type HanwhaDriverFields = {
     driverPhone: string | null;
 };
 
+const DISPATCH_COMPLETE_MARKER = '__HANWHA_DISPATCH_COMPLETE__=';
+
+export function markHanwhaDispatchCompletionStatus(rawCells: string[], status: string | null | undefined): string[] {
+    const text = status?.trim();
+    if (!text) return rawCells;
+    return [...rawCells, `${DISPATCH_COMPLETE_MARKER}${text}`];
+}
+
+export function hanwhaDispatchCompletionStatus(rawCells: string[] | string | null | undefined): string | null {
+    const marker = parseHanwhaRawCells(rawCells).find((value) => value.startsWith(DISPATCH_COMPLETE_MARKER));
+    const text = marker?.slice(DISPATCH_COMPLETE_MARKER.length).trim();
+    return text || null;
+}
+
 export function hanwhaDriverInfo(rawCells: string[] | string | null | undefined): string {
     const fields = extractHanwhaDriverFields(rawCells);
     return joinHanwhaDriverInfo(fields.vehicleNumber, fields.driverName, fields.driverPhone);

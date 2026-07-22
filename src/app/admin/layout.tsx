@@ -8,6 +8,7 @@ import StaffViewModeToggle from './StaffViewModeToggle';
 import AdminShellLayoutFrame from './AdminShellLayoutFrame';
 import { canViewAllStaffData, isYangHeeCheol } from '@/lib/staff-permissions';
 import HomepageArchiveLink from '@/components/HomepageArchiveLink';
+import BackgroundJobNotifications from '@/components/BackgroundJobNotifications';
 
 export default async function AdminLayout({
     children,
@@ -29,6 +30,7 @@ export default async function AdminLayout({
                     <span className="staff-mobile-toggle">
                         <StaffViewModeToggle short />
                     </span>
+                    <BackgroundJobNotifications />
                     <HomepageArchiveLink />
                     <Link
                         href="/settings"

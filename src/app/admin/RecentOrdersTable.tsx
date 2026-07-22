@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { statusLabel, statusColor, fmtDate, fmtDateTime, fmtNumber } from '@/lib/orders';
 import DashboardNextActionButton from './DashboardNextActionButton';
@@ -71,30 +70,20 @@ function SortHeader({
 
 export default function RecentOrdersTable({
     orders,
-    initialSort,
-    initialDir,
+    sort,
+    dir,
+    onSort,
     searchQuery = '',
 }: {
     orders: RecentOrderRow[];
-    initialSort: RecentSort;
-    initialDir: SortDir;
+    sort: RecentSort;
+    dir: SortDir;
+    onSort: (sort: RecentSort, dir: SortDir) => void;
     searchQuery?: string;
 }) {
-    const [sort, setSort] = useState<RecentSort>(initialSort);
-    const [dir, setDir] = useState<SortDir>(initialDir);
-
-    useEffect(() => {
-        setSort(initialSort);
-        setDir(initialDir);
-    }, [initialSort, initialDir]);
-
     function handleSort(key: RecentSort) {
-        if (sort === key) {
-            setDir((current) => (current === 'asc' ? 'desc' : 'asc'));
-            return;
-        }
-        setSort(key);
-        setDir('asc');
+        const nextDir = sort === key ? (dir === 'asc' ? 'desc' : 'asc') : 'asc';
+        onSort(key, nextDir);
     }
 
     const normalizedQuery = normalizeSearch(searchQuery);
@@ -125,7 +114,6 @@ export default function RecentOrdersTable({
             <table className="w-full text-sm">
                 <thead>
                     <tr className="bg-slate-50 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                        <th className="px-6 py-3"><SortHeader label="주문번호" sortKey="orderNo" currentSort={sort} dir={dir} onSort={handleSort} /></th>
                         <th className="px-6 py-3"><SortHeader label="거래처" sortKey="customer" currentSort={sort} dir={dir} onSort={handleSort} /></th>
                         <th className="px-6 py-3">도착지</th>
                         <th className="px-6 py-3">제품</th>
@@ -138,11 +126,6 @@ export default function RecentOrdersTable({
                 <tbody className="divide-y divide-slate-100">
                     {sorted.map((order) => (
                         <tr key={order.id} className="cursor-pointer transition hover:bg-blue-50/40">
-                            <td className="px-6 py-3 font-mono text-xs text-slate-700">
-                                <Link href={`/admin/orders/${order.id}`} className="block">
-                                    {order.orderNo}
-                                </Link>
-                            </td>
                             <td className="px-6 py-3 font-medium text-slate-800">
                                 <Link href={`/admin/orders/${order.id}`} className="block">
                                     {order.customer.companyName}

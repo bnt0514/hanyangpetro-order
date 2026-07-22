@@ -9,7 +9,7 @@ import { isBusinessDate, previousBusinessDate } from '@/lib/korean-holidays';
 
 const DEFAULT_SPREADSHEET_ID = process.env.ORDER_SPREADSHEET_ID || '13NGMp-iNJpRdeR0JlnwS367Xj8VZ5UYlfKc774g3j2w';
 const HANWHA_SUPPLIER_NAME = '한화솔루션';
-const CANCELLED_STATUSES = new Set(['CANCELLED', 'REJECTED']);
+const CANCELLED_STATUSES = new Set(['REJECTED']);
 const QUANTITY_EPSILON = 0.0001;
 
 type OrderBlock = {

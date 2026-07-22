@@ -314,6 +314,63 @@ export async function saveDeliveryAddress(input: {
     }
 }
 
+export async function deleteDeliveryAddress(input: {
+    customerId: string;
+    addressId: string;
+}): Promise<CreateCustomerResult> {
+    const session = await auth();
+    if (!session?.user) return { ok: false, error: '로그인이 필요합니다.' };
+    if (session.user.userKind !== 'staff') return { ok: false, error: '직원만 도착지를 삭제할 수 있습니다.' };
+
+    const customerId = input.customerId?.trim();
+    const addressId = input.addressId?.trim();
+    if (!customerId) return { ok: false, error: '업체를 선택해 주세요.' };
+    if (!addressId) return { ok: false, error: '삭제할 도착지를 선택해 주세요.' };
+
+    try {
+        const result = await prisma.$transaction(async (tx) => {
+            const address = await tx.deliveryAddress.findUnique({
+                where: { id: addressId },
+                select: { id: true, customerId: true, isDefault: true },
+            });
+            if (!address || address.customerId !== customerId) {
+                return { ok: false, error: '도착지를 찾을 수 없습니다.' } as const;
+            }
+
+            await tx.deliveryAddress.update({
+                where: { id: address.id },
+                data: { isActive: false, isDefault: false },
+            });
+
+            if (address.isDefault) {
+                const nextDefault = await tx.deliveryAddress.findFirst({
+                    where: { customerId, isActive: true, id: { not: address.id } },
+                    orderBy: [{ label: 'asc' }],
+                    select: { id: true },
+                });
+                if (nextDefault) {
+                    await tx.deliveryAddress.update({
+                        where: { id: nextDefault.id },
+                        data: { isDefault: true },
+                    });
+                }
+            }
+
+            return { ok: true, customerId } as const;
+        });
+
+        if (!result.ok) return result;
+        revalidatePath('/admin');
+        revalidatePath('/admin/customers');
+        revalidatePath(`/admin/customers/${customerId}`);
+        revalidatePath('/admin/orders/new');
+        return result;
+    } catch (e) {
+        console.error('deleteDeliveryAddress failed:', e);
+        return { ok: false, error: '도착지 삭제 중 오류가 발생했습니다.' };
+    }
+}
+
 export async function bulkImportDeliveryAddresses(rows: AddressImportRow[]): Promise<AddressImportResult> {
     const session = await auth();
     if (!session?.user) return { ok: false, error: '로그인이 필요합니다.' };

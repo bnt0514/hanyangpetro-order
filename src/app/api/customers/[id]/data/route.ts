@@ -53,7 +53,11 @@ export async function GET(
     const [customer, addresses, whitelist, allProducts, ledgerProducts, companyEntities, suppliers] = await Promise.all([
         prisma.customer.findUnique({
             where: { id: customerId },
-            select: { id: true, companyName: true, customerCode: true },
+            select: {
+                id: true,
+                companyName: true,
+                customerCode: true,
+            },
         }),
         prisma.deliveryAddress.findMany({
             where: { customerId, isActive: true },

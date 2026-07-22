@@ -23,7 +23,8 @@ export default async function CustomerEditPage({
             where: { id },
             include: {
                 addresses: {
-                    orderBy: [{ isDefault: 'desc' }, { isActive: 'desc' }, { label: 'asc' }],
+                    where: { isActive: true },
+                    orderBy: [{ isDefault: 'desc' }, { label: 'asc' }],
                 },
             },
         }),

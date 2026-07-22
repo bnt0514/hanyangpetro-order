@@ -22,6 +22,7 @@ import OrderCustomerAddressEditor from './OrderCustomerAddressEditor';
 import PurchaseLedgerDateEditor from './PurchaseLedgerDateEditor';
 import SalesLedgerDateModeToggle from './SalesLedgerDateModeToggle';
 import { purchaseRequestDateFromOrderNo } from '@/lib/ledger-policy';
+import { isYangHeeCheol } from '@/lib/staff-permissions';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,12 +44,26 @@ function nextMonthFirst(date: Date) {
     return new Date(date.getFullYear(), date.getMonth() + 1, 1);
 }
 
+function hanwhaOrderFailureReason(error: string | null, message: string | null) {
+    const raw = (error || message || '').replace(/\u001B\[[0-?]*[ -/]*[@-~]/g, '').trim();
+    if (/connectOverCDP.*timeout|timeout.*connectOverCDP/i.test(raw)) {
+        return '한화 e-Sales Chrome 연결 시간이 초과되었습니다.';
+    }
+    if (/target page, context or browser has been closed/i.test(raw)) {
+        return '한화 e-Sales Chrome 창 또는 연결이 작업 중 닫혔습니다.';
+    }
+    return raw.replace(/\s+/g, ' ').slice(0, 300) || '한화 e-Sales 자동 입력 중 오류가 발생했습니다.';
+}
+
 export default async function AdminOrderDetail({
     params,
+    searchParams,
 }: {
     params: Promise<{ id: string }>;
+    searchParams: Promise<{ autoHanwhaOrder?: string }>;
 }) {
     const { id } = await params;
+    const { autoHanwhaOrder } = await searchParams;
     const session = await auth();
     if (!session?.user) redirect('/login');
     if (session.user.userKind !== 'staff') redirect('/portal');
@@ -70,6 +85,27 @@ export default async function AdminOrderDetail({
     });
 
     if (!order) notFound();
+
+    const latestHanwhaOrderJob = await prisma.backgroundJob.findFirst({
+        where: {
+            type: 'HANWHA_NEW_ORDER',
+            entityType: 'ORDER',
+            entityId: order.id,
+        },
+        orderBy: { queuedAt: 'desc' },
+        select: {
+            status: true,
+            error: true,
+            message: true,
+            finishedAt: true,
+        },
+    });
+    const hanwhaOrderFailure = !order.hanwhaOrderedAt && latestHanwhaOrderJob?.status === 'FAILED'
+        ? {
+            reason: hanwhaOrderFailureReason(latestHanwhaOrderJob.error, latestHanwhaOrderJob.message),
+            failedAt: latestHanwhaOrderJob.finishedAt?.toISOString() ?? null,
+        }
+        : null;
 
     const products = await prisma.product.findMany({
         where: { isActive: true },
@@ -156,12 +192,22 @@ export default async function AdminOrderDetail({
     }));
     const orderQuantityTon = order.items.reduce((sum, item) => sum + item.requestedQuantity, 0);
     const canStartHanwhaOrder = session.user.userKind === 'staff';
+    const hasHanwhaOrderItems = order.items.some((item) => {
+        const supplierName = item.purchaseSupplier?.supplierName ?? '';
+        if (supplierName.includes('\uD55C\uD654\uC194\uB8E8\uC158')) return true;
+
+        const productName = (item.product.productName ?? '').replace(/\s+/g, '').toUpperCase();
+        const bagType = (item.hanwhaBagType ?? '').trim().toUpperCase();
+        return productName === 'MLLDPE<M1605EN>'
+            && bagType === 'FFS'
+            && Boolean(item.product.hanwhaItemCode?.trim() || item.product.hanwhaMaterialName?.trim());
+    });
     const isInternalPurchaseOnly = normalizeCompanyName(order.customer.companyName) === '한양유화';
     const hasNonHanwhaSupplier = order.items.some((item) => {
         const name = item.purchaseSupplier?.supplierName ?? '';
         return name !== '' && !name.includes('한화');
     });
-    const isDispatchWaiting = order.status === 'DISPATCH_WAITING';
+    const canCreateMissingDispatchBackorder = order.status === 'APPROVED' || order.status === 'DISPATCHING' || order.status === 'DISPATCH_COMPLETED';
     // 거래처 포털 주문처럼 단가가 비어 있을 때 자동 채움용: 이 거래처+품목의 최근 단가 조회
     const productIds = order.items.map((i) => i.productId);
     const productNameById = new Map(order.items.map((item) => [item.productId, item.product.productName]));
@@ -427,6 +473,8 @@ export default async function AdminOrderDetail({
                             purchaseCarryover={isPurchaseCarryover}
                             purchaseCarryoverDate={toLocalDateStr(purchaseCarryoverDate)}
                             currentPurchaseDateLabel={currentPurchaseDateLabel}
+                            sameDayDelivery={order.sameDayDelivery}
+                            sameDayDate={requestedDeliveryDateValue}
                         />
                     </div>
                 </section>
@@ -460,7 +508,7 @@ export default async function AdminOrderDetail({
                         }))}
                     />
                 )}
-                {isDispatchWaiting && <MissingDispatchBackorderForm
+                {canCreateMissingDispatchBackorder && <MissingDispatchBackorderForm
                     orderId={order.id}
                     defaultDeliveryDate={nextDeliveryDateValue}
                     items={order.items.map((item) => ({
@@ -562,7 +610,7 @@ export default async function AdminOrderDetail({
                 </section>
 
                 {/* 여신 시뮬레이션 (수락 전 필수 확인) */}
-                {['REQUESTED', 'PENDING_SALES_REVIEW', 'ON_HOLD'].includes(order.status) && (
+                {['REQUESTED', 'CREDIT_OVER_LIMIT'].includes(order.status) && (
                     <CreditSimulationPanel orderId={order.id} />
                 )}
 
@@ -573,7 +621,19 @@ export default async function AdminOrderDetail({
                             orderId={order.id}
                             currentStatus={order.status}
                             canStartHanwhaOrder={canStartHanwhaOrder}
+                            hasHanwhaOrderItems={hasHanwhaOrderItems}
+                            autoStartHanwhaOrder={
+                                autoHanwhaOrder === '1'
+                                && order.status === 'APPROVED'
+                                && !order.hanwhaOrderedAt
+                                && hasHanwhaOrderItems
+                            }
+                            canReorderHanwhaOrder={isYangHeeCheol(session.user)}
                             hanwhaOrderedAt={order.hanwhaOrderedAt ?? null}
+                            hanwhaStatusText={order.hanwhaStatusText ?? null}
+                            hanwhaStatusCheckedAt={order.hanwhaStatusCheckedAt ?? null}
+                            hanwhaStatusSource={order.hanwhaStatusSource ?? null}
+                            initialHanwhaOrderFailure={hanwhaOrderFailure}
                         />
                     </div>
                     <DeleteOrderButton orderId={order.id} />

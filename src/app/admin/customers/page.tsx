@@ -34,7 +34,7 @@ export default async function CustomersPage({
                 : {}),
         },
         orderBy: [{ isActive: 'desc' }, { companyName: 'asc' }],
-        include: { _count: { select: { addresses: true, orders: true } } },
+        include: { _count: { select: { addresses: { where: { isActive: true } }, orders: true } } },
         take: 300,
     });
 

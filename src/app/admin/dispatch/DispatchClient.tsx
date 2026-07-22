@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -16,12 +16,14 @@ import {
 } from 'lucide-react';
 import {
     fetchHanwhaDispatch,
+    getHanwhaDispatchJobStatus,
     refetchHanwhaDispatch,
     matchHanwhaDispatchRow,
 } from '@/app/dispatch/actions';
 import DispatchKakaoNoticeButton from '@/components/DispatchKakaoNoticeButton';
-import { hanwhaDriverInfo, extractHanwhaDriverFields } from '@/lib/hanwha-dispatch';
+import { hanwhaDispatchCompletionStatus, hanwhaDriverInfo, extractHanwhaDriverFields } from '@/lib/hanwha-dispatch';
 import { isSameQuantity, matchProductToMaterial } from '@/lib/product-matching';
+import { isDispatchDestinationMatch, normalizeDispatchDestinationText } from '@/lib/dispatch-destination-match';
 import { fmtDateTime, fmtNumber } from '@/lib/orders';
 
 export interface DispatchRowVM {
@@ -72,28 +74,44 @@ type AutoMatchHit = {
     reason: string;
 };
 
-function normalizeCompanyMatchText(value: string) {
-    return value
-        .toLowerCase()
-        .replace(/주식회사|\(주\)|㈜|\s/g, '')
-        .replace(/[()\[\]{}.,/\\_-]/g, '')
-        .replace(/앤/g, '엔')
-        .trim();
+function isMatchedDispatchComplete(order: MatchCandidateVM | null, line: DispatchRowVM) {
+    if (!order) return true;
+
+    const totalRemaining = order.items.reduce((sum, item) => sum + item.remainingQuantityTon, 0);
+    if (totalRemaining <= 0.0001) return true;
+
+    const lineQuantity = line.quantityKg;
+    if (!Number.isFinite(lineQuantity)) return false;
+
+    const matchedItemRemaining = order.items.reduce((sum, item) => {
+        const productMatch = matchProductToMaterial(
+            { productName: item.productName, productCode: item.productCode },
+            { materialName: line.materialName, materialNameRaw: line.materialNameRaw },
+        );
+        return productMatch.matches ? sum + item.remainingQuantityTon : sum;
+    }, 0);
+    const quantityAppliedByThisLine = matchedItemRemaining > 0
+        ? Math.min(matchedItemRemaining, Number(lineQuantity))
+        : Number(lineQuantity);
+    return totalRemaining - quantityAppliedByThisLine <= 0.0001
+        || isSameQuantity(totalRemaining, quantityAppliedByThisLine);
 }
 
 function isChemcoPrecisionSecondFactory(value: string) {
-    return normalizeCompanyMatchText(value).includes('켐코정밀2공장');
+    return normalizeDispatchDestinationText(value).includes('켐코정밀2공장');
 }
 
 export default function DispatchClient({
     defaultDate,
     initial,
     canManageCredentials,
+    canManualMatch,
     matchCandidates,
 }: {
     defaultDate: string;
     initial: DispatchSnapshotVM | null;
     canManageCredentials: boolean;
+    canManualMatch: boolean;
     matchCandidates: MatchCandidateVM[];
 }) {
     const router = useRouter();
@@ -104,6 +122,7 @@ export default function DispatchClient({
     const [selectedOrders, setSelectedOrders] = useState<Record<string, string>>({});
     const [error, setError] = useState<string | null>(null);
     const [info, setInfo] = useState<string | null>(null);
+    const [activeJobId, setActiveJobId] = useState<string | null>(null);
 
     function go(action: 'fetch' | 'refetch') {
         setError(null);
@@ -117,26 +136,73 @@ export default function DispatchClient({
                 setError(r.error);
                 return;
             }
-            if ('cached' in r) {
-                setInfo(
-                    r.rowCount === 0
-                        ? '해당일자 배차내역이 없습니다.'
-                        : r.cached
-                        ? `캐시에서 ${r.rowCount}건을 표시합니다. (재조회를 누르면 한화 사이트에서 새로 가져옵니다)`
-                        : `한화 사이트에서 새로 가져온 ${r.rowCount}건을 저장했습니다.`,
-                );
-                setSnapshot(r.snapshot);
+            if ('queued' in r) {
+                setActiveJobId(r.job.id);
+                setInfo(r.message);
+                if (r.snapshot) setSnapshot(r.snapshot);
+                router.push(`/admin/dispatch?date=${date}`);
+                return;
             }
+            setActiveJobId(null);
+            setInfo(
+                r.rowCount === 0
+                    ? '해당일자 배차내역이 없습니다.'
+                    : r.cached
+                    ? `캐시에서 ${r.rowCount}건을 표시합니다. (재조회를 누르면 한화 사이트에서 새로 가져옵니다)`
+                    : `한화 사이트에서 새로 가져온 ${r.rowCount}건을 저장했습니다.`,
+            );
+            setSnapshot(r.snapshot);
             router.push(`/admin/dispatch?date=${date}`);
             if (action !== 'fetch' || !('cached' in r) || !r.cached) router.refresh();
         });
     }
 
-    function doMatch(rowId: string, orderId: string) {
+    useEffect(() => {
+        if (!activeJobId) return;
+        const jobId = activeJobId;
+        let cancelled = false;
+
+        async function poll() {
+            const result = await getHanwhaDispatchJobStatus(jobId);
+            if (cancelled) return;
+            if (!result.ok) {
+                setError(result.error);
+                setActiveJobId(null);
+                return;
+            }
+
+            if (result.snapshot) setSnapshot(result.snapshot);
+
+            if (result.job.status === 'DONE') {
+                setInfo(result.job.message || '배차조회가 완료되었습니다.');
+                setActiveJobId(null);
+                router.refresh();
+                return;
+            }
+
+            if (result.job.status === 'FAILED') {
+                setError(result.job.error || result.job.message || '배차조회에 실패했습니다.');
+                setActiveJobId(null);
+                router.refresh();
+                return;
+            }
+
+            setInfo(result.job.message || '배차조회가 백그라운드에서 진행 중입니다. 다른 메뉴를 이용해도 됩니다.');
+        }
+
+        poll();
+        const timer = window.setInterval(poll, 2000);
+        return () => {
+            cancelled = true;
+            window.clearInterval(timer);
+        };
+    }, [activeJobId, router]);
+
+    function doMatch(rowId: string, orderId: string, matchMode: 'AUTO' | 'MANUAL') {
         setError(null);
         setInfo(null);
         startMatchTransition(async () => {
-            const r = await matchHanwhaDispatchRow(rowId, orderId);
+            const r = await matchHanwhaDispatchRow(rowId, orderId, matchMode);
             if (!r.ok) { setError(r.error); return; }
             const orderNo = matchCandidates.find((o) => o.id === orderId)?.orderNo ?? orderId;
             setInfo(`배차 라인과 [${orderNo}]을 매칭했습니다.`);
@@ -148,9 +214,19 @@ export default function DispatchClient({
     }
 
     function match(rowId: string) {
+        if (!canManualMatch) { setError('양희철만 수동 배차 매칭을 할 수 있습니다.'); return; }
         const orderId = selectedOrders[rowId];
         if (!orderId) { setError('매칭할 주문을 선택해주세요.'); return; }
-        doMatch(rowId, orderId);
+        doMatch(rowId, orderId, 'MANUAL');
+    }
+
+    function manualCandidatesFor(line: DispatchRowVM) {
+        return matchCandidates.filter((order) => isDispatchDestinationMatch(line.indoChiName, {
+            customerName: order.customerName,
+            addressLabel: order.addressLabel,
+            addressLine1: order.addressLine1,
+            addressLine2: order.addressLine2,
+        }));
     }
 
     function autoMatch(line: DispatchRowVM) {
@@ -179,7 +255,7 @@ export default function DispatchClient({
         const best = scored[0];
         const tied = scored.filter((hit) => best.score - hit.score <= 10);
         if (tied.length === 1 && best.score >= 100) {
-            doMatch(line.id, best.order.id);
+            doMatch(line.id, best.order.id, 'AUTO');
             return;
         }
 
@@ -240,7 +316,12 @@ export default function DispatchClient({
 
                 {pending && (
                     <p className="mt-3 text-xs text-slate-500">
-                        한화 사이트에 자동 로그인하여 데이터를 가져오는 중입니다… 1~3분 정도 소요됩니다.
+                        배차조회 작업을 등록하는 중입니다.
+                    </p>
+                )}
+                {activeJobId && !pending && (
+                    <p className="mt-3 text-xs text-slate-500">
+                        백그라운드에서 배차조회가 진행 중입니다. 완료되면 이 화면에 자동으로 반영됩니다.
                     </p>
                 )}
 
@@ -312,6 +393,11 @@ export default function DispatchClient({
                                                 <Package size={16} className="text-slate-500" />
                                                 <span className="text-xs text-slate-400 font-mono">#{g.indoChiIndex}</span>
                                                 {g.indoChiName}
+                                                {g.dispatchCompletionStatus && (
+                                                    <span className="ml-2 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-100">
+                                                        {g.dispatchCompletionStatus}
+                                                    </span>
+                                                )}
                                             </h2>
                                             <span className="text-xs text-slate-500">
                                                 라인 {g.lines.length}건 · 합계 {fmtNumber(total)} TON
@@ -322,7 +408,6 @@ export default function DispatchClient({
                                                 <thead>
                                                     <tr className="bg-white text-left text-xs font-medium text-slate-500 uppercase">
                                                         <th className="px-4 py-2 w-10">#</th>
-                                                        <th className="px-4 py-2">인도처</th>
                                                         <th className="px-4 py-2">자재명</th>
                                                         <th className="px-4 py-2 text-right">수량(TON)</th>
                                                         <th className="px-4 py-2">기사정보</th>
@@ -332,15 +417,17 @@ export default function DispatchClient({
                                                 <tbody className="divide-y divide-slate-100">
                                                     {g.lines.map((l, i) => {
                                                         const matchedOrder = l.matchedOrderId
-                                                            ? matchCandidates.find((o) => o.id === l.matchedOrderId)
+                                                            ? matchCandidates.find((o) => o.id === l.matchedOrderId) ?? null
                                                             : null;
+                                                        const matchedComplete = l.matchedOrderId ? isMatchedDispatchComplete(matchedOrder, l) : false;
                                                         const driverInfo = hanwhaDriverInfo(l.rawCells);
                                                         const driverFields = extractHanwhaDriverFields(l.rawCells);
                                                         const hasDriverInfo = Boolean(driverFields.vehicleNumber || driverFields.driverName || driverFields.driverPhone);
+                                                        const manualCandidates = manualCandidatesFor(l);
+                                                        const selectedManualCandidate = manualCandidates.some((order) => order.id === selectedOrders[l.id]);
                                                         return (
                                                             <tr key={l.id} className="hover:bg-slate-50/60">
                                                                 <td className="px-4 py-2 text-xs text-slate-400">{i + 1}</td>
-                                                                <td className="px-4 py-2 font-medium text-slate-800">{l.indoChiName}</td>
                                                                 <td className="px-4 py-2 font-medium text-slate-800">{l.materialNameRaw ?? '-'}</td>
                                                                 <td className="px-4 py-2 text-right text-slate-700">{l.quantityKg != null ? fmtNumber(l.quantityKg) : '-'}</td>
                                                                 <td className="px-4 py-2 text-xs text-slate-400">{driverInfo}</td>
@@ -351,7 +438,9 @@ export default function DispatchClient({
                                                                                 <div className="text-xs text-emerald-700 font-semibold flex items-center gap-1">
                                                                                     <CheckCircle2 size={12} />
                                                                                     {matchedOrder?.orderNo ?? l.matchedOrderId}
-                                                                                    <span className="ml-1 text-slate-400 font-normal">(추가 매칭 가능)</span>
+                                                                                    <span className={`ml-1 font-normal ${matchedComplete ? 'text-emerald-600' : 'text-slate-400'}`}>
+                                                                                        ({matchedComplete ? '매칭 완료' : '추가 매칭 가능'})
+                                                                                    </span>
                                                                                 </div>
                                                                             </div>
                                                                         )}
@@ -379,39 +468,55 @@ export default function DispatchClient({
                                                                                 }}
                                                                             />
                                                                         )}
-                                                                    <div className="flex items-center gap-2">
-                                                                        <button
-                                                                            type="button"
-                                                                            disabled={matchPending || !hasDriverInfo}
-                                                                            title={hasDriverInfo ? '자동 매칭' : '기사정보가 없어 자동매칭할 수 없습니다.'}
-                                                                            onClick={() => autoMatch(l)}
-                                                                            className="rounded-lg bg-blue-500 hover:bg-blue-600 px-2.5 py-1.5 text-xs font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
-                                                                        >
-                                                                            자동
-                                                                        </button>
-                                                                        <select
-                                                                            value={selectedOrders[l.id] ?? ''}
-                                                                            onChange={(e) => setSelectedOrders((prev) => ({ ...prev, [l.id]: e.target.value }))}
-                                                                            disabled={matchPending}
-                                                                            className="min-w-52 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs outline-none focus:border-blue-500 disabled:opacity-60"
-                                                                        >
-                                                                            <option value="">{l.matchedOrderId ? '추가 매칭할 주문 선택' : '수동 선택'}</option>
-                                                                            {matchCandidates.map((o) => (
-                                                                                <option key={o.id} value={o.id}>
-                                                                                    {o.orderNo} · 도착 {o.requestedDeliveryDate?.slice(0, 10) ?? '-'} · {o.customerName} · {o.addressLabel} · {o.itemSummary}
-                                                                                </option>
-                                                                            ))}
-                                                                        </select>
-                                                                        <button
-                                                                            type="button"
-                                                                            disabled={matchPending || !selectedOrders[l.id]}
-                                                                            title="매칭"
-                                                                            onClick={() => match(l.id)}
-                                                                            className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
-                                                                        >
-                                                                            매칭
-                                                                        </button>
-                                                                    </div>
+                                                                    {!matchedComplete && (
+                                                                        <div className="flex items-center gap-2">
+                                                                            <button
+                                                                                type="button"
+                                                                                disabled={matchPending || !hasDriverInfo}
+                                                                                title={hasDriverInfo ? '자동 매칭' : '기사정보가 없어 자동매칭할 수 없습니다.'}
+                                                                                onClick={() => autoMatch(l)}
+                                                                                className="rounded-lg bg-blue-500 hover:bg-blue-600 px-2.5 py-1.5 text-xs font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                                                                            >
+                                                                                자동
+                                                                            </button>
+                                                                            {canManualMatch ? (
+                                                                                <>
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        disabled={matchPending || !selectedManualCandidate}
+                                                                                        title="수동 매칭"
+                                                                                        onClick={() => match(l.id)}
+                                                                                        className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                                                                                    >
+                                                                                        매칭
+                                                                                    </button>
+                                                                                    <select
+                                                                                        value={selectedOrders[l.id] ?? ''}
+                                                                                        onChange={(e) => setSelectedOrders((prev) => ({ ...prev, [l.id]: e.target.value }))}
+                                                                                        disabled={matchPending}
+                                                                                        className="min-w-52 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs outline-none focus:border-blue-500 disabled:opacity-60"
+                                                                                    >
+                                                                                        <option value="">
+                                                                                            {manualCandidates.length === 0
+                                                                                                ? '일치하는 도착지 주문 없음'
+                                                                                                : l.matchedOrderId
+                                                                                                    ? '추가 매칭할 주문 선택'
+                                                                                                    : '도착지 일치 주문 선택'}
+                                                                                        </option>
+                                                                                        {manualCandidates.map((o) => (
+                                                                                            <option key={o.id} value={o.id}>
+                                                                                                {o.orderNo} · 도착 {o.requestedDeliveryDate?.slice(0, 10) ?? '-'} · {o.customerName} · {o.addressLabel} · {o.itemSummary}
+                                                                                            </option>
+                                                                                        ))}
+                                                                                    </select>
+                                                                                </>
+                                                                            ) : (
+                                                                                <span className="text-xs font-semibold text-slate-400">
+                                                                                    수동매칭은 양희철 전용
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                    )}
                                                                     </div>
                                                                 </td>
                                                             </tr>
@@ -438,8 +543,8 @@ function scoreAutoMatch(
     dispatchDate: string,
 ): AutoMatchHit | null {
     const hay = [order.customerName, order.addressLabel, order.addressLine1].join(' ').toLowerCase();
-    const normalizedHay = normalizeCompanyMatchText(hay);
-    const normalizedIndoChiName = normalizeCompanyMatchText(line.indoChiName);
+    const normalizedHay = normalizeDispatchDestinationText(hay);
+    const normalizedIndoChiName = normalizeDispatchDestinationText(line.indoChiName);
     const addressHits = keywords.filter((kw) => hay.includes(kw));
     const normalizedAddressHit = Boolean(normalizedIndoChiName) && normalizedHay.includes(normalizedIndoChiName);
     const chemcoSecondFactoryNameHit =
@@ -497,13 +602,15 @@ function scoreAutoMatch(
 }
 
 function groupByIndoChi(rows: DispatchRowVM[]) {
-    const m = new Map<string, { indoChiIndex: number; indoChiName: string; lines: DispatchRowVM[] }>();
+    const m = new Map<string, { indoChiIndex: number; indoChiName: string; dispatchCompletionStatus: string | null; lines: DispatchRowVM[] }>();
     for (const r of rows) {
         const key = `${r.indoChiIndex}|${r.indoChiName}`;
         if (!m.has(key)) {
-            m.set(key, { indoChiIndex: r.indoChiIndex, indoChiName: r.indoChiName, lines: [] });
+            m.set(key, { indoChiIndex: r.indoChiIndex, indoChiName: r.indoChiName, dispatchCompletionStatus: null, lines: [] });
         }
-        m.get(key)!.lines.push(r);
+        const group = m.get(key)!;
+        group.dispatchCompletionStatus ??= hanwhaDispatchCompletionStatus(r.rawCells);
+        group.lines.push(r);
     }
     return Array.from(m.values()).sort((a, b) => a.indoChiIndex - b.indoChiIndex);
 }
