@@ -73,17 +73,16 @@ export async function getBackgroundJobNotifications(): Promise<BackgroundJobNoti
     };
 }
 
-export async function markBackgroundJobNotificationsRead(notificationIds: string[]) {
+export async function markBackgroundJobNotificationsRead() {
     const session = await auth();
     if (!session?.user || session.user.userKind !== 'staff') return { ok: false as const, error: '권한이 없습니다.' };
 
-    if (notificationIds.length === 0) return { ok: true as const };
-
     await prisma.notificationLog.updateMany({
         where: {
-            id: { in: notificationIds },
             recipientType: 'STAFF',
             recipientId: session.user.id,
+            channel: 'IN_APP',
+            notificationType: { in: ['BACKGROUND_JOB_DONE', 'BACKGROUND_JOB_FAILED'] },
             readAt: null,
         },
         data: { readAt: new Date() },

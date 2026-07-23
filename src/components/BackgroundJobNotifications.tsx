@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { Bell, CheckCircle2, Loader2, XCircle } from 'lucide-react';
 import {
     getBackgroundJobNotifications,
@@ -37,11 +37,6 @@ export default function BackgroundJobNotifications() {
 
     const activeCount = activeJobs.length;
     const badgeCount = activeCount + unreadCount;
-    const unreadIds = useMemo(
-        () => notifications.filter((notification) => !notification.readAt).map((notification) => notification.id),
-        [notifications],
-    );
-
     async function load() {
         const result = await getBackgroundJobNotifications();
         if (!result.ok) {
@@ -64,9 +59,9 @@ export default function BackgroundJobNotifications() {
     }, []);
 
     function markRead() {
-        if (unreadIds.length === 0) return;
+        if (unreadCount === 0) return;
         startTransition(async () => {
-            const result = await markBackgroundJobNotificationsRead(unreadIds);
+            const result = await markBackgroundJobNotificationsRead();
             if (!result.ok) {
                 setError(result.error);
                 return;
@@ -98,7 +93,7 @@ export default function BackgroundJobNotifications() {
                         <button
                             type="button"
                             onClick={markRead}
-                            disabled={pending || unreadIds.length === 0}
+                            disabled={pending || unreadCount === 0}
                             className="rounded-md px-2 py-1 font-bold text-slate-500 hover:bg-slate-50 disabled:opacity-40"
                         >
                             모두 읽음
