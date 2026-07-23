@@ -21,6 +21,9 @@ const HOME_TAB: WorkspaceTab = {
     fixed: true,
 };
 
+// An order detail is a replaceable workspace, not a growing browser-style history.
+const ORDER_DETAIL_TAB_KEY = '/admin/orders/[detail]';
+
 const MENU_TITLES: Record<string, string> = {
     '/admin': '메인',
     '/admin/orders/new': '오더 등록',
@@ -48,21 +51,43 @@ const MENU_TITLES: Record<string, string> = {
     '/admin/suppliers': '매입처 관리',
 };
 
+function normalizePathname(pathname: string) {
+    const normalized = pathname.replace(/\/+$/, '');
+    return normalized || '/admin';
+}
+
+function pathnameFromHref(href: string) {
+    return normalizePathname(href.split(/[?#]/, 1)[0] || '/admin');
+}
+
+function normalizeHref(href: string) {
+    const [pathname, search = ''] = href.split('?', 2);
+    const normalizedPathname = normalizePathname(pathname);
+    return search ? `${normalizedPathname}?${search}` : normalizedPathname;
+}
+
+function isOrderDetailPath(pathname: string) {
+    return /^\/admin\/orders\/[^/]+$/.test(pathname) && !MENU_TITLES[pathname];
+}
+
 function tabLabel(pathname: string) {
-    if (MENU_TITLES[pathname]) return MENU_TITLES[pathname];
-    if (/^\/admin\/orders\/[^/]+$/.test(pathname)) return '주문 상세';
-    if (/^\/admin\/customers\/[^/]+\/ledger$/.test(pathname)) return '거래처 원장';
-    if (/^\/admin\/customers\/[^/]+$/.test(pathname)) return '거래처 상세';
-    if (/^\/admin\/suppliers\/[^/]+\/ledger$/.test(pathname)) return '매입처 원장';
+    const normalizedPathname = normalizePathname(pathname);
+    if (MENU_TITLES[normalizedPathname]) return MENU_TITLES[normalizedPathname];
+    if (isOrderDetailPath(normalizedPathname)) return '주문 상세';
+    if (/^\/admin\/customers\/[^/]+\/ledger$/.test(normalizedPathname)) return '거래처 원장';
+    if (/^\/admin\/customers\/[^/]+$/.test(normalizedPathname)) return '거래처 상세';
+    if (/^\/admin\/suppliers\/[^/]+\/ledger$/.test(normalizedPathname)) return '매입처 원장';
     return '업무 화면';
 }
 
 function tabKey(pathname: string) {
-    return pathname || '/admin';
+    const normalizedPathname = normalizePathname(pathname);
+    return isOrderDetailPath(normalizedPathname) ? ORDER_DETAIL_TAB_KEY : normalizedPathname;
 }
 
 function hrefWithSearch(pathname: string, search: string) {
-    return search ? `${pathname}?${search}` : pathname;
+    const normalizedPathname = normalizePathname(pathname);
+    return search ? `${normalizedPathname}?${search}` : normalizedPathname;
 }
 
 function normalizeTabs(value: unknown): WorkspaceTab[] {
@@ -73,8 +98,16 @@ function normalizeTabs(value: unknown): WorkspaceTab[] {
         if (!item || typeof item !== 'object') continue;
         const tab = item as Partial<WorkspaceTab>;
         if (!tab.key || !tab.href || !tab.label) continue;
-        if (!tab.key.startsWith('/admin') || !tab.href.startsWith('/admin')) continue;
-        byKey.set(tab.key, { key: tab.key, href: tab.href, label: tab.label, fixed: tab.key === HOME_TAB.key });
+        const href = normalizeHref(tab.href);
+        const pathname = pathnameFromHref(href);
+        if (!pathname.startsWith('/admin')) continue;
+
+        const key = tabKey(pathname);
+        if (key === HOME_TAB.key) continue;
+
+        // Replace old duplicates with the most recently opened tab for that workspace.
+        byKey.delete(key);
+        byKey.set(key, { key, href, label: tabLabel(pathname) });
     }
     return Array.from(byKey.values());
 }
