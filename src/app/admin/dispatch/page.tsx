@@ -82,6 +82,7 @@ export default async function AdminDispatchPage({
         addressLine1: o.deliveryAddress.addressLine1,
         addressLine2: o.deliveryAddress.addressLine2,
         requestedDeliveryDate: o.requestedDeliveryDate?.toISOString() ?? null,
+        sameDayDelivery: o.sameDayDelivery,
         itemSummary: o.items
             .map((it) => `${it.product.productName} ${it.requestedQuantity}${it.unit}`)
             .join(', '),

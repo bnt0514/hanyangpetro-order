@@ -25,6 +25,7 @@ import { hanwhaDispatchCompletionStatus, hanwhaDriverInfo, extractHanwhaDriverFi
 import { isSameQuantity, matchProductToMaterial } from '@/lib/product-matching';
 import { isDispatchDestinationMatch, normalizeDispatchDestinationText } from '@/lib/dispatch-destination-match';
 import { fmtDateTime, fmtNumber } from '@/lib/orders';
+import { isShipmentDueOnKstDate } from '@/lib/shipment-status';
 
 export interface DispatchRowVM {
     id: string;
@@ -64,6 +65,7 @@ export interface MatchCandidateVM {
     addressLine1: string;
     addressLine2: string | null;
     requestedDeliveryDate: string | null;
+    sameDayDelivery: boolean;
     itemSummary: string;
     items: MatchCandidateItemVM[];
 }
@@ -583,9 +585,13 @@ function scoreAutoMatch(
 
     if (itemHits.length === 0) return null;
 
-    const deliveryDate = order.requestedDeliveryDate?.slice(0, 10) ?? null;
-    const dateExact = deliveryDate === dispatchDate;
-    if (!dateExact) return null;
+    const shipmentDateExact = order.requestedDeliveryDate
+        ? isShipmentDueOnKstDate({
+            requestedDeliveryDate: new Date(order.requestedDeliveryDate),
+            sameDayDelivery: order.sameDayDelivery,
+        }, dispatchDate)
+        : false;
+    if (!shipmentDateExact) return null;
     const bestItem = itemHits[0];
     const addressScore = chemcoSecondFactoryNameHit
         ? 80
@@ -597,7 +603,7 @@ function scoreAutoMatch(
     return {
         order,
         score,
-        reason: `${chemcoSecondFactoryNameHit ? '켐코정밀 2공장 도착지명 일치, ' : ''}${dateExact ? '도착일 일치' : '도착일 불일치'}, ${bestItem.reason}`,
+        reason: `${chemcoSecondFactoryNameHit ? '켐코정밀 2공장 도착지명 일치, ' : ''}출고일 일치, ${bestItem.reason}`,
     };
 }
 

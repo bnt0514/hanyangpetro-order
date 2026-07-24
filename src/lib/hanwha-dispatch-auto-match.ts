@@ -8,7 +8,7 @@ import {
 import { ORDER_STATUS } from '@/lib/orders';
 import { isSameQuantity, matchProductToMaterial } from '@/lib/product-matching';
 import { syncOrderWarehouseStockMovements } from '@/lib/warehouse-stock-sync';
-import { dispatchCompletedStatusForOrder } from '@/lib/shipment-status';
+import { dispatchCompletedStatusForOrder, isShipmentDueOnKstDate } from '@/lib/shipment-status';
 
 type MatchMode = 'AUTO' | 'MANUAL';
 
@@ -42,10 +42,6 @@ function dateToKstIso(date: Date) {
     }).formatToParts(date);
     const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
     return `${values.year}-${values.month}-${values.day}`;
-}
-
-function sameIsoDate(date: Date | null, isoDate: string) {
-    return date?.toISOString().slice(0, 10) === isoDate;
 }
 
 export async function applyHanwhaDispatchMatch({
@@ -172,13 +168,14 @@ function scoreAutoMatch(
         customer: { companyName: string };
         deliveryAddress: { label: string; addressLine1: string; addressLine2: string | null };
         requestedDeliveryDate: Date | null;
+        sameDayDelivery: boolean;
         items: Array<{ requestedQuantity: number; product: { productName: string; productCode: string } }>;
         dispatches: Array<{ hanwhaMaterialName: string | null; hanwhaMaterialNameRaw: string | null; hanwhaQuantityTon: number | null }>;
     },
     row: { indoChiName: string; materialName: string | null; materialNameRaw: string | null; quantityKg: number | null },
     dispatchDate: string,
 ) {
-    if (!sameIsoDate(order.requestedDeliveryDate, dispatchDate)) return null;
+    if (!isShipmentDueOnKstDate(order, dispatchDate)) return null;
 
     const keywords = row.indoChiName
         .split(/[\s,./()\[\]]/)
